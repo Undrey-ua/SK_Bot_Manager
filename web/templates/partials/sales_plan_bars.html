@@ -1,0 +1,24 @@
+<div class="sales-plan-bars">
+  {% for row in sales_plan_progress %}
+  {% set bar_pct = row.pct if row.pct <= 100 else 100 %}
+  <div class="sales-plan-bar">
+    <div class="sales-plan-bar__header">
+      <span class="sales-plan-bar__name">{{ row.manager_name }}</span>
+      <span class="sales-plan-bar__meta">
+        {{ format_qty(row.actual, decimals=1) }}
+        {% if row.target %}
+        / {{ format_qty(row.target, decimals=0) }} кв. м
+        {% else %}
+        / — кв. м
+        {% endif %}
+        · <strong>{{ row.pct }}%</strong>
+      </span>
+    </div>
+    <div class="sales-plan-bar__track" role="progressbar" aria-valuenow="{{ row.pct }}" aria-valuemin="0" aria-valuemax="100">
+      <div class="sales-plan-bar__fill{% if row.pct >= 100 %} sales-plan-bar__fill--done{% elif row.pct >= 75 %} sales-plan-bar__fill--good{% endif %}" style="width: {{ bar_pct }}%"></div>
+    </div>
+  </div>
+  {% else %}
+  <p class="muted">Немає менеджерів для відображення плану.</p>
+  {% endfor %}
+</div>

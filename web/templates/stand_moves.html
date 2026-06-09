@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Переміщення стендів — SK Bot Manager{% endblock %}
+{% block content %}
+<header class="page-header page-header--row">
+  <div>
+    <h1 class="page-title">Історія операцій зі стендами</h1>
+    <p class="page-subtitle">Переміщення, склад і списання стендів</p>
+  </div>
+  <div class="page-actions stands-actions">
+    {% if can_operate_stand_warehouse %}
+    <button type="button" class="btn btn-primary" data-open-stand-move>Перемістити</button>
+    <button type="button" class="btn btn-secondary" data-open-stand-to-warehouse>На склад</button>
+    <button type="button" class="btn btn-secondary" data-open-stand-from-warehouse>Зі складу</button>
+    <button type="button" class="btn btn-danger" data-open-stand-writeoff>Списати</button>
+    {% endif %}
+    <a href="/stands/warehouse" class="btn btn-secondary">Віртуальний склад</a>
+  </div>
+</header>
+
+<form class="filters filters--compact clients-filters" method="get" action="/stands/moves">
+  {% if can_filter_managers %}
+  <label class="filters__field--manager">
+    Менеджер
+    <select name="manager_id" onchange="this.form.submit()">
+      <option value="">Усі</option>
+      {% for m in managers %}
+      <option value="{{ m.id }}" {% if selected_manager_id == m.id %}selected{% endif %}>{{ m.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  {% endif %}
+  <label>Рік
+    <select name="year" onchange="this.form.submit()">
+      {% for y in range(2020, 2031) %}
+      <option value="{{ y }}" {% if year == y %}selected{% endif %}>{{ y }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Місяць
+    <select name="month" onchange="this.form.submit()">
+      {% for num, name in uk_months %}
+      <option value="{{ num }}" {% if month == num %}selected{% endif %}>{{ name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="filters__field--region">
+    Область
+    <select name="region_id" onchange="this.form.submit()">
+      <option value="">Усі</option>
+      {% for region_id, region_name in filter_regions %}
+      <option value="{{ region_id }}" {% if selected_region_id == region_id %}selected{% endif %}>{{ region_name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="filters__field--city">
+    Місто
+    <select name="city" onchange="this.form.submit()">
+      <option value="">Усі</option>
+      {% for city_name in filter_cities %}
+      <option value="{{ city_name }}" {% if selected_city == city_name %}selected{% endif %}>{{ city_name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="filters__field--stand">
+    Стенд
+    <select name="stand_id" onchange="this.form.submit()">
+      <option value="">Усі</option>
+      {% for sid, sname in filter_stands %}
+      <option value="{{ sid }}" {% if selected_stand_id == sid %}selected{% endif %}>{{ sname }}</option>
+      {% endfor %}
+    </select>
+  </label>
+</form>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Дата</th>
+          {% if can_filter_managers %}<th>Менеджер</th>{% endif %}
+          <th>Операція</th>
+          <th>Звідки</th>
+          <th>Куди</th>
+          <th>Стенд</th>
+          <th>К-сть</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        {% set t = row.transfer %}
+        <tr{% if t.operation == 'write_off' %} class="row-writeoff"{% elif t.operation in ('allocate', 'to_warehouse', 'from_warehouse') %} class="row-warehouse"{% endif %}>
+          <td>{{ format_dt(t.created_at) }}</td>
+          {% if can_filter_managers %}<td>{{ t.manager.name if t.manager else '—' }}</td>{% endif %}
+          <td>{{ stand_transfer_operation_label(t.operation) }}</td>
+          <td>
+            <strong>{{ row.from_label }}</strong>
+            {% if row.from_city %}<br><span class="muted">{{ row.from_oblast }} · {{ row.from_city }}</span>{% endif %}
+          </td>
+          <td>
+            <strong>{{ row.to_label }}</strong>
+            {% if t.to_was_new %}<span class="badge badge-new">нова ТТ</span>{% endif %}
+            {% if row.to_city %}<br><span class="muted">{{ row.to_oblast }} · {{ row.to_city }}</span>{% endif %}
+            {% if t.note and t.operation in ('write_off', 'to_warehouse', 'allocate') %}<br><span class="muted">{{ t.note }}</span>{% endif %}
+          </td>
+          <td>{{ t.stand.name if t.stand else '—' }}</td>
+          <td>{{ t.quantity }} шт</td>
+        </tr>
+        {% else %}
+        <tr class="empty-row"><td colspan="{% if can_filter_managers %}7{% else %}6{% endif %}">Немає операцій за обраний період</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% include "partials/stand_move_modal.html" %}
+{% endblock %}
+{% block scripts %}
+<script src="/static/stands.js"></script>
+{% endblock %}

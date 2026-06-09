@@ -1,33 +1,57 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from database.models import TASK_LABELS, VISIT_TYPE_LABELS, Client, TaskType, VisitType
+from bot.utils.roles import is_sales_manager
+from database.models import VISIT_TYPE_LABELS, Client, ManagerRegion, User, VisitType
 
 
-def main_menu_keyboard() -> InlineKeyboardMarkup:
+def main_menu_keyboard(user: User | None = None) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
+    if user is not None and is_sales_manager(user):
+        builder.row(
+            InlineKeyboardButton(text="💰 Додати продаж", callback_data="sale:new"),
+            InlineKeyboardButton(text="📦 Резерви", callback_data="reserve:hub"),
+        )
+        return builder.as_markup()
+
     builder.row(
-        InlineKeyboardButton(text="📋 Мої клієнти", callback_data="clients:list"),
+        InlineKeyboardButton(text="👤 Клієнти", callback_data="clients:hub"),
+        InlineKeyboardButton(text="➕ Новий візит", callback_data="visit:new"),
     )
     builder.row(
-        InlineKeyboardButton(text="➕ Новий візит", callback_data="visit:new"),
+        InlineKeyboardButton(text="💰 Додати продаж", callback_data="sale:new"),
+        InlineKeyboardButton(text="📦 Резерви", callback_data="reserve:hub"),
+    )
+    builder.row(
+        InlineKeyboardButton(text="📝 Мої завдання", callback_data="tasks:hub"),
     )
     return builder.as_markup()
 
 
-def clients_keyboard(clients: list[Client]) -> InlineKeyboardMarkup:
+def visit_regions_keyboard(regions: list[ManagerRegion]) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    for client in clients:
-        label = client.name
-        if client.district:
-            label = f"{client.name} ({client.district})"
+    for region in regions:
         builder.row(
             InlineKeyboardButton(
-                text=label,
+                text=region.name,
+                callback_data=f"visit:pick_region:{region.id}",
+            )
+        )
+    builder.row(InlineKeyboardButton(text="◀️ Меню", callback_data="menu:main"))
+    return builder.as_markup()
+
+
+def visit_clients_keyboard(clients: list[Client]) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for client in clients:
+        builder.row(
+            InlineKeyboardButton(
+                text=client.name[:60],
                 callback_data=f"visit:client:{client.id}",
             )
         )
-    builder.row(InlineKeyboardButton(text="◀️ Назад", callback_data="menu:main"))
+    builder.row(InlineKeyboardButton(text="◀️ Області", callback_data="visit:back:regions"))
+    builder.row(InlineKeyboardButton(text="◀️ Меню", callback_data="menu:main"))
     return builder.as_markup()
 
 
@@ -44,14 +68,17 @@ def visit_type_keyboard() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def tasks_keyboard(selected: set[str]) -> InlineKeyboardMarkup:
+def tasks_keyboard(
+    selected: set[str],
+    task_types: list[tuple[str, str]],
+) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    for task in TaskType:
-        checked = "✅" if task.value in selected else "⬜"
+    for code, label in task_types:
+        checked = "✅" if code in selected else "⬜"
         builder.row(
             InlineKeyboardButton(
-                text=f"{checked} {TASK_LABELS[task]}",
-                callback_data=f"visit:task:{task.value}",
+                text=f"{checked} {label}",
+                callback_data=f"visit:task:{code}",
             )
         )
     builder.row(
@@ -65,9 +92,14 @@ def tasks_keyboard(selected: set[str]) -> InlineKeyboardMarkup:
 
 def photos_keyboard(photo_count: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
+    finish_label = (
+        f"✅ Завершити ({photo_count} фото)"
+        if photo_count
+        else "✅ Завершити без фото"
+    )
     builder.row(
         InlineKeyboardButton(
-            text=f"✅ Завершити ({photo_count} фото)",
+            text=finish_label,
             callback_data="visit:photos:done",
         )
     )

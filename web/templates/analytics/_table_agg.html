@@ -1,0 +1,12 @@
+<table>
+  <thead>
+    <tr><th>Назва</th><th>Кількість ({{ agg_unit|default('кв. м') }})</th></tr>
+  </thead>
+  <tbody>
+    {% for r in rows %}
+    <tr><td>{{ r.label }}</td><td>{% if agg_unit == 'шт' %}{{ r.value|int }}{% else %}{{ format_qty(r.value, decimals=2) }}{% endif %}</td></tr>
+    {% else %}
+    <tr><td colspan="2">Немає даних</td></tr>
+    {% endfor %}
+  </tbody>
+</table>

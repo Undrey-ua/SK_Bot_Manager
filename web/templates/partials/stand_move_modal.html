@@ -1,0 +1,90 @@
+{% if client_stands_json is defined %}
+<script type="application/json" id="client-stands-json">{{ client_stands_json | safe }}</script>
+{% endif %}
+{% if warehouse_stands_json is defined %}
+<script type="application/json" id="warehouse-stands-json">{{ warehouse_stands_json | safe }}</script>
+{% endif %}
+<div class="modal" id="stand-move-modal" hidden>
+  <div class="modal__backdrop" data-close-modal></div>
+  <div class="modal__dialog" role="dialog" aria-labelledby="stand-move-title">
+    <header class="modal__header">
+      <h2 id="stand-move-title">Операція зі стендом</h2>
+      <button type="button" class="modal__close" data-close-modal aria-label="Закрити">×</button>
+    </header>
+    <p class="modal__hint muted" id="move-hint">Знімає стенд у відправника й додає отримувачу.</p>
+    <form id="stand-move-form" class="stand-move-form">
+      {% if warehouse_manager_id is defined %}
+      <input type="hidden" name="manager_id" id="warehouse-manager-id" value="{{ warehouse_manager_id }}">
+      {% endif %}
+      <label id="move-operation-label">Операція
+        <select name="operation" id="move-operation">
+          <option value="move">Перемістити між ТТ</option>
+          <option value="to_warehouse">З ТТ на склад</option>
+          <option value="from_warehouse">Зі складу на ТТ</option>
+          <option value="write_off">Списати</option>
+        </select>
+      </label>
+      <label id="move-from-label">Від кого (ТТ)
+        <select name="from_client_id" id="move-from" required>
+          <option value="">Оберіть ТТ</option>
+          {% for c in move_clients %}
+          <option value="{{ c.id }}">{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Стенд
+        <select name="stand_id" id="move-stand" required>
+          <option value="">Оберіть стенд</option>
+          {% for sid, sname in filter_stands %}
+          <option value="{{ sid }}">{{ sname }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Кількість
+        <input type="number" name="quantity" id="move-qty" value="1" min="1" step="1" required>
+      </label>
+      <div id="move-recipient-block">
+        <label>Отримувач
+          <select name="to_kind" id="move-target-kind">
+            <option value="existing">Існуючий клієнт</option>
+            <option value="new">Нова торгова точка</option>
+          </select>
+        </label>
+        <div id="move-existing-block">
+          <label>Клієнт
+            <select name="to_client_id" id="move-target-shop">
+              <option value="">Оберіть ТТ</option>
+              {% for c in move_clients %}
+              <option value="{{ c.id }}">{{ c.name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+        </div>
+        <div id="move-new-block" hidden>
+          <label>Назва нової ТТ
+            <input type="text" name="new_name" id="move-new-name">
+          </label>
+          <label>Адреса
+            <input type="text" name="new_address" id="move-new-address">
+          </label>
+          <label>Місто
+            <input type="text" name="new_city" id="move-new-city">
+          </label>
+          <label>Область
+            <input type="text" name="new_oblast" id="move-new-oblast">
+          </label>
+        </div>
+      </div>
+      <div id="move-writeoff-block" hidden>
+        <label>Коментар (необовʼязково)
+          <input type="text" name="note" id="move-note" placeholder="Напр. застаріла марка, демонтаж">
+        </label>
+      </div>
+      <p class="modal__error" id="move-error" hidden></p>
+      <div class="modal__actions">
+        <button type="button" class="btn btn-secondary" data-close-modal>Скасувати</button>
+        <button type="submit" class="btn btn-primary" id="move-submit-btn">Виконати</button>
+      </div>
+    </form>
+  </div>
+</div>

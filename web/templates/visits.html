@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Візити — SK Bot Manager{% endblock %}
+{% block content %}
+<header class="page-header">
+  <h1 class="page-title">{% if can_filter_managers %}Візити менеджерів{% else %}Мої візити{% endif %}</h1>
+  <p class="page-subtitle">{% if can_filter_managers %}Останні звіти з полів — фільтруйте за менеджером{% else %}Останні звіти з полів{% endif %}</p>
+</header>
+
+<div class="stats">
+  <div class="stat-card">
+    <div class="label">Всього</div>
+    <div class="value">{{ stats.total }}</div>
+  </div>
+  <div class="stat-card stat-card--today">
+    <div class="label">Сьогодні</div>
+    <div class="value">{{ stats.today }}</div>
+  </div>
+  <div class="stat-card stat-card--week">
+    <div class="label">Цього тижня</div>
+    <div class="value">{{ stats.week }}</div>
+  </div>
+</div>
+
+{% if can_filter_managers %}
+<form class="filters" method="get" action="/">
+  <label>
+    Менеджер
+    <select name="manager_id" onchange="this.form.submit()">
+      <option value="">Усі</option>
+      {% for m in managers %}
+      <option value="{{ m.id }}" {% if selected_manager_id == m.id %}selected{% endif %}>
+        {{ m.name }}
+      </option>
+      {% endfor %}
+    </select>
+  </label>
+</form>
+{% endif %}
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Дата</th>
+          {% if can_filter_managers %}<th>Менеджер</th>{% endif %}
+          <th>Клієнт</th>
+          <th>Область</th>
+          <th>Тип</th>
+          <th>Задачі</th>
+          <th>Фото</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for visit in visits %}
+        <tr>
+          <td>{{ format_dt(visit.created_at) }}</td>
+          {% if can_filter_managers %}<td>{{ visit.manager.name if visit.manager else '—' }}</td>{% endif %}
+          <td>{{ visit.client.name if visit.client else '—' }}</td>
+          <td>{{ visit.client.region.name if visit.client and visit.client.region else '—' }}</td>
+          <td>
+            <span class="badge {% if visit.visit_type == 'stand' %}badge-stand{% endif %}">
+              {{ visit_type_label(visit.visit_type) }}
+            </span>
+          </td>
+          <td>
+            <div class="task-list">
+              {% for t in visit.tasks %}
+              <span class="task-chip">{{ task_label(t.task) }}</span>
+              {% endfor %}
+            </div>
+          </td>
+          <td>{{ visit.photos|length }}</td>
+          <td><a class="btn-ghost" href="/visits/{{ visit.id }}">Деталі →</a></td>
+        </tr>
+        {% else %}
+        <tr class="empty-row">
+          <td colspan="{% if can_filter_managers %}8{% else %}7{% endif %}">Візитів ще немає</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if total_pages > 1 %}
+<nav class="pagination">
+  {% if page > 1 %}
+  <a href="?page={{ page - 1 }}{% if selected_manager_id %}&manager_id={{ selected_manager_id }}{% endif %}">←</a>
+  {% endif %}
+  <span class="current">{{ page }} / {{ total_pages }}</span>
+  {% if page < total_pages %}
+  <a href="?page={{ page + 1 }}{% if selected_manager_id %}&manager_id={{ selected_manager_id }}{% endif %}">→</a>
+  {% endif %}
+</nav>
+{% endif %}
+{% endblock %}

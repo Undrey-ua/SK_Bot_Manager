@@ -1,0 +1,9 @@
+    @app.get("/analytics", response_class=HTMLResponse)
+    async def analytics_page(
+        request: Request,
+        service: AnalyticsService = Depends(analytics_service),
+        _auth: Response | None = Depends(require_auth),
+        section: str = "sales",
+        period_kind: str = "month",
+        compare_kind: str = "month",
+    ) -> HTMLResponse:

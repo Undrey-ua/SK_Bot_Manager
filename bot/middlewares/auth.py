@@ -23,6 +23,7 @@ class AuthMiddleware(BaseMiddleware):
         telegram_user = data.get("event_from_user")
 
         if telegram_user is None:
+            data["db_user"] = None
             return await handler(event, data)
 
         db_user = await user_service.get_by_telegram_id(telegram_user.id)

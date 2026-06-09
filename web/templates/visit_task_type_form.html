@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{% if task_type %}Редагувати{% else %}Нова{% endif %} задача візиту — SK Bot Manager{% endblock %}
+{% block content %}
+<nav class="breadcrumb">
+  <a href="/admin/visit-tasks">Задачі візитів</a>
+  <span class="breadcrumb-sep">/</span>
+  <span>{% if task_type %}{{ task_type.label }}{% else %}Нова{% endif %}</span>
+</nav>
+
+<div class="card card--compact-form">
+  <h2>{% if task_type %}Редагувати задачу{% else %}Нова задача{% endif %}</h2>
+  <form method="post" action="{{ form_action }}" class="client-web-form">
+    <label>Назва (як у боті)
+      <input type="text" name="label" required value="{{ form_label }}">
+    </label>
+    {% if task_type %}
+    <label>Код
+      <input type="text" value="{{ form_code }}" disabled>
+    </label>
+    <label class="tasks-filters__checkbox">
+      <input type="checkbox" name="is_active" value="1" {% if form_is_active %}checked{% endif %}>
+      Активна (показувати в боті)
+    </label>
+    {% else %}
+    <label>Код (необовʼязково)
+      <input type="text" name="code" value="{{ form_code }}" placeholder="автоматично з назви">
+    </label>
+    {% endif %}
+    <label>Порядок у списку
+      <input type="number" name="sort_order" value="{{ form_sort_order }}" min="0" step="1">
+    </label>
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">{{ submit_label }}</button>
+      <a href="/admin/visit-tasks" class="btn btn-secondary">Скасувати</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

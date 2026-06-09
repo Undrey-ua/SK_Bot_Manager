@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Клієнти — SK Bot Manager{% endblock %}
+{% block content %}
+<header class="page-header">
+  <h1 class="page-title">Клієнти</h1>
+  <p class="page-subtitle">
+    База торгових точок
+    {% if has_filters %}
+    — показано {{ clients|length }} з {{ clients_total }}
+    {% else %}
+    — {{ clients_total }} торгових точок
+    {% endif %}
+  </p>
+</header>
+
+{% if not is_leader %}
+<div class="page-actions">
+  <a href="/clients/new" class="btn btn-primary">+ Новий клієнт</a>
+</div>
+{% endif %}
+
+<form class="filters filters--compact clients-filters" method="get" action="/clients">
+  {% if can_filter_managers %}
+  <label class="filters__field--manager">
+    Менеджер
+    <select name="manager_id" onchange="this.form.submit()">
+      <option value="">Усі</option>
+      {% for m in managers %}
+      <option value="{{ m.id }}" {% if selected_manager_id == m.id %}selected{% endif %}>
+        {{ m.name }}
+      </option>
+      {% endfor %}
+    </select>
+  </label>
+  {% endif %}
+  <label class="filters__field--region">
+    Область
+    <select name="region_id" onchange="this.form.submit()">
+      <option value="">Усі області</option>
+      {% for region_id, region_name in filter_regions %}
+      <option value="{{ region_id }}" {% if selected_region_id == region_id %}selected{% endif %}>{{ region_name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="filters__field--city">
+    Місто
+    <select name="city" onchange="this.form.submit()">
+      <option value="">Усі міста</option>
+      {% for city_name in filter_cities %}
+      <option value="{{ city_name }}" {% if selected_city == city_name %}selected{% endif %}>{{ city_name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="filters__field--stand">
+    Стенд
+    <select name="stand_id" onchange="this.form.submit()">
+      <option value="">Усі стенди</option>
+      {% for stand_id, stand_name in filter_stands %}
+      <option value="{{ stand_id }}" {% if selected_stand_id == stand_id %}selected{% endif %}>{{ stand_name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  {% if has_filters %}
+  <a href="/clients" class="btn btn-secondary btn-sm clients-filters__reset">Скинути</a>
+  {% endif %}
+</form>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Назва</th>
+          {% if can_filter_managers %}<th>Менеджер</th>{% endif %}
+          <th>Область</th>
+          <th>Місто</th>
+          <th>Адреса</th>
+          <th>Стенди</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for client in clients %}
+        <tr>
+          <td><a href="/clients/{{ client.id }}"><strong>{{ client.name }}</strong></a></td>
+          {% if can_filter_managers %}<td>{{ client.manager.name if client.manager else '—' }}</td>{% endif %}
+          <td>{{ client.region.name if client.region else '—' }}</td>
+          <td>{{ client_city(client) }}</td>
+          <td>{{ client.address }}</td>
+          <td>{{ client_stands(client) }}</td>
+          <td><a class="btn-ghost" href="/clients/{{ client.id }}">Картка →</a></td>
+        </tr>
+        {% else %}
+        <tr class="empty-row">
+          <td colspan="{% if can_filter_managers %}7{% else %}6{% endif %}">
+            {% if has_filters %}Клієнтів за обраними фільтрами не знайдено{% else %}Клієнтів ще немає{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

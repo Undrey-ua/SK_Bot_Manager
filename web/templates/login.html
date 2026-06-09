@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Вхід — SK Bot Manager</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="login-page">
+    <div class="login-brand">
+      <div class="login-brand-inner">
+        <div class="brand-mark">SK</div>
+        <h1>Контроль роботи менеджерів у реальному часі</h1>
+        <p>Візити, клієнти, аналітика, стенди та резерви — у одній панелі.</p>
+      </div>
+    </div>
+    <div class="login-form-wrap">
+      <div class="login-card">
+        <h2>Вхід</h2>
+        <p class="subtitle">Окремі облікові дані для керівника та менеджерів</p>
+        {% if error == '1' %}
+        <p class="error">Невірний пароль.</p>
+        {% elif error == 'manager_telegram' %}
+        <p class="error">Для менеджера обовʼязковий Telegram ID. Вхід лише паролем — лише для керівника.</p>
+        {% elif error == 'telegram' %}
+        <p class="error">Невірний формат Telegram ID.</p>
+        {% elif error == 'unknown' %}
+        <p class="error">Користувача з таким Telegram ID не знайдено в системі.</p>
+        {% elif error == 'no_supervisor' %}
+        <p class="error">Для менеджера збуту не налаштовано регіонального менеджера (supervisor_id).</p>
+        {% elif error == 'no_admin' %}
+        <p class="error">Немає облікового запису керівника. Увійдіть з Telegram ID менеджера.</p>
+        {% elif error == 'session' %}
+        <p class="error">Сесію завершено. Увійдіть знову.</p>
+        {% endif %}
+        <form method="post" action="/login">
+          <label for="password">Пароль</label>
+          <input type="password" id="password" name="password" required placeholder="••••••••">
+          <label for="telegram_id">Telegram ID <span class="muted">(менеджер)</span></label>
+          <input type="text" id="telegram_id" name="telegram_id" inputmode="numeric" placeholder="Напр. 123456789">
+          <p class="login-hint muted">Керівник: пароль керівника, поле Telegram залишити порожнім. Менеджер: спільний пароль команди + свій Telegram ID з бота.</p>
+          <button type="submit">Увійти</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

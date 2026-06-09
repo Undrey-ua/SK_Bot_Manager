@@ -4,7 +4,8 @@ CREATE TABLE IF NOT EXISTS users (
     id BIGSERIAL PRIMARY KEY,
     telegram_id BIGINT NOT NULL UNIQUE,
     name VARCHAR(255) NOT NULL,
-    role VARCHAR(50) NOT NULL DEFAULT 'manager'
+    role VARCHAR(50) NOT NULL DEFAULT 'manager',
+    supervisor_id BIGINT REFERENCES users(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS clients (

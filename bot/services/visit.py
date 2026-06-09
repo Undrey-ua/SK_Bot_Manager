@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from database.models import Visit
 from database.repositories.visit import VisitRepository
 

@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Користувачі — SK Bot Manager{% endblock %}
+{% block content %}
+<header class="page-header page-header--row">
+  <div>
+    <h1 class="page-title">Користувачі</h1>
+    <p class="page-subtitle">Облікові записи бота та веб-панелі. Для регіонального менеджера — підлеглі менеджери зі збуту; для менеджера зі збуту — його регіональний керівник.</p>
+  </div>
+  <a href="/admin/users/new" class="btn btn-primary">+ Додати користувача</a>
+</header>
+
+{% if created %}
+<p class="notice notice--success">Користувача додано. Він може увійти в бот після /start і в панель за паролем команди + Telegram ID.</p>
+{% endif %}
+{% if updated %}
+<p class="notice notice--success">Зміни збережено.</p>
+{% endif %}
+{% if deleted %}
+<p class="notice notice--success">Користувача видалено.</p>
+{% endif %}
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>ПІБ</th>
+          <th>Telegram ID</th>
+          <th>Роль</th>
+          <th>Менеджер зі збуту</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td><strong>{{ u.name }}</strong></td>
+          <td><code>{{ u.telegram_id }}</code></td>
+          <td>{{ user_roles_display(u) }}</td>
+          <td>
+            {% if u.role == 'sales_manager' and u.supervisor %}
+            <span class="muted">Регіональний:</span> {{ u.supervisor.name }}
+            {% elif is_regional_manager(u) and u.role != 'sales_manager' %}
+            {% set team = sales_team.get(u.id, []) %}
+            {% if team %}
+            {{ team | map(attribute='name') | join(', ') }}
+            {% else %}
+            <span class="muted">—</span>
+            {% endif %}
+            {% else %}
+            <span class="muted">—</span>
+            {% endif %}
+          </td>
+          <td class="table-actions">
+            <a href="/admin/users/{{ u.id }}/edit" class="btn btn-secondary btn-sm">Редагувати</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr class="empty-row"><td colspan="5">Немає користувачів</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

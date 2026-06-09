@@ -1,0 +1,12 @@
+<table>
+  <thead>
+    <tr><th>Назва</th><th>Працювало</th><th>Деталі</th></tr>
+  </thead>
+  <tbody>
+    {% for r in rows %}
+    <tr><td>{{ r.label }}</td><td>{{ r.value }}</td><td>{{ r.extra }}</td></tr>
+    {% else %}
+    <tr><td colspan="3">Немає даних</td></tr>
+    {% endfor %}
+  </tbody>
+</table>

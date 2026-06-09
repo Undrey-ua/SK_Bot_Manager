@@ -1,0 +1,40 @@
+<div class="modal" id="sale-modal" hidden>
+  <div class="modal__backdrop" data-close-modal></div>
+  <div class="modal__dialog" role="dialog" aria-labelledby="sale-modal-title">
+    <header class="modal__header">
+      <h2 id="sale-modal-title">Додати продаж</h2>
+      <button type="button" class="modal__close" data-close-modal aria-label="Закрити">×</button>
+    </header>
+    <p class="modal__hint muted">Область → клієнт (ТТ) → бренд → кількість → коментар (необовʼязково)</p>
+    <form method="post" action="/sales/new" id="sale-form" class="stand-move-form">
+      <input type="hidden" name="sold_at" id="sale-sold-at" value="{{ sale_default_sold_at }}">
+      <input type="hidden" name="return_url" id="sale-return-url" value="{{ sales_return_url }}">
+      <label>Область
+        <select id="sale-region" required>
+          <option value="">Завантаження…</option>
+        </select>
+      </label>
+      <label>Клієнт (ТТ)
+        <select name="client_id" id="sale-client" required disabled>
+          <option value="">Спочатку оберіть область</option>
+        </select>
+      </label>
+      <label>Торгова марка
+        <select name="brand_id" id="sale-brand" required disabled>
+          <option value="">Спочатку оберіть клієнта</option>
+        </select>
+      </label>
+      <label>Кількість, кв. м
+        <input type="text" name="quantity" id="sale-quantity" required inputmode="decimal" placeholder="12.5">
+      </label>
+      <label>Коментар
+        <textarea name="comment" id="sale-comment" rows="2" placeholder="Необовʼязково"></textarea>
+      </label>
+      <p class="modal__error" id="sale-error" hidden></p>
+      <div class="modal__actions">
+        <button type="button" class="btn btn-secondary" data-close-modal>Скасувати</button>
+        <button type="submit" class="btn btn-primary" id="sale-submit">Зберегти</button>
+      </div>
+    </form>
+  </div>
+</div>

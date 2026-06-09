@@ -1,0 +1,576 @@
+{% extends "base.html" %}
+{% block title %}Аналітика — SK Bot Manager{% endblock %}
+{% block content %}
+<header class="page-header">
+  <h1 class="page-title">Аналітика</h1>
+  <p class="page-subtitle">Продажі та стенди</p>
+</header>
+
+<form class="filters{% if section in ('stands', 'sales') %} filters--compact{% endif %}" method="get">
+  <input type="hidden" name="section" value="{{ section }}">
+  {% if section == 'sales' %}
+  <label>
+    Період
+    <select name="period_kind" onchange="this.form.submit()">
+      <option value="month" {% if period_kind == 'month' %}selected{% endif %}>Місяць</option>
+      <option value="quarter" {% if period_kind == 'quarter' %}selected{% endif %}>Квартал</option>
+      <option value="year" {% if period_kind == 'year' %}selected{% endif %}>Рік</option>
+    </select>
+  </label>
+  <label>
+    Рік
+    <select name="year" onchange="this.form.submit()">
+      {% for y in range(2020, 2031) %}
+      <option value="{{ y }}" {% if year == y %}selected{% endif %}>{{ y }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  {% if period_kind == 'month' %}
+  <label>
+    Місяць
+    <select name="month" onchange="this.form.submit()">
+      {% for num, name in uk_months %}
+      <option value="{{ num }}" {% if month == num %}selected{% endif %}>{{ name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  {% endif %}
+  {% if period_kind == 'quarter' %}
+  <label>
+    Квартал
+    <select name="quarter" onchange="this.form.submit()">
+      {% for q in range(1, 5) %}
+      <option value="{{ q }}" {% if quarter == q %}selected{% endif %}>Q{{ q }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  {% endif %}
+  {% if can_filter_managers %}
+  <label class="filters__field--manager">
+    Менеджер
+    <select name="manager_id" onchange="this.form.submit()">
+      <option value="">Усі</option>
+      {% for m in managers %}
+      <option value="{{ m.id }}" {% if selected_manager_id == m.id %}selected{% endif %}>{{ m.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  {% endif %}
+  <label class="filters__field--region">
+    Область
+    <select name="region_id" onchange="this.form.submit()">
+      <option value="">Усі області</option>
+      {% for region_id, region_name in filter_regions %}
+      <option value="{{ region_id }}" {% if selected_region_id == region_id %}selected{% endif %}>{{ region_name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="filters__field--city">
+    Місто
+    <select name="city" onchange="this.form.submit()">
+      <option value="">Усі міста</option>
+      {% for city_name in filter_cities %}
+      <option value="{{ city_name }}" {% if selected_city == city_name %}selected{% endif %}>{{ city_name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="filters__field--stand">
+    Стенд
+    <select name="stand_id" onchange="this.form.submit()">
+      <option value="">Усі стенди</option>
+      {% for sid, sname in filter_stands %}
+      <option value="{{ sid }}" {% if selected_stand_id == sid %}selected{% endif %}>{{ sname }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="filters__field--brand">
+    Торгова марка
+    <select name="brand_id" onchange="this.form.submit()">
+      <option value="">Усі марки</option>
+      {% for bid, bname in filter_brands %}
+      <option value="{{ bid }}" {% if selected_brand_id == bid %}selected{% endif %}>{{ bname }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  {% if sales_has_filters %}
+  <a href="/analytics?section=sales&amp;period_kind={{ period_kind }}&amp;year={{ year }}{% if period_kind == 'month' %}&amp;month={{ month }}{% endif %}{% if period_kind == 'quarter' %}&amp;quarter={{ quarter }}{% endif %}" class="btn btn-secondary btn-sm clients-filters__reset">Скинути</a>
+  {% endif %}
+  {% else %}
+  {% if can_filter_managers %}
+  <label class="filters__field--manager">
+    Менеджер
+    <select name="manager_id" onchange="this.form.submit()">
+      <option value="">Усі</option>
+      {% for m in managers %}
+      <option value="{{ m.id }}" {% if selected_manager_id == m.id %}selected{% endif %}>{{ m.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  {% endif %}
+  <label class="filters__field--region">
+    Область
+    <select name="region_id" onchange="this.form.submit()">
+      <option value="">Усі області</option>
+      {% for region_id, region_name in filter_regions %}
+      <option value="{{ region_id }}" {% if selected_region_id == region_id %}selected{% endif %}>{{ region_name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="filters__field--city">
+    Місто
+    <select name="city" onchange="this.form.submit()">
+      <option value="">Усі міста</option>
+      {% for city_name in filter_cities %}
+      <option value="{{ city_name }}" {% if selected_city == city_name %}selected{% endif %}>{{ city_name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="filters__field--stand">
+    Стенд
+    <select name="stand_id" onchange="this.form.submit()">
+      <option value="">Усі стенди</option>
+      {% for stand_id, stand_name in filter_stands %}
+      <option value="{{ stand_id }}" {% if selected_stand_id == stand_id %}selected{% endif %}>{{ stand_name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  {% if stands_has_filters %}
+  <a href="/analytics?section=stands" class="btn btn-secondary btn-sm clients-filters__reset">Скинути</a>
+  {% endif %}
+  {% endif %}
+  <button type="submit">Оновити</button>
+</form>
+
+{% if section == 'sales' %}
+<div class="page-actions sales-actions">
+  <p class="muted sales-actions__summary">Період: <strong>{{ period_label }}</strong> · Всього: <strong>{{ total_sales }} кв. м</strong>{% if sales_has_filters %} · застосовано фільтри{% endif %}</p>
+  {% if can_create_sale %}
+  <button type="button" class="btn btn-primary" data-open-sale>+ Додати продаж</button>
+  {% endif %}
+</div>
+{% elif section == 'stands' %}
+<p class="muted">Кількість стендів у <strong>шт.</strong>{% if stands_has_filters %} · застосовано фільтри{% endif %}</p>
+{% endif %}
+
+{% if section == 'sales' %}
+{% if can_filter_managers and sales_plan_progress %}
+<section class="card">
+  <h2>Виконання плану — {{ sales_plan_month_label }} {{ year }}</h2>
+  <p class="muted">План продажів (кв. м) vs факт за обраний місяць</p>
+  {% include "partials/sales_plan_bars.html" %}
+</section>
+{% endif %}
+{% if can_filter_managers %}
+<section class="card">
+  <h2>Звіт продажів по менеджерах ({{ period_kind_label }})</h2>
+  <div class="table-wrap">
+    <table class="table--darkhead">
+      <thead>
+        <tr><th>Менеджер</th><th>Продано, кв. м</th></tr>
+      </thead>
+      <tbody>
+        {% for r in sales_by_manager %}
+        <tr><td>{{ r.label }}</td><td>{{ r.value }}</td></tr>
+        {% else %}
+        <tr class="empty-row"><td colspan="2">Немає даних</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+<section class="card">
+  <h2>По стендам (торговим маркам) — {{ period_label }}</h2>
+  <div class="table-wrap">
+    <table class="table--darkhead">
+      <thead>
+        <tr><th>Стенд (торгова марка)</th><th>Продано, кв. м</th></tr>
+      </thead>
+      <tbody>
+        {% for r in sales_by_brand %}
+        <tr><td>{{ r.label }}</td><td>{{ r.value }}</td></tr>
+        {% else %}
+        <tr class="empty-row"><td colspan="2">Немає даних</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <h2>По областях — {{ period_label }}</h2>
+  <div class="table-wrap">
+    <table class="table--darkhead">
+      <thead>
+        <tr><th>Область</th><th>Продано, кв. м</th></tr>
+      </thead>
+      <tbody>
+        {% for r in sales_by_oblast %}
+        <tr><td>{{ r.label }}</td><td>{{ r.value }}</td></tr>
+        {% else %}
+        <tr class="empty-row"><td colspan="2">Немає даних</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Торгові марки по областях — {{ period_label }}</h2>
+  <div class="table-wrap">
+    <table class="table--darkhead">
+      <thead>
+        <tr><th>Область</th><th>Торгова марка</th><th>Продано, кв. м</th></tr>
+      </thead>
+      <tbody>
+        {% for r in brands_by_oblast_rows %}
+        <tr><td>{{ r.left }}</td><td>{{ r.middle }}</td><td>{{ r.value }}</td></tr>
+        {% else %}
+        <tr class="empty-row"><td colspan="3">Немає даних</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <h2>По клієнтам — {{ period_label }}</h2>
+  <div class="table-wrap">
+    <table class="table--darkhead">
+      <thead>
+        <tr><th>Клієнт (ТТ)</th><th>Продано, кв. м</th></tr>
+      </thead>
+      <tbody>
+        {% for r in sales_by_client %}
+        <tr><td>{{ r.label }}</td><td>{{ r.value }}</td></tr>
+        {% else %}
+        <tr class="empty-row"><td colspan="2">Немає даних</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Торгові марки по містах — {{ period_label }}</h2>
+  <div class="table-wrap">
+    <table class="table--darkhead">
+      <thead>
+        <tr><th>Місто</th><th>Торгова марка</th><th>Продано, кв. м</th></tr>
+      </thead>
+      <tbody>
+        {% for r in brands_by_city_rows %}
+        <tr><td>{{ r.left }}</td><td>{{ r.middle }}</td><td>{{ r.value }}</td></tr>
+        {% else %}
+        <tr class="empty-row"><td colspan="3">Немає даних</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Продажі (матриця) — {{ period_label }}</h2>
+  <p class="matrix-legend">
+    <span class="matrix-legend__item"><span class="matrix-cell matrix-cell--sale matrix-legend__sample">12</span> продаж, кв. м</span>
+    <span class="matrix-legend__item"><span class="matrix-cell matrix-cell--no_sale matrix-legend__sample">0</span> стенд є, продажу за період немає</span>
+    <span class="matrix-legend__item"><span class="matrix-cell matrix-cell--na matrix-legend__sample">·</span> стенду у клієнта немає</span>
+  </p>
+  <div class="table-wrap matrix-wrap">
+    <table class="table--darkhead matrix-table">
+      <thead>
+        <tr>
+          <th class="sticky-col">Торгова точка</th>
+          {% for c in sales_matrix_cols %}
+          <th>
+            {{ c.label }}<br>
+            <span class="sales-matrix-th-meta">{{ c.total_points }} тт · {{ c.worked_points }} спрацювало · {{ c.pct }}%</span>
+          </th>
+          {% endfor %}
+          <th>Всього</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in sales_matrix_rows %}
+        <tr>
+          <td class="sticky-col"><strong>{{ row['client'] }}</strong></td>
+          {% for c in sales_matrix_cols %}
+          {% set cell = row.cells[c.key] %}
+          <td class="matrix-cell matrix-cell--{{ cell.kind }}">
+            {% if cell.kind == 'sale' %}{{ format_qty(cell.quantity, decimals=2) }}
+            {% elif cell.kind == 'no_sale' %}0
+            {% else %}<span class="matrix-na" aria-label="Стенду немає">·</span>{% endif %}
+          </td>
+          {% endfor %}
+          <td><strong>{% if row.total and row.total != 0 %}{{ format_qty(row.total, decimals=2) }}{% else %}0{% endif %}</strong></td>
+        </tr>
+        {% else %}
+        <tr class="empty-row"><td colspan="{{ sales_matrix_cols|length + 2 }}">Немає даних</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Журнал продажів</h2>
+  <p class="muted">
+    За період <strong>{{ period_label }}</strong>, у хронологічному порядку за часом додавання
+    (найновіші зверху). Фільтри зверху застосовуються до списку.
+  </p>
+  <div class="table-wrap">
+    <table class="table--darkhead sales-ledger-table">
+      <thead>
+        <tr>
+          <th>Дата додавання</th>
+          <th>ТТ</th>
+          <th>Бренд</th>
+          <th>Кількість, кв. м</th>
+          <th>Коментар</th>
+          {% if can_filter_managers %}<th>Менеджер</th>{% endif %}
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sale in sales_ledger %}
+        <tr>
+          <td class="col-datetime">{{ format_dt(sale.created_at) }}</td>
+          <td>
+            {% if sale.client %}
+            <a href="/clients/{{ sale.client_id }}">{{ sale.client.name }}</a>
+            {% else %}—{% endif %}
+          </td>
+          <td>{{ sale.brand.name if sale.brand else '—' }}</td>
+          <td>{{ format_qty(sale.quantity, decimals=2) }}</td>
+          <td>{{ sale.comment or '—' }}</td>
+          {% if can_filter_managers %}<td>{{ sale.manager.name if sale.manager else '—' }}</td>{% endif %}
+          <td class="sales-ledger-actions">
+            {% if can_manage_sale(current_user, sale.manager_id) %}
+            <a class="btn-ghost btn-sm" href="/sales/{{ sale.id }}/edit?return_url={{ sales_return_url | urlencode }}">Редагувати</a>
+            <form method="post" action="/sales/{{ sale.id }}/delete" class="sales-ledger-delete" onsubmit="return confirm('Видалити цей продаж?');">
+              <input type="hidden" name="return_url" value="{{ sales_return_url }}">
+              <button type="submit" class="btn-ghost btn-sm btn-ghost--danger">Видалити</button>
+            </form>
+            {% else %}
+            <span class="muted">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr class="empty-row">
+          <td colspan="{% if can_filter_managers %}7{% else %}6{% endif %}">Немає продажів за обраний період і фільтри</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Стенди без продажів (3 та 6 місяців)</h2>
+  <p class="muted">
+    Встановлені стенди з карток клієнтів, по яких не було продажів за
+    <strong>останні 3 міс.</strong> ({{ stands_not_worked_count_3 }} поз.) та
+    <strong>останні 6 міс.</strong> ({{ stands_not_worked_count_6 }} поз.).
+    Фільтри зверху застосовуються до цієї таблиці (крім торгової марки).
+  </p>
+  <div class="table-wrap">
+    <table class="table--darkhead">
+      <thead>
+        <tr>
+          <th>Період</th>
+          <th>Торгова марка (стенд)</th>
+          <th>Клієнт (ТТ)</th>
+          <th>К-сть</th>
+          {% if can_filter_managers %}<th>Менеджер</th>{% endif %}
+          <th>Область</th>
+          <th>Місто</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in stands_not_worked_rows %}
+        <tr>
+          <td>{{ r.period_label }}</td>
+          <td>{{ r.stand_name }}</td>
+          <td><a href="/clients/{{ r.client_id }}">{{ r.client_label }}</a></td>
+          <td>{{ r.placement_count }}</td>
+          {% if can_filter_managers %}<td>{{ r.manager_name }}</td>{% endif %}
+          <td>{{ r.region_name }}</td>
+          <td>{{ r.city }}</td>
+        </tr>
+        {% else %}
+        <tr class="empty-row"><td colspan="{% if can_filter_managers %}7{% else %}6{% endif %}">Немає стендів без продажів за обраними фільтрами</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{% if can_create_sale %}
+{% include "partials/sale_form_modal.html" %}
+{% endif %}
+{% endif %}
+
+{% if section == 'stands' and not is_sales_manager %}
+{% set agg_unit = 'шт' %}
+<div class="page-actions stands-actions">
+  {% if can_operate_stand_warehouse %}
+  <button type="button" class="btn btn-primary" data-open-stand-move>Перемістити</button>
+  <button type="button" class="btn btn-secondary" data-open-stand-to-warehouse>На склад</button>
+  <button type="button" class="btn btn-secondary" data-open-stand-from-warehouse>Зі складу</button>
+  <button type="button" class="btn btn-danger" data-open-stand-writeoff>Списати</button>
+  {% endif %}
+  <a href="/stands/warehouse" class="btn btn-secondary">Віртуальний склад</a>
+  <a href="/stands/moves" class="btn btn-secondary">Історія</a>
+</div>
+{% if can_filter_managers %}
+<section class="card">
+  <h2>Всього стендів по менеджеру — ({{ stands_scope_name }})</h2>
+  <div class="table-wrap">
+    <table class="table--darkhead stands-report-table">
+      <thead>
+        <tr><th>Менеджер</th><th class="stands-report-table__num">К-сть встановлених</th></tr>
+      </thead>
+      <tbody>
+        {% for r in stands_total_by_manager %}
+        <tr><td>{{ r.manager }}</td><td class="stands-report-table__num">{{ r.count }}</td></tr>
+        {% else %}
+        <tr class="empty-row"><td colspan="2">Немає даних</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+<section class="card">
+  <h2>Стенди у менеджерів — ({{ stands_scope_name }})</h2>
+  <div class="table-wrap">
+    <table class="table--darkhead stands-report-table">
+      <thead>
+        <tr>
+          <th>Менеджер</th>
+          <th>Стенд (торгова марка)</th>
+          <th class="stands-report-table__num">К-сть встановлених</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in stands_by_manager_stand %}
+        <tr>
+          <td>{{ r.manager }}</td>
+          <td>{{ r.stand }}</td>
+          <td class="stands-report-table__num">{{ r.count }}</td>
+        </tr>
+        {% else %}
+        <tr class="empty-row"><td colspan="3">Немає даних</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+<section class="card">
+  <h2>Всього стендів по містах — ({{ stands_scope_name }})</h2>
+  <div class="table-wrap">
+    <table class="table--darkhead stands-report-table">
+      <thead>
+        <tr><th>Місто</th><th class="stands-report-table__num">К-сть встановлених</th></tr>
+      </thead>
+      <tbody>
+        {% for r in stands_totals_city %}
+        <tr><td>{{ r.label }}</td><td class="stands-report-table__num">{{ r.value|int }}</td></tr>
+        {% else %}
+        <tr class="empty-row"><td colspan="2">Немає даних</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+<section class="card">
+  <h2>Стенди по містах — ({{ stands_scope_name }})</h2>
+  <div class="table-wrap">
+    <table class="table--darkhead stands-report-table">
+      <thead>
+        <tr>
+          <th>Місто</th>
+          <th>Стенд (торгова марка)</th>
+          <th class="stands-report-table__num">К-сть встановлених</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in stands_by_city %}
+        <tr>
+          <td>{{ r.city }}</td>
+          <td>{{ r.stand }}</td>
+          <td class="stands-report-table__num">{{ r.count }}</td>
+        </tr>
+        {% else %}
+        <tr class="empty-row"><td colspan="3">Немає даних</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+<section class="card">
+  <h2>Всього стендів по областях — ({{ stands_scope_name }})</h2>
+  <div class="table-wrap">
+    <table class="table--darkhead stands-report-table">
+      <thead>
+        <tr><th>Область</th><th class="stands-report-table__num">К-сть встановлених</th></tr>
+      </thead>
+      <tbody>
+        {% for r in stands_totals_oblast %}
+        <tr><td>{{ r.label }}</td><td class="stands-report-table__num">{{ r.value|int }}</td></tr>
+        {% else %}
+        <tr class="empty-row"><td colspan="2">Немає даних</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+<section class="card">
+  <h2>Стенди по областях — ({{ stands_scope_name }})</h2>
+  <div class="table-wrap">
+    <table class="table--darkhead stands-report-table">
+      <thead>
+        <tr>
+          <th>Область</th>
+          <th>Стенд (торгова марка)</th>
+          <th class="stands-report-table__num">К-сть встановлених</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in stands_by_oblast %}
+        <tr>
+          <td>{{ r.oblast }}</td>
+          <td>{{ r.stand }}</td>
+          <td class="stands-report-table__num">{{ r.count }}</td>
+        </tr>
+        {% else %}
+        <tr class="empty-row"><td colspan="3">Немає даних</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% include "partials/stand_move_modal.html" %}
+{% endif %}
+{% endblock %}
+{% block scripts %}
+{% if section == 'stands' %}
+<script src="/static/stands.js"></script>
+{% endif %}
+{% if section == 'sales' and can_create_sale %}
+<script src="/static/cascade_form.js"></script>
+<script>
+setupCascadeForm({
+  modalId: "sale-modal",
+  formId: "sale-form",
+  regionId: "sale-region",
+  clientId: "sale-client",
+  brandId: "sale-brand",
+  errorId: "sale-error",
+  openSelector: "[data-open-sale]",
+});
+</script>
+{% endif %}
+{% endblock %}

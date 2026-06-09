@@ -1,0 +1,28 @@
+<div class="modal" id="reserve-sale-modal" hidden>
+  <div class="modal__backdrop" data-close-modal></div>
+  <div class="modal__dialog" role="dialog" aria-labelledby="reserve-sale-title">
+    <header class="modal__header">
+      <h2 id="reserve-sale-title">Продаж із резерву</h2>
+      <button type="button" class="modal__close" data-close-modal aria-label="Закрити">×</button>
+    </header>
+    <p class="modal__hint muted" id="reserve-sale-hint">Оберіть бренд і кількість (кв. м)</p>
+    <form method="post" action="/reserves/sale" id="reserve-sale-form" class="stand-move-form">
+      <input type="hidden" name="reserve_id" id="reserve-sale-id" value="">
+      <input type="hidden" name="return_manager_id" id="reserve-sale-return-manager" value="{{ selected_manager_id or '' }}">
+      <p class="reserve-sale-meta muted" id="reserve-sale-meta"></p>
+      <label>Торгова марка
+        <select name="brand_id" id="reserve-sale-brand" required disabled>
+          <option value="">Завантаження…</option>
+        </select>
+      </label>
+      <label>Кількість, кв. м
+        <input type="text" name="quantity" id="reserve-sale-quantity" required inputmode="decimal" placeholder="12.5">
+      </label>
+      <p class="modal__error" id="reserve-sale-error" hidden></p>
+      <div class="modal__actions">
+        <button type="button" class="btn btn-secondary" data-close-modal>Скасувати</button>
+        <button type="submit" class="btn btn-primary" id="reserve-sale-submit">Зберегти продаж</button>
+      </div>
+    </form>
+  </div>
+</div>

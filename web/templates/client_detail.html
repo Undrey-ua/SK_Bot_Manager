@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+{% block title %}{{ client.name }} — SK Bot Manager{% endblock %}
+{% block content %}
+<nav class="breadcrumb">
+  <a href="/clients">Клієнти</a>
+  <span class="breadcrumb-sep">/</span>
+  <span>{{ client.name }}</span>
+</nav>
+
+<header class="client-hero{% if client.photo_url %} client-hero--with-cover{% endif %}">
+  <div class="client-hero-main">
+    {% if client.photo_url %}
+    <div class="client-cover">
+      <img src="{{ client.photo_url }}" alt="Фото {{ client.name }}">
+    </div>
+    {% else %}
+    <div class="client-avatar">{{ client.name[0] | upper }}</div>
+    {% endif %}
+    <div class="client-hero-text">
+      <h1 class="page-title" style="margin:0">{{ client.name }}</h1>
+      <p class="page-subtitle" style="margin:0.35rem 0 0">
+        {{ client.region.name if client.region else '—' }}
+      </p>
+      <p class="client-hero-address">{{ client.address }}</p>
+      {% if client.stand_links %}
+      <div class="stand-badges" aria-label="Стенди">
+        {% for link in client.stand_links %}
+        {% if link.stand and link.stand.is_active %}
+        <span class="stand-badge">{{ link.stand.name }}</span>
+        {% endif %}
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="page-actions client-hero-actions">
+    {% if not is_leader %}
+    <a class="btn btn-secondary" href="/clients/{{ client.id }}/edit">Редагувати</a>
+    {% endif %}
+    <a class="btn btn-primary" href="/clients/{{ client.id }}/visits">
+      Історія візитів ({{ visit_count }})
+    </a>
+  </div>
+</header>
+
+<section class="detail-section client-sales-section">
+  <h2>Продажі</h2>
+  <form class="filters filters--compact client-sales-filters" method="get">
+    <label>
+      Період
+      <select name="period_kind" onchange="this.form.submit()">
+        {% for kind, label in client_sales_period_labels.items() %}
+        <option value="{{ kind }}" {% if period_kind == kind %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% if period_kind == 'year' %}
+    <label>
+      Рік
+      <select name="year" onchange="this.form.submit()">
+        {% for y in range(2020, 2031) %}
+        <option value="{{ y }}" {% if year == y %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% endif %}
+    {% if period_kind == 'quarter' %}
+    <label>
+      Рік
+      <select name="year" onchange="this.form.submit()">
+        {% for y in range(2020, 2031) %}
+        <option value="{{ y }}" {% if year == y %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Квартал
+      <select name="quarter" onchange="this.form.submit()">
+        {% for q in range(1, 5) %}
+        <option value="{{ q }}" {% if quarter == q %}selected{% endif %}>Q{{ q }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% endif %}
+    <label class="filters__field--brand">
+      Торгова марка
+      <select name="brand_id" onchange="this.form.submit()">
+        <option value="">Усі марки</option>
+        {% for bid, bname in filter_brands %}
+        <option value="{{ bid }}" {% if selected_brand_id == bid %}selected{% endif %}>{{ bname }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% if sales_has_filters or period_kind not in ('current',) %}
+    <a href="/clients/{{ client.id }}" class="btn btn-secondary btn-sm clients-filters__reset">Скинути</a>
+    {% endif %}
+    <button type="submit" class="btn btn-secondary btn-sm">Оновити</button>
+  </form>
+
+  <p class="muted client-sales-summary">
+    Період: <strong>{{ period_label }}</strong>
+    · Всього: <strong>{{ format_qty(sales_total, decimals=2) }} кв. м</strong>
+    {% if sales_has_filters %} · застосовано фільтри{% endif %}
+  </p>
+
+  {% if sales_by_brand %}
+  <div class="table-wrap client-sales-by-brand">
+    <table class="table--darkhead">
+      <thead>
+        <tr><th>Торгова марка</th><th>Продано, кв. м</th></tr>
+      </thead>
+      <tbody>
+        {% for row in sales_by_brand %}
+        <tr>
+          <td>{{ row.brand_name }}</td>
+          <td>{{ format_qty(row.quantity, decimals=2) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <div class="table-wrap">
+    <table class="table--darkhead">
+      <thead>
+        <tr>
+          <th>Дата</th>
+          <th>Торгова марка</th>
+          <th>Кількість, кв. м</th>
+          <th>Коментар</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sale in sales_rows %}
+        <tr>
+          <td>{{ format_date(sale.sold_at) }}</td>
+          <td>{{ sale.brand.name if sale.brand else '—' }}</td>
+          <td>{{ format_qty(sale.quantity, decimals=2) }}</td>
+          <td>{{ sale.comment or '—' }}</td>
+        </tr>
+        {% else %}
+        <tr class="empty-row">
+          <td colspan="4">Немає продажів за обраний період{% if sales_has_filters %} і фільтрами{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div class="detail-grid client-detail-grid">
+  <section class="detail-section meta">
+    <h2>Картка клієнта</h2>
+    <dl>
+      {% if can_filter_managers %}
+      <dt>Менеджер</dt>
+      <dd>{{ client.manager.name if client.manager else '—' }}</dd>
+      {% endif %}
+      <dt>Область</dt>
+      <dd>{{ client.region.name if client.region else '—' }}</dd>
+      <dt>Адреса</dt>
+      <dd>{{ client.address }}</dd>
+      <dt>Місто</dt>
+      <dd>{{ client_display_city(client) }}</dd>
+      <dt>Контакти</dt>
+      <dd>
+        {% if client.contacts %}
+        <div class="client-contacts">{{ client.contacts }}</div>
+        {% else %}
+        <span class="muted">Не вказано · можна додати при редагуванні в веб-панелі</span>
+        {% endif %}
+      </dd>
+      <dt>Коментар</dt>
+      <dd>{{ client_display_comment(client) }}</dd>
+      <dt>Візитів</dt>
+      <dd>{{ visit_count }}</dd>
+    </dl>
+  </section>
+</div>
+
+{% if visit_gallery %}
+<section class="detail-section client-gallery-section">
+  <h2>Фото з візитів ({{ visit_gallery|length }})</h2>
+  <p class="muted">Натисніть на фото, щоб відкрити деталі візиту.</p>
+  <div class="photo-grid photo-grid--visit-gallery">
+    {% for item in visit_gallery %}
+    <a href="/visits/{{ item.visit_id }}" class="visit-gallery-card" title="Візит {{ format_dt(item.visit_at) }}">
+      <img src="{{ item.photo_url }}" alt="Фото візиту" loading="lazy">
+      <span class="visit-gallery-card__meta">{{ format_dt(item.visit_at) }}</span>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% else %}
+<section class="detail-section client-gallery-section">
+  <h2>Фото з візитів</h2>
+  <p class="muted">Поки немає фото у візитах цієї торгової точки.</p>
+</section>
+{% endif %}
+{% endblock %}

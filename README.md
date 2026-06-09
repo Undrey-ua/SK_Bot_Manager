@@ -28,9 +28,14 @@ Telegram-бот для регіональних менеджерів: фікса
 │   └── schema.sql      # SQL для Supabase
 ├── config/
 │   └── settings.py     # Pydantic Settings
+├── web/
+│   ├── app.py          # FastAPI + шаблони
+│   ├── templates/      # HTML панель
+│   └── services/       # Запити для дашборду
 ├── utils/
 │   └── logging.py
-└── main.py             # Точка входу
+├── main.py             # Telegram-бот
+└── web_main.py         # Веб-панель керівника
 ```
 
 ## Швидкий старт (локально)
@@ -39,7 +44,7 @@ Telegram-бот для регіональних менеджерів: фікса
 
 ```bash
 cd SK_Bot_Manager
-python3.12 -m venv .venv
+python3.12 -m venv .venv    # мінімум Python 3.10; 3.12 рекомендовано
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
@@ -58,13 +63,13 @@ cp .env.example .env
 
 ```sql
 INSERT INTO users (telegram_id, name, role)
-VALUES (YOUR_TELEGRAM_ID, 'Ваше Імʼя', 'manager');
+VALUES (535827585, 'Ваше Імʼя', 'manager');
 
 INSERT INTO clients (manager_id, name, type, district, address)
 VALUES (1, 'Тестовий магазин', 'retail', 'Київ', 'вул. Приклад, 1');
 ```
 
-`YOUR_TELEGRAM_ID` — дізнайтесь у [@userinfobot](https://t.me/userinfobot).
+`Y535827585` — дізнайтесь у [@userinfobot](https://t.me/userinfobot).
 
 ### 4. Storage bucket
 
@@ -74,6 +79,8 @@ VALUES (1, 'Тестовий магазин', 'retail', 'Київ', 'вул. П�
 
 ```bash
 python main.py
+# або явно з venv (не системний python3):
+# .venv/bin/python main.py
 ```
 
 У Telegram: `/start` → головне меню → **Новий візит**.
@@ -82,10 +89,10 @@ python main.py
 
 | Змінна | Де взяти |
 |--------|----------|
-| `DATABASE_URL` | Project Settings → Database → Connection string → URI. Замініть `postgresql://` на `postgresql+asyncpg://`. Для production краще **Transaction pooler** (порт 6543). |
+| `DATABASE_URL` | Dashboard → **Connect** → URI → **Transaction pooler** (6543). Скопіюйте host **з Dashboard**, не з прикладу. Префікс: `postgresql+asyncpg://` |
 | `SUPABASE_URL` | Project Settings → API → Project URL |
-| `SUPABASE_KEY` | Project Settings → API → `service_role` key (для Storage upload) |
-| `SUPABASE_STORAGE_BUCKET` | Імʼя bucket, напр. `visit-photos` |
+| `SUPABASE_KEY` | Settings → **API Keys** → **Secret keys** → `sb_secret_...` (або legacy service_role `eyJ...`) |
+| `SUPABASE_STORAGE_BUCKET` | Storage → bucket `visit-photos` → **Public bucket** |
 
 > **Важливо:** не комітьте `.env` у git. Service role key — лише на сервері.
 
@@ -108,9 +115,98 @@ python main.py
 5. Завантаження фото → **Завершити**
 6. Збереження в `visits`, `visit_tasks`, `visit_photos`
 
+## Веб-панель для керівника
+
+Окремий сервіс показує всю інформацію з бота: візити (задачі, коментарі, фото), клієнтів, статистику по менеджерах.
+
+### Локально
+
+```bash
+# У .env додайте:
+# DASHBOARD_PASSWORD=надійний_пароль
+python web_main.py
+```
+
+Відкрийте http://localhost:8000 — увійдіть паролем з `DASHBOARD_PASSWORD`.
+
+### Railway (другий сервіс)
+
+1. У тому ж репозиторії створіть **другий сервіс** (бот залишається на `python main.py`).
+2. Start command: `python web_main.py`
+3. Додайте ті самі змінні, що й у бота, плюс `DASHBOARD_PASSWORD`.
+4. У Settings → Networking увімкніть публічний домен і вкажіть порт `8000` (або `WEB_PORT`).
+
+Альтернатива: скопіюйте `railway.web.json` у `railway.json` для окремого деплою панелі.
+
 ## Авторизація
 
-Доступ лише для `telegram_id`, що є в таблиці `users`. Незареєстровані користувачі бачать повідомлення зі своїм ID для передачі адміністратору.
+**Telegram-бот:** доступ лише для `telegram_id`, що є в таблиці `users`. Незареєстровані користувачі бачать повідомлення зі своїм ID для передачі адміністратору.
+
+**Веб-панель:** пароль із `DASHBOARD_PASSWORD` (окремо від Telegram).
+
+## Клієнти, області, стенди
+
+- **👤 Клієнти** — додавання/редагування клієнта (назва, область, адреса, коментар, стенди).
+- **🗺 Мої області** — кожен менеджер веде свій список областей.
+- **🏷 Каталог стендів** — лише `role = admin` (додати/вимкнути стенди).
+
+Адміністратор:
+
+```sql
+UPDATE users SET role = 'admin' WHERE telegram_id = YOUR_TELEGRAM_ID;
+```
+
+Міграції для існуючої БД: `database/migrations/` (зокрема `009_task_kind.sql`, `010_stand_transfers.sql`, `011_user_roles_supervisor.sql`).
+
+**Веб-панель:** `python web_main.py` → http://localhost:8000  
+- **Адмін (1):** `DASHBOARD_ADMIN_PASSWORD`, Telegram порожній; у `.env` вкажіть `DASHBOARD_ADMIN_TELEGRAM_ID=535827585` для **Андрія Вовнянка** (адмін + своє поле як регіональний менеджер).  
+- **Керівник (3):** `DASHBOARD_PASSWORD` + Telegram ID, роль `leader` — повний огляд, задачі від їхнього імені.  
+- **Регіональний менеджер:** роль `manager` — **Роман Ковальов**, **Павло Ковалишин**; **Андрій Вовнянко** — `role=admin`, але в полі як регіональний (див. `config/team.py`).  
+- **Менеджер збуту:** роль `sales_manager`, `supervisor_id` → id регіонального менеджера; у боті лише «Резерви» та «Додати продаж», у вебі — аналітика та резерви по своєму регіональному.
+
+### Ролі в БД (`users.role`)
+
+| Роль | Значення | Опис |
+|------|----------|------|
+| Адмін | `admin` | Каталог стендів, продовження резервів, керування користувачами (А. Вовнянко — також поле) |
+| Керівник | `leader` | Панель як у адміна (без каталогу стендів), створення задач від свого імені |
+| Регіональний менеджер | `manager` | Свої клієнти, візити, стенди |
+| Менеджер збуту | `sales_manager` | `supervisor_id` = регіональний менеджер |
+
+Міграція: `database/migrations/011_user_roles_supervisor.sql`
+
+Приклад призначення ролей:
+
+```sql
+-- адмін (Андрій Вовнянко — також регіональний менеджер у полі)
+UPDATE users SET role = 'admin', supervisor_id = NULL WHERE telegram_id = 535827585;
+-- міграція: database/migrations/012_andrii_admin_regional.sql
+
+-- три керівники (колишні admin → leader)
+UPDATE users SET role = 'leader' WHERE telegram_id IN (222222222, 333333333, 444444444);
+
+-- регіональні (Роман, Павло)
+UPDATE users SET role = 'manager', supervisor_id = NULL
+WHERE telegram_id IN (5009921383, 7770797356);
+
+-- менеджер збуту (пізніше)
+INSERT INTO users (telegram_id, name, role, supervisor_id)
+VALUES (555555555, 'Іван Збут', 'sales_manager', (SELECT id FROM users WHERE telegram_id = 666666666 LIMIT 1));
+```
+
+## Troubleshooting: `Tenant or user not found`
+
+Ця помилка майже завжди означає **неправильний host pooler** у `DATABASE_URL` (скопійовано приклад `aws-0-eu-central-1` замість host вашого проєкту).
+
+1. Supabase Dashboard → ваш проєкт → **Connect** (кнопка зверху).
+2. **ORMs** → **URI** → **Transaction pooler** (порт **6543**).
+3. Скопіюйте **весь** рядок і в `.env`:
+   - `postgresql://` → `postgresql+asyncpg://`
+   - `[YOUR-PASSWORD]` → реальний пароль (без дужок)
+4. Перевірте **user**: `postgres.yjvfebhgbzpkdchvwcqp` (ref з URL проєкту).
+5. **Host** має збігатися з Dashboard (напр. `aws-1-us-east-2.pooler.supabase.com`, не обовʼязково `aws-0-eu-central-1`).
+
+Якщо пароль не памʼятаєте: **Project Settings → Database → Reset database password**.
 
 ## Ліцензія
 

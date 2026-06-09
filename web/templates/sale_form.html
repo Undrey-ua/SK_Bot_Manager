@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Редагувати продаж — SK Bot Manager{% endblock %}
+{% block content %}
+<nav class="breadcrumb">
+  <a href="/analytics?section=sales">Продажі</a>
+  <span class="breadcrumb-sep">/</span>
+  <span>Редагування</span>
+</nav>
+
+<div class="card card--compact-form">
+  <h2>Редагувати продаж</h2>
+  <p class="muted">
+    Додано: <strong>{{ format_dt(sale.created_at) }}</strong>
+    {% if sale.manager %} · {{ sale.manager.name }}{% endif %}
+  </p>
+  <form method="post" action="/sales/{{ sale.id }}/edit" class="client-web-form">
+    <input type="hidden" name="return_url" value="{{ return_url }}">
+    <label>Торгова точка
+      <select name="client_id" required>
+        {% for c in clients %}
+        <option value="{{ c.id }}" {% if sale.client_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Торгова марка
+      <select name="brand_id" required>
+        {% for b in brands %}
+        {% if b.is_active %}
+        <option value="{{ b.id }}" {% if sale.brand_id == b.id %}selected{% endif %}>{{ b.name }}</option>
+        {% endif %}
+        {% endfor %}
+      </select>
+    </label>
+    <label>Дата продажу (період)
+      <input type="date" name="sold_at" required value="{{ sale.sold_at.isoformat() }}">
+    </label>
+    <label>Кількість, кв. м
+      <input type="text" name="quantity" required inputmode="decimal" value="{{ sale.quantity }}">
+    </label>
+    <label>Коментар
+      <textarea name="comment" rows="2">{{ sale.comment or '' }}</textarea>
+    </label>
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Зберегти</button>
+      <a href="{{ return_url }}" class="btn btn-secondary">Скасувати</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

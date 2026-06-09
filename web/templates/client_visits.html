@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Історія візитів — {{ client.name }}{% endblock %}
+{% block content %}
+<nav class="breadcrumb">
+  <a href="/clients">Клієнти</a>
+  <span class="breadcrumb-sep">/</span>
+  <a href="/clients/{{ client.id }}">{{ client.name }}</a>
+  <span class="breadcrumb-sep">/</span>
+  <span>Історія візитів</span>
+</nav>
+
+<header class="page-header">
+  <h1 class="page-title">Історія візитів</h1>
+  <p class="page-subtitle">{{ client.name }} · {{ client.region.name if client.region else '—' }}</p>
+</header>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Дата</th>
+          {% if can_filter_managers %}<th>Менеджер</th>{% endif %}
+          <th>Тип</th>
+          <th>Задачі</th>
+          <th>Коментар</th>
+          <th>Фото</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for visit in visits %}
+        <tr>
+          <td>{{ format_dt(visit.created_at) }}</td>
+          {% if can_filter_managers %}<td>{{ visit.manager.name if visit.manager else '—' }}</td>{% endif %}
+          <td>
+            <span class="badge {% if visit.visit_type == 'stand' %}badge-stand{% endif %}">
+              {{ visit_type_label(visit.visit_type) }}
+            </span>
+          </td>
+          <td>
+            <div class="task-list">
+              {% for t in visit.tasks %}
+              <span class="task-chip">{{ task_label(t.task) }}</span>
+              {% endfor %}
+            </div>
+          </td>
+          <td class="comment-cell">{{ visit.comment or '—' }}</td>
+          <td>{{ visit.photos|length }}</td>
+          <td><a class="btn-ghost" href="/visits/{{ visit.id }}">Деталі →</a></td>
+        </tr>
+        {% else %}
+        <tr class="empty-row">
+          <td colspan="{% if can_filter_managers %}7{% else %}6{% endif %}">Візитів ще немає</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

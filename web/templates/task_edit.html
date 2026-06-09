@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Редагувати задачу — SK Bot Manager{% endblock %}
+{% block content %}
+<header class="page-header">
+  <h1 class="page-title">Редагувати задачу #{{ task.id }}</h1>
+  <p class="page-subtitle"><a href="/tasks">← До списку задач</a></p>
+</header>
+
+<div class="card card--compact-form">
+  <h2>Змінити</h2>
+  {% with form_action='/tasks/' ~ task.id ~ '/edit', submit_label='Зберегти', cancel_href='/tasks' %}
+  {% include "partials/task_form.html" %}
+  {% endwith %}
+</div>
+{% endblock %}

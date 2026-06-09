@@ -1,0 +1,55 @@
+<article class="task-card task-card--{{ item.status }}{% if item.is_overdue %} task-card--overdue{% endif %}" id="task-{{ item.task.id }}">
+  <div class="task-card__main">
+    <p class="task-card__title">{{ item.task.title }}</p>
+    {% if item.task.comment %}
+    <p class="task-card__comment">{{ item.task.comment }}</p>
+    {% endif %}
+    <div class="task-card__meta">
+      <span class="task-card__tag task-card__tag--kind">{{ manager_task_kind_label(item.task.kind) }}</span>
+      {% if item.task.deadline %}
+      <span class="task-card__tag task-card__tag--deadline{% if item.is_overdue %} task-card__tag--warn{% endif %}">
+        Дедлайн {{ format_date(item.task.deadline) }}
+      </span>
+      {% endif %}
+      {% if item.task.weekday is not none %}
+      <span class="task-card__tag task-card__tag--reminder">
+        {{ weekday_labels[item.task.weekday] }}
+      </span>
+      {% endif %}
+      {% if item.status == 'completed' and item.task.completed_at %}
+      <span class="task-card__tag task-card__tag--done">Виконано {{ format_dt(item.task.completed_at) }}</span>
+      {% elif item.status == 'deleted' %}
+      <span class="task-card__tag task-card__tag--muted">Видалено</span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="task-card__aside">
+    <span class="task-status task-status--{{ item.status }}">
+      {% if item.status == 'active' %}Активна{% elif item.status == 'completed' %}Виконано{% else %}Видалено{% endif %}
+    </span>
+    <span class="task-card__id">#{{ item.task.id }}</span>
+    {% if can_manage_task(current_user, assignee_id=item.task.assignee_id) and item.status != 'deleted' %}
+    <div class="task-card__actions">
+      {% if item.status == 'active' %}
+      <form method="post" action="/tasks/complete" class="task-card__complete-form">
+        <input type="hidden" name="task_id" value="{{ item.task.id }}">
+        {% if selected_manager_id %}<input type="hidden" name="return_manager_id" value="{{ selected_manager_id }}">{% endif %}
+        {% if show_completed %}<input type="hidden" name="return_show_completed" value="1">{% endif %}
+        {% if status_filter and status_filter != 'active' %}<input type="hidden" name="return_status" value="{{ status_filter }}">{% endif %}
+        {% if selected_kind %}<input type="hidden" name="return_kind" value="{{ selected_kind }}">{% endif %}
+        <button type="submit" class="btn btn-primary btn-sm">Виконано</button>
+      </form>
+      {% endif %}
+      <a href="/tasks/{{ item.task.id }}/edit" class="btn btn-secondary btn-sm">Редагувати</a>
+      <form method="post" action="/tasks/delete" class="task-card__delete-form">
+        <input type="hidden" name="task_id" value="{{ item.task.id }}">
+        {% if selected_manager_id %}<input type="hidden" name="return_manager_id" value="{{ selected_manager_id }}">{% endif %}
+        {% if show_completed %}<input type="hidden" name="return_show_completed" value="1">{% endif %}
+        {% if status_filter and status_filter != 'active' %}<input type="hidden" name="return_status" value="{{ status_filter }}">{% endif %}
+        {% if selected_kind %}<input type="hidden" name="return_kind" value="{{ selected_kind }}">{% endif %}
+        <button type="submit" class="btn btn-danger btn-sm">Видалити</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+</article>

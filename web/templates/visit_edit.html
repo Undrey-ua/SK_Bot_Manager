@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Редагувати візит — SK Bot Manager{% endblock %}
+{% block content %}
+<nav class="breadcrumb">
+  <a href="/visits/{{ visit.id }}">Візит #{{ visit.id }}</a>
+  <span class="breadcrumb-sep">/</span>
+  <span>Редагування</span>
+</nav>
+
+<div class="card card--compact-form">
+  <h2>Редагувати візит</h2>
+  <form method="post" action="/visits/{{ visit.id }}/edit">
+    <label>Тип візиту
+      <select name="visit_type" required>
+        <option value="pvh" {% if visit.visit_type == 'pvh' %}selected{% endif %}>ПВХ</option>
+        <option value="stand" {% if visit.visit_type == 'stand' %}selected{% endif %}>Стенд</option>
+      </select>
+    </label>
+    <label>Коментар
+      <textarea name="comment" rows="4">{% if visit.comment %}{{ visit.comment }}{% endif %}</textarea>
+    </label>
+    <fieldset class="stands-picker">
+      <legend>Задачі візиту</legend>
+      <div class="stands-picker__grid">
+        {% for tt in task_types %}
+        <label class="stands-picker__item">
+          <input type="checkbox" name="task" value="{{ tt.code }}" {% if tt.code in selected_tasks %}checked{% endif %}>
+          {{ tt.label }}{% if not tt.is_active %} <span class="muted">(неактивна)</span>{% endif %}
+        </label>
+        {% endfor %}
+      </div>
+    </fieldset>
+    <div class="task-form__actions">
+      <button type="submit" class="btn btn-primary">Зберегти</button>
+      <a href="/visits/{{ visit.id }}" class="btn btn-secondary">Скасувати</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}{% if client %}Редагувати{% else %}Новий{% endif %} клієнт — SK Bot Manager{% endblock %}
+{% block content %}
+<nav class="breadcrumb">
+  <a href="/clients">Клієнти</a>
+  <span class="breadcrumb-sep">/</span>
+  <span>{% if client %}{{ client.name }}{% else %}Новий клієнт{% endif %}</span>
+</nav>
+
+<div class="client-form-page">
+<div class="card card--compact-form">
+  <h2>{% if client %}Редагувати картку{% else %}Новий клієнт{% endif %}</h2>
+  <p class="muted client-form-hint">Загальне фото ТТ і контакти доступні лише в веб-панелі (у Telegram-боті без змін).</p>
+  <form method="post" action="{{ form_action }}" class="client-web-form" enctype="multipart/form-data">
+    {% if is_admin and form_managers %}
+    <label>Менеджер
+      <select name="form_manager_id" onchange="window.location='/clients/new?manager_id='+this.value">
+        {% for m in form_managers %}
+        {% if m.role == 'manager' %}
+        <option value="{{ m.id }}" {% if form_manager_id == m.id %}selected{% endif %}>{{ m.name }}</option>
+        {% endif %}
+        {% endfor %}
+      </select>
+    </label>
+    {% elif is_admin %}
+    <input type="hidden" name="form_manager_id" value="{{ form_manager_id }}">
+    {% endif %}
+    <label>Назва
+      <input type="text" name="name" required value="{% if client %}{{ client.name }}{% endif %}">
+    </label>
+    <label>Область
+      <select name="region_id" required>
+        {% for r in regions %}
+        <option value="{{ r.id }}" {% if client and client.region_id == r.id %}selected{% endif %}>{{ r.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Адреса
+      <input type="text" name="address" required value="{% if client %}{{ client.address }}{% endif %}">
+    </label>
+    <label>Місто
+      <input type="text" name="city" value="{% if client and client.city %}{{ client.city }}{% endif %}" placeholder="Житомир">
+    </label>
+    <label>Контакти
+      <textarea name="contacts" rows="3" placeholder="Телефон, email, контактна особа…">{% if client and client.contacts %}{{ client.contacts }}{% endif %}</textarea>
+    </label>
+    <label>Коментар
+      <textarea name="comment" rows="2">{% if client and client.comment %}{{ client.comment }}{% endif %}</textarea>
+    </label>
+    <div class="client-cover-field">
+      <span class="client-cover-field__label">Загальне фото торгової точки</span>
+      {% if client and client.photo_url %}
+      <div class="client-cover-preview">
+        <img src="{{ client.photo_url }}" alt="Поточне фото">
+      </div>
+      <label class="client-cover-remove">
+        <input type="checkbox" name="remove_photo" value="1">
+        Видалити поточне фото
+      </label>
+      {% endif %}
+      <input type="file" name="cover_photo" accept="image/jpeg,image/png,image/webp">
+      <span class="muted">JPEG, PNG або WebP. Необовʼязково.</span>
+    </div>
+    <fieldset class="stands-picker">
+      <legend>Стенди</legend>
+      <div class="stands-picker__grid">
+        {% for s in stands %}
+        <label class="stands-picker__item">
+          <input type="checkbox" name="stand_id" value="{{ s.id }}" {% if s.id in selected_stand_ids %}checked{% endif %}>
+          {{ s.name }}
+        </label>
+        {% endfor %}
+      </div>
+    </fieldset>
+    <div class="task-form__actions">
+      <button type="submit" class="btn btn-primary">{{ submit_label }}</button>
+      <a href="{% if client %}/clients/{{ client.id }}{% else %}/clients{% endif %}" class="btn btn-secondary">Скасувати</a>
+    </div>
+  </form>
+</div>
+</div>
+{% endblock %}

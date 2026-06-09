@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Візит #{{ visit.id }} — SK Bot Manager{% endblock %}
+{% block content %}
+<nav class="breadcrumb">
+  <a href="/">Візити</a>
+  <span class="breadcrumb-sep">/</span>
+  <span>{{ format_dt(visit.created_at) }}</span>
+</nav>
+
+<header class="page-header">
+  <h1 class="page-title">Візит від {{ format_dt(visit.created_at) }}</h1>
+  {% if visit.client %}
+  <p class="page-subtitle">
+    <a href="/clients/{{ visit.client.id }}">{{ visit.client.name }}</a>
+    · <a href="/clients/{{ visit.client.id }}/visits">Історія візитів</a>
+  </p>
+  {% endif %}
+</header>
+<div class="page-actions">
+  <a class="btn btn-secondary" href="/visits/{{ visit.id }}/edit">Редагувати</a>
+</div>
+
+<div class="detail-grid">
+  <section class="detail-section meta">
+    <h2>Інформація</h2>
+    <dl>
+      {% if can_filter_managers %}
+      <dt>Менеджер</dt>
+      <dd>{{ visit.manager.name if visit.manager else '—' }}</dd>
+      {% endif %}
+      <dt>Клієнт</dt>
+      <dd>
+        {% if visit.client %}
+        <a href="/clients/{{ visit.client.id }}">{{ visit.client.name }}</a>
+        {% else %}
+        —
+        {% endif %}
+      </dd>
+      <dt>Область</dt>
+      <dd>{{ visit.client.region.name if visit.client and visit.client.region else '—' }}</dd>
+      <dt>Адреса</dt>
+      <dd>{{ visit.client.address if visit.client else '—' }}</dd>
+      <dt>Тип візиту</dt>
+      <dd>
+        <span class="badge {% if visit.visit_type == 'stand' %}badge-stand{% endif %}">
+          {{ visit_type_label(visit.visit_type) }}
+        </span>
+      </dd>
+      <dt>Задачі</dt>
+      <dd>
+        <div class="task-list">
+          {% for t in visit.tasks %}
+          <span class="task-chip">{{ task_label(t.task) }}</span>
+          {% endfor %}
+        </div>
+      </dd>
+      <dt>Коментар</dt>
+      <dd>{{ visit.comment or '—' }}</dd>
+    </dl>
+  </section>
+
+  {% if visit.photos %}
+  <section class="detail-section">
+    <h2>Фото ({{ visit.photos|length }})</h2>
+    <div class="photo-grid">
+      {% for photo in visit.photos %}
+      <a href="{{ photo.photo_url }}" target="_blank" rel="noopener">
+        <img src="{{ photo.photo_url }}" alt="Фото візиту" loading="lazy">
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

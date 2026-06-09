@@ -1,0 +1,45 @@
+<form method="post" action="{{ form_action }}" class="task-form">
+  <div class="task-form__row">
+    {% if can_manage_tasks %}
+    <label class="task-form__field task-form__field--manager">Менеджер
+      <select name="assignee_id" required>
+        {% for m in managers %}
+        <option value="{{ m.id }}" {% if task and task.assignee_id == m.id %}selected{% endif %}>{{ m.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% else %}
+    <input type="hidden" name="assignee_id" value="{{ current_user.id }}">
+    {% endif %}
+    <label class="task-form__field task-form__field--date">Дедлайн
+      <input type="date" name="deadline" value="{% if task and task.deadline %}{{ task.deadline.isoformat() }}{% endif %}">
+    </label>
+    <label class="task-form__field task-form__field--weekday">День нагадування
+      <select name="weekday">
+        <option value="" {% if not task or task.weekday is none %}selected{% endif %}>Без нагадування</option>
+        {% for i in range(7) %}
+        <option value="{{ i }}" {% if task and task.weekday == i %}selected{% endif %}>{{ weekday_labels[i] }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="task-form__field task-form__field--kind">Тип задачі
+      <select name="kind">
+        {% for value, label in manager_task_kind_choices %}
+        <option value="{{ value }}" {% if task %}{% if task.kind == value or (not task.kind and value == 'general') %}selected{% endif %}{% elif value == 'general' %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </div>
+  <label class="task-form__field task-form__field--full">Текст
+    <textarea name="title" rows="3" required placeholder="Опишіть задачу…">{% if task %}{{ task.title }}{% endif %}</textarea>
+  </label>
+  <label class="task-form__field task-form__field--full">Коментар
+    <textarea name="comment" rows="2" placeholder="Додаткові деталі (необовʼязково)">{% if task and task.comment %}{{ task.comment }}{% endif %}</textarea>
+  </label>
+  <div class="task-form__actions">
+    <button type="submit" class="btn btn-primary">{{ submit_label }}</button>
+    {% if cancel_href %}
+    <a href="{{ cancel_href }}" class="btn btn-secondary">Скасувати</a>
+    {% endif %}
+  </div>
+</form>

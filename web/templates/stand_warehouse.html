@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Віртуальний склад — SK Bot Manager{% endblock %}
+{% block content %}
+<header class="page-header page-header--row">
+  <div>
+    <h1 class="page-title">Віртуальний склад</h1>
+    <p class="page-subtitle">Стенди для встановлення — {{ warehouse_scope_name }}</p>
+  </div>
+  {% if can_operate_stand_warehouse %}
+  <div class="page-actions stands-actions">
+    <button type="button" class="btn btn-primary" data-open-stand-from-warehouse>Зі складу на ТТ</button>
+    <button type="button" class="btn btn-secondary" data-open-stand-to-warehouse>З ТТ на склад</button>
+    <a href="/stands/moves" class="btn btn-secondary">Історія операцій</a>
+  </div>
+  {% elif can_allocate_stand_stock %}
+  <div class="page-actions stands-actions">
+    <a href="/stands/moves" class="btn btn-secondary">Історія операцій</a>
+  </div>
+  {% endif %}
+</header>
+
+{% if can_filter_managers %}
+<form class="filters filters--compact clients-filters" method="get" action="/stands/warehouse">
+  <label class="filters__field--manager">
+    Менеджер
+    <select name="manager_id" onchange="this.form.submit()">
+      <option value="">Оберіть менеджера</option>
+      {% for m in managers %}
+      <option value="{{ m.id }}" {% if selected_manager_id == m.id %}selected{% endif %}>{{ m.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+</form>
+{% endif %}
+
+{% if can_allocate_stand_stock %}
+<section class="card">
+  <h2>Виділити стенди на склад менеджера</h2>
+  <p class="muted">Керівник додає кількість актуальних стендів на віртуальний склад регіонального менеджера.</p>
+  <form id="allocate-form" class="allocate-form">
+    <label>
+      Менеджер
+      <select name="manager_id" required>
+        <option value="">Оберіть</option>
+        {% for m in managers %}
+        <option value="{{ m.id }}" {% if warehouse_manager_id == m.id %}selected{% endif %}>{{ m.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Стенд (бренд)
+      <select name="stand_id" required>
+        <option value="">Оберіть</option>
+        {% for sid, sname in filter_stands %}
+        <option value="{{ sid }}">{{ sname }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Кількість (додати)
+      <input type="number" name="quantity" value="1" min="1" step="1" required>
+    </label>
+    <label>
+      Коментар
+      <input type="text" name="note" placeholder="Необовʼязково">
+    </label>
+    <p class="modal__error" id="allocate-error" hidden></p>
+    <button type="submit" class="btn btn-primary">Виділити на склад</button>
+  </form>
+</section>
+{% endif %}
+
+<section class="card">
+  <h2>На складі — {{ warehouse_scope_name }}</h2>
+  <div class="table-wrap">
+    <table class="table--darkhead stands-report-table">
+      <thead>
+        <tr>
+          <th>Стенд (торгова марка)</th>
+          <th class="stands-report-table__num">К-сть</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in stock_rows %}
+        <tr>
+          <td>{{ row.stand_name }}</td>
+          <td class="stands-report-table__num">{{ row.quantity }}</td>
+        </tr>
+        {% else %}
+        <tr class="empty-row"><td colspan="2">На складі немає стендів</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="muted warehouse-hint">Стенди на складі не враховуються в аналітиці встановлених. В аналітиці лише стенди на торгових точках.</p>
+</section>
+
+<input type="hidden" id="warehouse-manager-id" value="{{ warehouse_manager_id }}">
+{% if warehouse_stands_json is defined %}
+<script type="application/json" id="warehouse-stands-json">{{ warehouse_stands_json | safe }}</script>
+{% endif %}
+{% include "partials/stand_move_modal.html" %}
+{% endblock %}
+{% block scripts %}
+<script src="/static/stands.js"></script>
+{% if can_allocate_stand_stock %}
+<script>
+(function () {
+  const form = document.getElementById("allocate-form");
+  const errEl = document.getElementById("allocate-error");
+  if (!form) return;
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    errEl.hidden = true;
+    try {
+      const res = await fetch("/stands/allocate", { method: "POST", body: new FormData(form) });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || "Помилка");
+      window.location.reload();
+    } catch (err) {
+      errEl.textContent = err.message || "Помилка";
+      errEl.hidden = false;
+    }
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,18 @@
+<aside class="sales-plan-ring-card card">
+  <h3 class="sales-plan-ring-card__title">План продажів</h3>
+  <p class="sales-plan-ring-card__period muted">{{ plan_month_label }} {{ plan_year_display }}</p>
+  <div class="plan-ring" style="--pct: {{ sales_plan_progress.pct if sales_plan_progress.pct <= 100 else 100 }}">
+    <div class="plan-ring__inner">
+      <span class="plan-ring__pct">{{ sales_plan_progress.pct }}%</span>
+      <span class="plan-ring__values">
+        {{ format_qty(sales_plan_progress.actual, decimals=1) }}
+        {% if sales_plan_progress.target %}
+        / {{ format_qty(sales_plan_progress.target, decimals=0) }}
+        {% else %}
+        <span class="plan-ring__no-plan">план не задано</span>
+        {% endif %}
+      </span>
+      <span class="plan-ring__unit">кв. м</span>
+    </div>
+  </div>
+</aside>

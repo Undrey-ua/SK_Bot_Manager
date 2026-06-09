@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+{% block title %}Задачі — SK Bot Manager{% endblock %}
+{% block content %}
+<header class="page-header">
+  <h1 class="page-title">Задачі</h1>
+  <p class="page-subtitle">Призначення та контроль — по менеджерах і днях</p>
+</header>
+
+{% if can_manage_sales_plans %}
+<section class="card card--compact-form sales-plans-admin">
+  <h2>План продажів на місяць</h2>
+  <p class="muted sales-plans-admin__hint">Ціль у кв. м для кожного менеджера. Виконання — у розділі «Продажі».</p>
+  <form method="post" action="/tasks/sales-plans" class="sales-plans-form">
+    <div class="sales-plans-form__period">
+      <label>Рік
+        <select name="plan_year">
+          {% for y in range(plan_year - 1, plan_year + 2) %}
+          <option value="{{ y }}" {% if plan_year == y %}selected{% endif %}>{{ y }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Місяць
+        <select name="plan_month">
+          {% for num, name in uk_months %}
+          <option value="{{ num }}" {% if plan_month == num %}selected{% endif %}>{{ name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+    <div class="table-wrap">
+      <table class="sales-plans-table">
+        <thead>
+          <tr>
+            <th>Менеджер</th>
+            <th>План, кв. м</th>
+            <th>Факт</th>
+            <th>%</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in sales_plan_rows %}
+          <tr>
+            <td>{{ row.manager_name }}</td>
+            <td>
+              <input type="text" name="plan_{{ row.manager_id }}" inputmode="decimal"
+                     value="{% if row.target %}{{ row.target }}{% endif %}"
+                     placeholder="0" class="sales-plans-table__input">
+            </td>
+            <td>{{ format_qty(row.actual, decimals=1) }}</td>
+            <td>{% if row.target %}{{ row.pct }}%{% else %}—{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="task-form__actions">
+      <button type="submit" class="btn btn-primary">Зберегти плани</button>
+    </div>
+  </form>
+</section>
+{% endif %}
+
+<div class="tasks-top-layout">
+{% if can_create_tasks %}
+<div class="card card--compact-form tasks-top-layout__form">
+  <h2>{% if can_manage_tasks %}Додати задачу{% else %}Додати задачу собі{% endif %}</h2>
+  {% with form_action='/tasks', submit_label='Додати' %}
+  {% include "partials/task_form.html" %}
+  {% endwith %}
+</div>
+{% endif %}
+{% if sales_plan_progress %}
+{% include "partials/sales_plan_ring.html" %}
+{% endif %}
+</div>
+
+<nav class="stats tasks-stats tasks-stats--filters" aria-label="Фільтр за статусом">
+  <a href="/tasks{{ tasks_page_query(manager_id=selected_manager_id, status='active', kind=selected_kind, show_completed=show_completed) }}"
+     class="stat-card stat-card--filter{% if status_filter == 'active' %} stat-card--selected{% endif %}"
+     aria-current="{% if status_filter == 'active' %}true{% else %}false{% endif %}">
+    <div class="label">Активних</div>
+    <div class="value">{{ board_stats.active }}</div>
+  </a>
+  <a href="/tasks{{ tasks_page_query(manager_id=selected_manager_id, status='overdue', kind=selected_kind, show_completed=show_completed) }}"
+     class="stat-card stat-card--filter stat-card--warn{% if status_filter == 'overdue' %} stat-card--selected{% endif %}"
+     aria-current="{% if status_filter == 'overdue' %}true{% else %}false{% endif %}">
+    <div class="label">Прострочені</div>
+    <div class="value">{{ board_stats.overdue }}</div>
+  </a>
+  <a href="/tasks{{ tasks_page_query(manager_id=selected_manager_id, status='completed', kind=selected_kind, show_completed=show_completed) }}"
+     class="stat-card stat-card--filter stat-card--success{% if status_filter == 'completed' %} stat-card--selected{% endif %}"
+     aria-current="{% if status_filter == 'completed' %}true{% else %}false{% endif %}">
+    <div class="label">Виконано</div>
+    <div class="value">{{ board_stats.completed }}</div>
+  </a>
+</nav>
+
+<form class="filters filters--compact tasks-filters" method="get" action="/tasks">
+  {% if status_filter != 'active' %}
+  <input type="hidden" name="status" value="{{ status_filter }}">
+  {% endif %}
+  <label class="filters__field--kind">
+    Тип задачі
+    <select name="kind" onchange="this.form.submit()">
+      <option value="">Усі типи</option>
+      {% for value, label in manager_task_kind_choices %}
+      <option value="{{ value }}" {% if selected_kind == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  {% if can_filter_managers %}
+  <label class="filters__field--manager">
+    Менеджер
+    <select name="manager_id" onchange="this.form.submit()">
+      <option value="">Усі менеджери</option>
+      {% for m in managers %}
+      <option value="{{ m.id }}" {% if selected_manager_id == m.id %}selected{% endif %}>
+        {{ m.name }}
+      </option>
+      {% endfor %}
+    </select>
+  </label>
+  {% endif %}
+  {% if status_filter == 'active' %}
+  <label class="tasks-filters__checkbox">
+    <input type="checkbox" name="show_completed" value="1" {% if show_completed %}checked{% endif %} onchange="this.form.submit()">
+    Показати виконані та видалені
+  </label>
+  {% elif status_filter == 'completed' %}
+  <input type="hidden" name="status" value="completed">
+  <label class="tasks-filters__checkbox">
+    <input type="checkbox" name="show_completed" value="1" {% if show_completed %}checked{% endif %} onchange="this.form.submit()">
+    Також показати видалені
+  </label>
+  {% endif %}
+</form>
+
+{% if manager_sections %}
+<div class="tasks-board">
+  {% for section in manager_sections %}
+  <section class="tasks-manager" id="manager-{{ section.manager.id }}">
+    <header class="tasks-manager__header">
+      <div class="tasks-manager__identity">
+        <span class="tasks-manager__avatar" aria-hidden="true">{{ section.manager.name[:1] }}</span>
+        <div>
+          <h2 class="tasks-manager__name">{{ section.manager.name }}</h2>
+          {% if section.manager.role == 'admin' %}
+          <span class="tasks-manager__role">Адміністратор</span>
+          {% endif %}
+        </div>
+      </div>
+      {% if section.visible_count %}
+      <div class="tasks-manager__counts">
+        {% if status_filter == 'overdue' %}
+        <span class="tasks-count tasks-count--overdue">{{ section.visible_count }} простроч.</span>
+        {% elif status_filter == 'completed' %}
+        <span class="tasks-count tasks-count--done">{{ section.visible_count }} виконано</span>
+        {% else %}
+        <span class="tasks-count tasks-count--active">{{ section.visible_count }} активних</span>
+        {% endif %}
+      </div>
+      {% endif %}
+    </header>
+
+    {% if section.day_groups %}
+    <div class="tasks-manager__groups">
+      {% for group in section.day_groups %}
+      <div class="tasks-day-group{% if group.label == 'Прострочені' %} tasks-day-group--overdue{% elif group.label == 'Сьогодні' %} tasks-day-group--today{% endif %}">
+        <h3 class="tasks-day-group__title">
+          <span class="tasks-day-group__label">{{ group.label }}</span>
+          <span class="tasks-day-group__count">{{ group.tasks|length }}</span>
+        </h3>
+        <div class="tasks-day-group__list">
+          {% for item in group.tasks %}
+          {% include "partials/task_card.html" %}
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if section.archive %}
+      {% if status_filter == 'completed' %}
+      <div class="tasks-manager__groups tasks-manager__groups--archive">
+        <div class="tasks-day-group__list">
+          {% for item in section.archive %}
+          {% include "partials/task_card.html" %}
+          {% endfor %}
+        </div>
+      </div>
+      {% else %}
+      <details class="tasks-archive" {% if show_completed and not section.day_groups %}open{% endif %}>
+        <summary class="tasks-archive__summary">
+          Архів
+          <span class="tasks-day-group__count">{{ section.archive|length }}</span>
+        </summary>
+        <div class="tasks-day-group__list">
+          {% for item in section.archive %}
+          {% include "partials/task_card.html" %}
+          {% endfor %}
+        </div>
+      </details>
+      {% endif %}
+    {% endif %}
+  </section>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  <p class="muted" style="margin:0">
+    {% if status_filter == 'overdue' %}Немає прострочених задач
+    {% elif status_filter == 'completed' %}Немає виконаних задач
+    {% else %}Немає активних задач
+    {% endif %}{% if selected_manager_id %} у обраного менеджера{% endif %}{% if selected_kind %} з обраним типом{% endif %}.
+  </p>
+</div>
+{% endif %}
+{% endblock %}

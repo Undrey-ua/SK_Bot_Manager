@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}{% if edit_user %}Редагувати{% else %}Новий{% endif %} користувач — SK Bot Manager{% endblock %}
+{% block content %}
+<nav class="breadcrumb">
+  <a href="/admin/users">Користувачі</a>
+  <span class="breadcrumb-sep">/</span>
+  <span>{% if edit_user %}Редагувати{% else %}Новий{% endif %}</span>
+</nav>
+
+<div class="card card--compact-form">
+  <h2>{% if edit_user %}Редагувати користувача{% else %}Додати користувача{% endif %}</h2>
+  {% if error %}
+  <p class="error">{{ error }}</p>
+  {% endif %}
+  <form method="post" action="{{ form_action }}" class="client-web-form" id="user-form">
+    <label>ПІБ
+      <input type="text" name="name" required value="{{ form_name }}" placeholder="Прізвище Імʼя">
+    </label>
+    <label>Telegram ID
+      <input type="text" name="telegram_id" required inputmode="numeric" value="{{ form_telegram_id }}" placeholder="Напр. 123456789">
+      <span class="login-hint muted">Користувач надсилає /start у боті — ID можна скопіювати з повідомлення активації.</span>
+    </label>
+    <label>Роль
+      <select name="role" id="user-role" required>
+        {% for value, label in role_choices %}
+        <option value="{{ value }}" {% if form_role == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <div id="supervisor-block" {% if form_role != 'sales_manager' %}hidden{% endif %}>
+      <label>Регіональний менеджер
+        <select name="supervisor_id" id="user-supervisor">
+          <option value="">Оберіть менеджера</option>
+          {% for m in regional_managers %}
+          <option value="{{ m.id }}" {% if form_supervisor_id == m.id %}selected{% endif %}>{{ m.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+    <div class="task-form__actions">
+      <button type="submit" class="btn btn-primary">{{ submit_label }}</button>
+      <a href="/admin/users" class="btn btn-secondary">Скасувати</a>
+    </div>
+  </form>
+
+  {% if edit_user %}
+  <div class="user-form__danger-zone">
+    {% if delete_blocked %}
+    <p class="muted">Видалення недоступне: {{ delete_blocked }}</p>
+    {% else %}
+    <form
+      method="post"
+      action="/admin/users/{{ edit_user.id }}/delete"
+      class="user-form__delete-form"
+      onsubmit="return confirm('Видалити користувача «{{ edit_user.name }}»? Цю дію не можна скасувати.');"
+    >
+      <button type="submit" class="btn btn-danger">Видалити користувача</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const roleSel = document.getElementById("user-role");
+  const block = document.getElementById("supervisor-block");
+  const supSel = document.getElementById("user-supervisor");
+  if (!roleSel || !block) return;
+  function sync() {
+    const isSales = roleSel.value === "sales_manager";
+    block.hidden = !isSales;
+    if (supSel) supSel.required = isSales;
+  }
+  roleSel.addEventListener("change", sync);
+  sync();
+})();
+</script>
+{% endblock %}

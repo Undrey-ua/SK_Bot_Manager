@@ -11,10 +11,15 @@ from config.settings import Settings
 
 
 def create_engine(database_url: str) -> AsyncEngine:
+    # Supabase transaction pooler (6543) does not support asyncpg prepared statements.
     return create_async_engine(
         database_url,
         echo=False,
         pool_pre_ping=True,
+        connect_args={
+            "statement_cache_size": 0,
+            "prepared_statement_cache_size": 0,
+        },
     )
 
 

@@ -1,0 +1,47 @@
+<div class="modal" id="reserve-modal" hidden>
+  <div class="modal__backdrop" data-close-modal></div>
+  <div class="modal__dialog" role="dialog" aria-labelledby="reserve-modal-title">
+    <header class="modal__header">
+      <h2 id="reserve-modal-title">Додати резерв</h2>
+      <button type="button" class="modal__close" data-close-modal aria-label="Закрити">×</button>
+    </header>
+    <p class="modal__hint muted">
+      {% if can_pick_reserve_manager %}Менеджер → область → клієнт → матеріал → кількість (кв. м)
+      {% else %}Область → клієнт → матеріал → кількість (кв. м){% endif %}
+    </p>
+    <form method="post" action="/reserves/new" id="reserve-form" class="stand-move-form">
+      {% if selected_manager_id %}<input type="hidden" name="return_manager_id" value="{{ selected_manager_id }}">{% endif %}
+      {% if can_pick_reserve_manager %}
+      <label>Менеджер
+        <select name="manager_id" id="reserve-manager" required>
+          <option value="">Оберіть менеджера</option>
+          {% for m in managers %}
+          <option value="{{ m.id }}">{{ m.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      {% endif %}
+      <label>Область
+        <select name="region_id" id="reserve-region" required {% if can_pick_reserve_manager %}disabled{% endif %}>
+          <option value="">{% if can_pick_reserve_manager %}Спочатку оберіть менеджера{% else %}Завантаження…{% endif %}</option>
+        </select>
+      </label>
+      <label>Клієнт (ТТ)
+        <select name="client_id" id="reserve-client" required disabled>
+          <option value="">Спочатку оберіть область</option>
+        </select>
+      </label>
+      <label>Матеріал
+        <input type="text" name="material" id="reserve-material" required placeholder="Назва матеріалу">
+      </label>
+      <label>Кількість, кв. м
+        <input type="text" name="quantity" id="reserve-quantity" required inputmode="decimal" placeholder="12.5">
+      </label>
+      <p class="modal__error" id="reserve-error" hidden></p>
+      <div class="modal__actions">
+        <button type="button" class="btn btn-secondary" data-close-modal>Скасувати</button>
+        <button type="submit" class="btn btn-primary" id="reserve-submit">Зберегти</button>
+      </div>
+    </form>
+  </div>
+</div>

@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Резерви — SK Bot Manager{% endblock %}
+{% block content %}
+<header class="page-header page-header--row">
+  <div>
+    <h1 class="page-title">Резерви</h1>
+    <p class="page-subtitle">{% if show_reserves_manager %}Залишки та резерви по менеджерах{% else %}Залишки та резерви{% endif %}</p>
+  </div>
+  {% if can_create_reserves %}
+  <button type="button" class="btn btn-primary" data-open-reserve>+ Додати резерв</button>
+  {% endif %}
+</header>
+
+{% if can_filter_reserves %}
+<form class="filters filters--compact" method="get" action="/reserves">
+  <label class="filters__field--manager">
+    Менеджер
+    <select name="manager_id" onchange="this.form.submit()">
+      <option value="">Усі</option>
+      {% for m in managers %}
+      <option value="{{ m.id }}" {% if selected_manager_id == m.id %}selected{% endif %}>{{ m.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+</form>
+{% endif %}
+
+<div class="card">
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        {% if show_reserves_manager %}<th>Менеджер</th>{% endif %}
+        <th>Область</th>
+        <th>Клієнт</th>
+        <th>Матеріал</th>
+        <th>Кв. м</th>
+        <th>Діє до</th>
+        <th>Статус</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in reserves %}
+      <tr>
+        <td>#{{ r.id }}</td>
+        {% if show_reserves_manager %}
+        <td>
+          {% if r.manager %}{{ r.manager.name }}{% else %}—{% endif %}
+          {% if r.created_by and r.created_by_id != r.manager_id %}
+          <span class="reserve-creator-badge" title="{{ r.created_by.name }}">{{ user_initials(r.created_by.name) }}</span>
+          {% endif %}
+        </td>
+        {% endif %}
+        <td>{{ r.region.name if r.region else '—' }}</td>
+        <td>{{ r.client.name if r.client else '—' }}</td>
+        <td>{{ r.material }}</td>
+        <td>{{ format_qty(r.quantity, decimals=2) }}</td>
+        <td class="col-datetime">{{ format_dt(r.expires_at) }}</td>
+        <td>
+          {% if r.cancelled_at %}скасовано
+          {% else %}активний{% endif %}
+        </td>
+        <td class="table-actions">
+          {% if can_manage_reserve(current_user, manager_id=r.manager_id) and not r.cancelled_at %}
+          {% if can_sale_from_reserve(current_user, manager_id=r.manager_id) %}
+          <button type="button" class="btn btn-primary btn-sm" data-open-reserve-sale data-reserve-id="{{ r.id }}">Продаж</button>
+          {% endif %}
+          <form method="post" action="/reserves/extend">
+            <input type="hidden" name="reserve_id" value="{{ r.id }}">
+            {% if selected_manager_id %}<input type="hidden" name="return_manager_id" value="{{ selected_manager_id }}">{% endif %}
+            <button type="submit" class="btn btn-secondary btn-sm">+7 днів</button>
+          </form>
+          <form method="post" action="/reserves/cancel" onsubmit="return confirm('Скасувати резерв #{{ r.id }}?');">
+            <input type="hidden" name="reserve_id" value="{{ r.id }}">
+            {% if selected_manager_id %}<input type="hidden" name="return_manager_id" value="{{ selected_manager_id }}">{% endif %}
+            <button type="submit" class="btn btn-danger btn-sm">Скасувати</button>
+          </form>
+          {% else %}
+          <span class="muted">—</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="{% if show_reserves_manager %}9{% else %}8{% endif %}">Немає активних резервів</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+{% include "partials/reserve_sale_modal.html" %}
+{% if can_create_reserves %}
+{% include "partials/reserve_form_modal.html" %}
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script src="/static/reserve_sale.js"></script>
+{% if can_create_reserves %}
+<script src="/static/cascade_form.js"></script>
+<script>
+setupCascadeForm({
+  modalId: "reserve-modal",
+  formId: "reserve-form",
+  managerId: "reserve-manager",
+  managerPick: {{ 'true' if can_pick_reserve_manager else 'false' }},
+  regionId: "reserve-region",
+  clientId: "reserve-client",
+  errorId: "reserve-error",
+  openSelector: "[data-open-reserve]",
+});
+</script>
+{% endif %}
+{% endblock %}

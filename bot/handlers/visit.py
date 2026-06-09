@@ -6,26 +6,35 @@ from aiogram.types import CallbackQuery, Message
 
 from bot.keyboards.inline import (
     back_to_menu_keyboard,
-    clients_keyboard,
     main_menu_keyboard,
     photos_keyboard,
     tasks_keyboard,
+    visit_clients_keyboard,
+    visit_regions_keyboard,
     visit_type_keyboard,
 )
 from bot.services.client import ClientService
+from bot.services.region import RegionService
 from bot.services.storage import StorageService
 from bot.services.visit import VisitService
+from bot.services.visit_task_type import VisitTaskTypeService
 from bot.states.visit import VisitStates
-from database.models import (
-    TASK_LABELS,
-    VISIT_TYPE_LABELS,
-    TaskType,
-    User,
-    VisitType,
-)
+from database.models import VISIT_TYPE_LABELS, User, VisitType
+from visit_task_labels import visit_task_label
 
 logger = logging.getLogger(__name__)
 router = Router(name="visit")
+
+
+async def _active_task_choices(
+    visit_task_type_service: VisitTaskTypeService,
+) -> list[tuple[str, str]]:
+    rows = await visit_task_type_service.list_active()
+    return [(row.code, row.label) for row in rows]
+
+
+def _tasks_text(selected: list[str]) -> str:
+    return ", ".join(visit_task_label(t) for t in selected) if selected else "—"
 
 
 @router.callback_query(F.data == "visit:new")
@@ -33,25 +42,67 @@ async def start_visit(
     callback: CallbackQuery,
     state: FSMContext,
     db_user: User,
-    client_service: ClientService,
+    region_service: RegionService,
 ) -> None:
     await callback.answer()
     if callback.message is None:
         return
 
-    clients = await client_service.list_by_manager(db_user.id)
-    if not clients:
+    regions = await region_service.list_by_manager(db_user.id)
+    if not regions:
         await callback.message.edit_text(
-            "Неможливо створити візит — немає клієнтів.",
-            reply_markup=main_menu_keyboard(),
+            "➕ <b>Новий візит</b>\n\n"
+            "Спочатку додайте область: 👤 Клієнти → 🗺 Мої області",
+            reply_markup=main_menu_keyboard(db_user),
         )
         return
 
     await state.clear()
+    await state.set_state(VisitStates.select_region)
+    await callback.message.edit_text(
+        "➕ <b>Новий візит</b>\n\nОберіть область:",
+        reply_markup=visit_regions_keyboard(regions),
+    )
+
+
+@router.callback_query(
+    VisitStates.select_region,
+    F.data.startswith("visit:pick_region:"),
+)
+async def pick_region(
+    callback: CallbackQuery,
+    state: FSMContext,
+    db_user: User,
+    client_service: ClientService,
+    region_service: RegionService,
+) -> None:
+    await callback.answer()
+    if callback.message is None:
+        return
+
+    region_id = int(callback.data.split(":")[-1])
+    region = await region_service.get_by_id(region_id)
+    if region is None or region.manager_id != db_user.id:
+        await callback.answer("Область не знайдена", show_alert=True)
+        return
+
+    clients = await client_service.list_by_manager_and_region(db_user.id, region_id)
+    if not clients:
+        regions = await region_service.list_by_manager(db_user.id)
+        await callback.message.edit_text(
+            f"➕ <b>Новий візит</b>\n\n"
+            f"<b>{region.name}</b> — немає клієнтів. Оберіть іншу область:",
+            reply_markup=visit_regions_keyboard(regions),
+        )
+        await state.set_state(VisitStates.select_region)
+        return
+
+    await state.update_data(region_id=region_id, region_name=region.name)
     await state.set_state(VisitStates.select_client)
     await callback.message.edit_text(
-        "➕ <b>Новий візит</b>\n\nОберіть клієнта:",
-        reply_markup=clients_keyboard(clients),
+        f"➕ <b>Новий візит</b>\n\n"
+        f"Область: <b>{region.name}</b>\n\nОберіть клієнта:",
+        reply_markup=visit_clients_keyboard(clients),
     )
 
 
@@ -87,9 +138,21 @@ async def select_client(
     VisitStates.select_visit_type,
     F.data.startswith("visit:type:"),
 )
-async def select_visit_type(callback: CallbackQuery, state: FSMContext) -> None:
+async def select_visit_type(
+    callback: CallbackQuery,
+    state: FSMContext,
+    visit_task_type_service: VisitTaskTypeService,
+) -> None:
     await callback.answer()
     if callback.message is None:
+        return
+
+    task_choices = await _active_task_choices(visit_task_type_service)
+    if not task_choices:
+        await callback.answer(
+            "Немає доступних задач візиту. Зверніться до адміністратора.",
+            show_alert=True,
+        )
         return
 
     visit_type = callback.data.split(":")[-1]
@@ -98,7 +161,7 @@ async def select_visit_type(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.message.edit_text(
         f"Тип: <b>{VISIT_TYPE_LABELS[VisitType(visit_type)]}</b>\n\n"
         "Оберіть задачі (можна кілька):",
-        reply_markup=tasks_keyboard(set()),
+        reply_markup=tasks_keyboard(set(), task_choices),
     )
 
 
@@ -106,7 +169,11 @@ async def select_visit_type(callback: CallbackQuery, state: FSMContext) -> None:
     VisitStates.select_tasks,
     F.data.startswith("visit:task:"),
 )
-async def toggle_task(callback: CallbackQuery, state: FSMContext) -> None:
+async def toggle_task(
+    callback: CallbackQuery,
+    state: FSMContext,
+    visit_task_type_service: VisitTaskTypeService,
+) -> None:
     await callback.answer()
     if callback.message is None:
         return
@@ -120,8 +187,9 @@ async def toggle_task(callback: CallbackQuery, state: FSMContext) -> None:
         selected.add(task)
 
     await state.update_data(selected_tasks=list(selected))
+    task_choices = await _active_task_choices(visit_task_type_service)
     await callback.message.edit_reply_markup(
-        reply_markup=tasks_keyboard(selected),
+        reply_markup=tasks_keyboard(selected, task_choices),
     )
 
 
@@ -137,10 +205,9 @@ async def tasks_done(callback: CallbackQuery, state: FSMContext) -> None:
         await callback.answer("Оберіть хоча б одну задачу", show_alert=True)
         return
 
-    tasks_text = ", ".join(TASK_LABELS[TaskType(t)] for t in selected)
     await state.set_state(VisitStates.enter_comment)
     await callback.message.edit_text(
-        f"Задачі: {tasks_text}\n\n"
+        f"Задачі: {_tasks_text(selected)}\n\n"
         "Введіть коментар до візиту (або «-» щоб пропустити):",
     )
 
@@ -153,7 +220,7 @@ async def enter_comment(message: Message, state: FSMContext) -> None:
     await state.update_data(comment=comment, photo_urls=[])
     await state.set_state(VisitStates.upload_photos)
     await message.answer(
-        "📷 Надішліть фото візиту.\n"
+        "📷 Надішліть фото візиту (необовʼязково).\n"
         "Можна кілька. Коли готово — натисніть «Завершити».",
         reply_markup=photos_keyboard(0),
     )
@@ -198,6 +265,7 @@ async def finish_visit(
     state: FSMContext,
     db_user: User,
     visit_service: VisitService,
+    visit_task_type_service: VisitTaskTypeService,
 ) -> None:
     await callback.answer()
     if callback.message is None:
@@ -205,8 +273,11 @@ async def finish_visit(
 
     data = await state.get_data()
     photo_urls: list[str] = data.get("photo_urls", [])
-    if not photo_urls:
-        await callback.answer("Додайте хоча б одне фото", show_alert=True)
+    selected_tasks = await visit_task_type_service.filter_known_tasks(
+        data.get("selected_tasks", [])
+    )
+    if not selected_tasks:
+        await callback.answer("Оберіть хоча б одну задачу", show_alert=True)
         return
 
     visit = await visit_service.create_visit(
@@ -214,34 +285,66 @@ async def finish_visit(
         client_id=data["client_id"],
         visit_type=data["visit_type"],
         comment=data.get("comment"),
-        tasks=data.get("selected_tasks", []),
+        tasks=selected_tasks,
         photo_urls=photo_urls,
     )
 
     await state.clear()
     visit_label = VISIT_TYPE_LABELS[VisitType(data["visit_type"])]
+    photos_line = f"{len(photo_urls)} шт." if photo_urls else "без фото"
     await callback.message.edit_text(
         f"✅ <b>Візит #{visit.id} збережено</b>\n\n"
         f"Клієнт: {data['client_name']}\n"
         f"Тип: {visit_label}\n"
-        f"Фото: {len(photo_urls)}",
+        f"Фото: {photos_line}",
         reply_markup=back_to_menu_keyboard(),
     )
     logger.info("Visit %s created by user %s", visit.id, db_user.id)
 
 
-# --- navigation back ---
-
-@router.callback_query(F.data == "visit:back:client")
-async def back_to_client(callback: CallbackQuery, state: FSMContext, db_user: User, client_service: ClientService) -> None:
+@router.callback_query(F.data == "visit:back:regions")
+async def back_to_regions(
+    callback: CallbackQuery,
+    state: FSMContext,
+    db_user: User,
+    region_service: RegionService,
+) -> None:
     await callback.answer()
     if callback.message is None:
         return
-    clients = await client_service.list_by_manager(db_user.id)
+    regions = await region_service.list_by_manager(db_user.id)
+    await state.set_state(VisitStates.select_region)
+    await callback.message.edit_text(
+        "➕ <b>Новий візит</b>\n\nОберіть область:",
+        reply_markup=visit_regions_keyboard(regions),
+    )
+
+
+@router.callback_query(F.data == "visit:back:client")
+async def back_to_client(
+    callback: CallbackQuery,
+    state: FSMContext,
+    db_user: User,
+    client_service: ClientService,
+) -> None:
+    await callback.answer()
+    if callback.message is None:
+        return
+    data = await state.get_data()
+    region_id = data.get("region_id")
+    region_name = data.get("region_name", "")
+    if not region_id:
+        await callback.answer("Спочатку оберіть область", show_alert=True)
+        return
+    clients = await client_service.list_by_manager_and_region(
+        db_user.id,
+        int(region_id),
+    )
     await state.set_state(VisitStates.select_client)
     await callback.message.edit_text(
-        "➕ <b>Новий візит</b>\n\nОберіть клієнта:",
-        reply_markup=clients_keyboard(clients),
+        f"➕ <b>Новий візит</b>\n\n"
+        f"Область: <b>{region_name}</b>\n\nОберіть клієнта:",
+        reply_markup=visit_clients_keyboard(clients),
     )
 
 
@@ -265,9 +368,8 @@ async def back_to_comment(callback: CallbackQuery, state: FSMContext) -> None:
         return
     data = await state.get_data()
     selected: list[str] = data.get("selected_tasks", [])
-    tasks_text = ", ".join(TASK_LABELS[TaskType(t)] for t in selected)
     await state.set_state(VisitStates.enter_comment)
     await callback.message.edit_text(
-        f"Задачі: {tasks_text}\n\n"
+        f"Задачі: {_tasks_text(selected)}\n\n"
         "Введіть коментар до візиту (або «-» щоб пропустити):",
     )

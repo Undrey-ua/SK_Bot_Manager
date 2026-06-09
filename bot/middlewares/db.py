@@ -23,7 +23,16 @@ class DbSessionMiddleware(BaseMiddleware):
             data["container"] = self._container
             data["user_service"] = self._container.user_service(session)
             data["client_service"] = self._container.client_service(session)
+            data["region_service"] = self._container.region_service(session)
+            data["stand_service"] = self._container.stand_service(session)
             data["visit_service"] = self._container.visit_service(session)
+            data["brand_service"] = self._container.brand_service(session)
+            data["sale_service"] = self._container.sale_service(session)
+            data["reserve_service"] = self._container.reserve_service(session)
+            data["task_service"] = self._container.task_service(session)
+            data["visit_task_type_service"] = self._container.visit_task_type_service(
+                session
+            )
             data["storage_service"] = self._container.storage_service
             try:
                 result = await handler(event, data)

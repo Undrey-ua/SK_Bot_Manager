@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from database.models import User
 from database.repositories.user import UserRepository
 
@@ -19,3 +21,6 @@ class UserService:
             return user, False
         user = await self._repo.create(telegram_id=telegram_id, name=name)
         return user, True
+
+    async def list_all(self) -> list[User]:
+        return await self._repo.list_all()
