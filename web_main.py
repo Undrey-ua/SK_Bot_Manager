@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import sys
 
 import uvicorn
@@ -23,8 +24,9 @@ def main() -> None:
         sys.exit(1)
 
     app = create_app(settings)
-    logger.info("Web dashboard starting on port %s", settings.web_port)
-    uvicorn.run(app, host="0.0.0.0", port=settings.web_port, log_level="info")
+    port = int(os.environ.get("PORT", str(settings.web_port)))
+    logger.info("Web dashboard starting on port %s", port)
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
 
 
 if __name__ == "__main__":
