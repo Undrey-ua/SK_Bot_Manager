@@ -90,6 +90,18 @@
   </div>
 </div>
 
+{% if total_pages > 1 %}
+<nav class="pagination">
+  {% if page > 1 %}
+  <a href="?page={{ page - 1 }}{% if selected_manager_id %}&manager_id={{ selected_manager_id }}{% endif %}">←</a>
+  {% endif %}
+  <span class="current">{{ page }} / {{ total_pages }}</span>
+  {% if page < total_pages %}
+  <a href="?page={{ page + 1 }}{% if selected_manager_id %}&manager_id={{ selected_manager_id }}{% endif %}">→</a>
+  {% endif %}
+</nav>
+{% endif %}
+
 {% include "partials/reserve_sale_modal.html" %}
 {% if can_create_reserves %}
 {% include "partials/reserve_form_modal.html" %}

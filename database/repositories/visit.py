@@ -59,6 +59,25 @@ class VisitRepository(BaseRepository):
         result = await self._session.execute(stmt)
         return int(result.scalar_one())
 
+    async def stats_summary(
+        self,
+        *,
+        start_of_day,
+        start_of_week,
+        manager_id: int | None = None,
+    ) -> tuple[int, int, int]:
+        """total, today, week — один запит до БД."""
+        stmt = select(
+            func.count(),
+            func.count().filter(Visit.created_at >= start_of_day),
+            func.count().filter(Visit.created_at >= start_of_week),
+        ).select_from(Visit)
+        if manager_id is not None:
+            stmt = stmt.where(Visit.manager_id == manager_id)
+        result = await self._session.execute(stmt)
+        total, today, week = result.one()
+        return int(total), int(today), int(week)
+
     async def count_since(self, since: datetime, *, manager_id: int | None = None) -> int:
         stmt = select(func.count()).select_from(Visit).where(Visit.created_at >= since)
         if manager_id is not None:

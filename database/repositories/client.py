@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -58,6 +58,86 @@ class ClientRepository(BaseRepository):
             .options(*self._detail_options())
             .order_by(Client.name)
         )
+        return list(result.scalars().all())
+
+    def _apply_filters(
+        self,
+        stmt,
+        *,
+        manager_id: int | None = None,
+        region_id: int | None = None,
+        city: str | None = None,
+        stand_id: int | None = None,
+    ):
+        if manager_id is not None:
+            stmt = stmt.where(Client.manager_id == manager_id)
+        if region_id is not None:
+            stmt = stmt.where(Client.region_id == region_id)
+        if city:
+            stmt = stmt.where(Client.city == city)
+        if stand_id is not None:
+            stmt = stmt.where(
+                exists().where(
+                    ClientStand.client_id == Client.id,
+                    ClientStand.stand_id == stand_id,
+                )
+            )
+        return stmt
+
+    async def count_filtered(
+        self,
+        *,
+        manager_id: int | None = None,
+        region_id: int | None = None,
+        city: str | None = None,
+        stand_id: int | None = None,
+    ) -> int:
+        stmt = self._apply_filters(
+            select(func.count()).select_from(Client),
+            manager_id=manager_id,
+            region_id=region_id,
+            city=city,
+            stand_id=stand_id,
+        )
+        result = await self._session.execute(stmt)
+        return int(result.scalar_one())
+
+    async def list_filtered(
+        self,
+        *,
+        manager_id: int | None = None,
+        region_id: int | None = None,
+        city: str | None = None,
+        stand_id: int | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[Client]:
+        stmt = self._apply_filters(
+            select(Client).options(*self._admin_list_options()).order_by(Client.name),
+            manager_id=manager_id,
+            region_id=region_id,
+            city=city,
+            stand_id=stand_id,
+        )
+        result = await self._session.execute(stmt.limit(limit).offset(offset))
+        return list(result.scalars().all())
+
+    async def list_for_filter_options(
+        self,
+        *,
+        manager_id: int | None = None,
+    ) -> list[Client]:
+        stmt = (
+            select(Client)
+            .options(
+                selectinload(Client.manager),
+                selectinload(Client.region),
+            )
+            .order_by(Client.name)
+        )
+        if manager_id is not None:
+            stmt = stmt.where(Client.manager_id == manager_id)
+        result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
     async def get_by_id(self, client_id: int) -> Client | None:

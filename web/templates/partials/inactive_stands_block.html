@@ -1,0 +1,36 @@
+<p class="muted">
+  Встановлені стенди з карток клієнтів, по яких не було продажів за
+  <strong>останні 3 міс.</strong> ({{ stands_not_worked_count_3 }} поз.) та
+  <strong>останні 6 міс.</strong> ({{ stands_not_worked_count_6 }} поз.).
+  Фільтри зверху застосовуються до цієї таблиці (крім торгової марки).
+</p>
+<div class="table-wrap">
+  <table class="table--darkhead">
+    <thead>
+      <tr>
+        <th>Період</th>
+        <th>Торгова марка (стенд)</th>
+        <th>Клієнт (ТТ)</th>
+        <th>К-сть</th>
+        {% if can_filter_managers %}<th>Менеджер</th>{% endif %}
+        <th>Область</th>
+        <th>Місто</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in stands_not_worked_rows %}
+      <tr>
+        <td>{{ r.period_label }}</td>
+        <td>{{ r.stand_name }}</td>
+        <td><a href="/clients/{{ r.client_id }}">{{ r.client_label }}</a></td>
+        <td>{{ r.placement_count }}</td>
+        {% if can_filter_managers %}<td>{{ r.manager_name }}</td>{% endif %}
+        <td>{{ r.region_name }}</td>
+        <td>{{ r.city }}</td>
+      </tr>
+      {% else %}
+      <tr class="empty-row"><td colspan="{% if can_filter_managers %}7{% else %}6{% endif %}">Немає стендів без продажів за обраними фільтрами</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

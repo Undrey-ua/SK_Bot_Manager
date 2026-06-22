@@ -6,10 +6,11 @@
   <p class="page-subtitle">
     База торгових точок
     {% if has_filters %}
-    — показано {{ clients|length }} з {{ clients_total }}
+    — знайдено {{ clients_total }}
     {% else %}
     — {{ clients_total }} торгових точок
     {% endif %}
+    {% if total_pages > 1 %} · сторінка {{ page }}/{{ total_pages }}{% endif %}
   </p>
 </header>
 
@@ -101,4 +102,16 @@
     </table>
   </div>
 </div>
+
+{% if total_pages > 1 %}
+<nav class="pagination">
+  {% if page > 1 %}
+  <a href="?page={{ page - 1 }}{% if selected_manager_id %}&manager_id={{ selected_manager_id }}{% endif %}{% if selected_region_id %}&region_id={{ selected_region_id }}{% endif %}{% if selected_city %}&city={{ selected_city | urlencode }}{% endif %}{% if selected_stand_id %}&stand_id={{ selected_stand_id }}{% endif %}">←</a>
+  {% endif %}
+  <span class="current">{{ page }} / {{ total_pages }}</span>
+  {% if page < total_pages %}
+  <a href="?page={{ page + 1 }}{% if selected_manager_id %}&manager_id={{ selected_manager_id }}{% endif %}{% if selected_region_id %}&region_id={{ selected_region_id }}{% endif %}{% if selected_city %}&city={{ selected_city | urlencode }}{% endif %}{% if selected_stand_id %}&stand_id={{ selected_stand_id }}{% endif %}">→</a>
+  {% endif %}
+</nav>
+{% endif %}
 {% endblock %}

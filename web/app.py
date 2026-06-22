@@ -29,7 +29,7 @@ from web.auth import (
 from web.deps import query_int, query_str
 from web.page_context import load_web_user, page_ctx, scoped_manager_filter
 from web.roles import can_filter_managers, data_owner_manager_id
-from web.services.clients_filter import ClientFilters, filter_clients, build_client_filter_options
+from web.services.clients_filter import ClientFilters, build_client_filter_options
 from web.services.dashboard import DashboardService
 from config.team import is_regional_manager
 from web.services.user_admin import user_role_label, user_roles_display
@@ -366,10 +366,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         session: AsyncSession = Depends(get_session),
         service: DashboardService = Depends(dashboard_service),
         _auth: Response | None = Depends(require_auth),
+        page: int = 1,
     ) -> HTMLResponse:
         user = await load_web_user(request, session)
         require_nav(user, "clients")
-        all_clients = await service.list_clients()
         stands = await service.list_active_stands()
         filters = ClientFilters(
             manager_id=scoped_manager_filter(user, query_int(request, "manager_id")),
@@ -378,14 +378,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             stand_id=query_int(request, "stand_id"),
         )
         owner = data_owner_manager_id(user)
-        pool = (
-            all_clients
-            if can_filter_managers(user)
-            else [c for c in all_clients if c.manager_id == owner]
+        filter_pool_manager = filters.manager_id
+        if not can_filter_managers(user):
+            filter_pool_manager = owner
+        filter_clients_pool = await service.list_clients_for_filters(
+            manager_id=filter_pool_manager,
         )
-        clients = filter_clients(pool, filters)
+        clients, clients_total, page, total_pages = await service.list_clients_page(
+            filters,
+            page=page,
+        )
         filter_options = build_client_filter_options(
-            pool,
+            filter_clients_pool,
             stands,
             manager_id=filters.manager_id,
             region_id=filters.region_id,
@@ -405,16 +409,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 user,
                 active_nav="clients",
                 clients=clients,
-                clients_total=len(pool),
+                clients_total=clients_total,
                 managers=await service.list_managers() if can_filter_managers(user) else [],
+                filter_regions=filter_options.regions,
+                filter_cities=filter_options.cities,
+                filter_stands=filter_options.stands,
                 selected_manager_id=filters.manager_id,
                 selected_region_id=filters.region_id,
                 selected_city=filters.city,
                 selected_stand_id=filters.stand_id,
-                filter_regions=filter_options.regions,
-                filter_cities=filter_options.cities,
-                filter_stands=filter_options.stands,
                 has_filters=has_filters,
+                page=page,
+                total_pages=total_pages,
             ),
         )
 

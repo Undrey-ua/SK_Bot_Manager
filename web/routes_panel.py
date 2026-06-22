@@ -8,7 +8,7 @@ from decimal import Decimal, InvalidOperation
 
 from fastapi import Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -80,6 +80,7 @@ from web.services.tasks_board import (
     TASK_STATUS_OVERDUE,
     build_tasks_board,
 )
+from web.ttl_cache import get_or_load
 from web.utils import (
     client_stands_map_json,
     parse_manager_task_kind_filter,
@@ -87,6 +88,91 @@ from web.utils import (
     uk_month_name,
     warehouse_stands_map_json,
 )
+
+
+def _resolve_sales_period(
+    period_kind: str,
+    year: int,
+    month: int,
+    quarter: int,
+):
+    if period_kind == "quarter":
+        return quarter_range(year, quarter)
+    if period_kind == "year":
+        return year_range(year)
+    return month_range(year, month)
+
+
+def _sales_analytics_cache_key(
+    *,
+    period_kind: str,
+    year: int,
+    month: int,
+    quarter: int,
+    sales_filters: SalesFilters,
+) -> str:
+    return ":".join(
+        [
+            "sales-bundle",
+            period_kind,
+            str(year),
+            str(month),
+            str(quarter),
+            str(sales_filters.manager_id or ""),
+            str(sales_filters.region_id or ""),
+            sales_filters.city or "",
+            str(sales_filters.stand_id or ""),
+            str(sales_filters.brand_id or ""),
+        ]
+    )
+
+
+async def _load_sales_analytics_bundle(
+    service: AnalyticsService,
+    plan_service: SalesPlanService,
+    *,
+    period,
+    sales_filters: SalesFilters,
+    period_kind: str,
+    year: int,
+    month: int,
+    quarter: int,
+    include_plans: bool,
+):
+    cache_key = _sales_analytics_cache_key(
+        period_kind=period_kind,
+        year=year,
+        month=month,
+        quarter=quarter,
+        sales_filters=sales_filters,
+    )
+
+    async def loader():
+        return {
+            "sales_by_manager": await service.sales_by_manager(period, sales_filters),
+            "sales_by_brand": await service.sales_by_brand(period, sales_filters),
+            "sales_by_client": await service.sales_by_client(period, sales_filters),
+            "sales_by_oblast": await service.sales_by_oblast(period, sales_filters),
+            "brands_by_city_rows": await service.brands_by_city_split(
+                period, sales_filters
+            ),
+            "brands_by_oblast_rows": await service.brands_by_oblast_split(
+                period, sales_filters
+            ),
+            "total_sales": await service.sales_total(period, sales_filters),
+            "sales_ledger": await service.sales_ledger(period, sales_filters),
+            "sales_plan_progress": (
+                await plan_service.progress_for_all_managers(year=year, month=month)
+                if include_plans
+                else []
+            ),
+        }
+
+    return await get_or_load(cache_key, loader)
+
+
+def _analytics_partial_query(request: Request) -> str:
+    return str(request.url.query)
 
 
 def register_panel_routes(
@@ -149,40 +235,31 @@ def register_panel_routes(
                 stand_id=stand_id,
                 brand_id=brand_id,
             )
-            all_clients = await dashboard.list_clients()
+            filter_clients_pool = await dashboard.list_clients_for_filters(
+                manager_id=manager_id,
+            )
             stands = await dashboard.list_active_stands()
             brands = await dashboard.list_active_brands()
             filter_opts = build_sales_filter_options(
-                all_clients,
+                filter_clients_pool,
                 stands,
                 brands,
                 manager_id=manager_id,
                 region_id=region_id,
             )
-            inactive_filters = sales_filters_to_client(sales_filters)
-
-            if period_kind == "quarter":
-                period = quarter_range(year, quarter)
-            elif period_kind == "year":
-                period = year_range(year)
-            else:
-                period = month_range(year, month)
-
-            sales_matrix_cols, sales_matrix_rows = await service.sales_matrix_from_stands(
-                period, sales_filters
+            period = _resolve_sales_period(period_kind, year, month, quarter)
+            bundle = await _load_sales_analytics_bundle(
+                service,
+                plan_service,
+                period=period,
+                sales_filters=sales_filters,
+                period_kind=period_kind,
+                year=year,
+                month=month,
+                quarter=quarter,
+                include_plans=period_kind == "month" and can_filter_managers(user),
             )
-            inactive_3, inactive_6 = await service.stands_not_worked(inactive_filters)
-            stands_not_worked_rows = [
-                *inactive_3,
-                *inactive_6,
-            ]
-            stands_not_worked_rows.sort(
-                key=lambda r: (
-                    r.period_label,
-                    r.stand_name.casefold(),
-                    r.client_label.casefold(),
-                )
-            )
+            partial_q = _analytics_partial_query(request)
 
             ctx.update(
                 period_kind=period_kind,
@@ -195,19 +272,15 @@ def register_panel_routes(
                     "quarter": "квартал",
                     "year": "рік",
                 }.get(period_kind, period_kind),
-                sales_by_manager=await service.sales_by_manager(period, sales_filters),
-                sales_by_brand=await service.sales_by_brand(period, sales_filters),
-                sales_by_client=await service.sales_by_client(period, sales_filters),
-                sales_by_oblast=await service.sales_by_oblast(period, sales_filters),
-                brands_by_city_rows=await service.brands_by_city_split(
-                    period, sales_filters
-                ),
-                brands_by_oblast_rows=await service.brands_by_oblast_split(
-                    period, sales_filters
-                ),
-                sales_matrix_cols=sales_matrix_cols,
-                sales_matrix_rows=sales_matrix_rows,
-                total_sales=await service.sales_total(period, sales_filters),
+                sales_by_manager=bundle["sales_by_manager"],
+                sales_by_brand=bundle["sales_by_brand"],
+                sales_by_client=bundle["sales_by_client"],
+                sales_by_oblast=bundle["sales_by_oblast"],
+                brands_by_city_rows=bundle["brands_by_city_rows"],
+                brands_by_oblast_rows=bundle["brands_by_oblast_rows"],
+                total_sales=bundle["total_sales"],
+                sales_ledger=bundle["sales_ledger"],
+                sales_plan_progress=bundle["sales_plan_progress"],
                 filter_regions=filter_opts.regions,
                 filter_cities=filter_opts.cities,
                 filter_stands=filter_opts.stands,
@@ -217,23 +290,13 @@ def register_panel_routes(
                 selected_stand_id=stand_id,
                 selected_brand_id=brand_id,
                 sales_has_filters=sales_filters_active(sales_filters),
-                stands_not_worked_rows=stands_not_worked_rows,
-                stands_not_worked_count_3=len(inactive_3),
-                stands_not_worked_count_6=len(inactive_6),
-                sales_ledger=await service.sales_ledger(period, sales_filters),
+                sales_matrix_partial_url=f"/analytics/partials/sales-matrix?{partial_q}",
+                inactive_stands_partial_url=f"/analytics/partials/inactive-stands?{partial_q}",
                 sales_return_url=analytics_sales_return_url(
                     dict(request.query_params)
                 ),
                 can_manage_sale=can_manage_sale,
                 sale_default_sold_at=period.start.isoformat(),
-                sales_plan_progress=(
-                    await plan_service.progress_for_all_managers(
-                        year=year,
-                        month=month,
-                    )
-                    if period_kind == "month" and can_filter_managers(user)
-                    else []
-                ),
                 sales_plan_month_label=uk_month_name(month),
             )
             return templates.TemplateResponse(request, "analytics.html", ctx)
@@ -393,6 +456,82 @@ def register_panel_routes(
             return templates.TemplateResponse(request, "analytics.html", ctx)
 
         return RedirectResponse("/analytics?section=sales", status_code=303)
+
+    @app.get("/analytics/partials/sales-matrix", response_class=HTMLResponse)
+    async def analytics_sales_matrix_partial(
+        request: Request,
+        session: AsyncSession = Depends(get_session),
+        service: AnalyticsService = Depends(analytics_service),
+        _auth: Response | None = Depends(require_auth),
+        period_kind: str = "month",
+        year: int | None = None,
+        month: int | None = None,
+        quarter: int | None = None,
+    ) -> HTMLResponse:
+        user = await load_web_user(request, session)
+        require_nav(user, "analytics")
+        manager_id = scoped_manager_filter(user, query_int(request, "manager_id"))
+        today = date_cls.today()
+        year = year or today.year
+        month = month or today.month
+        quarter = quarter or ((month - 1) // 3 + 1)
+        sales_filters = SalesFilters(
+            manager_id=manager_id,
+            region_id=query_int(request, "region_id"),
+            city=query_str(request, "city"),
+            stand_id=query_int(request, "stand_id"),
+            brand_id=query_int(request, "brand_id"),
+        )
+        period = _resolve_sales_period(period_kind, year, month, quarter)
+        sales_matrix_cols, sales_matrix_rows = await service.sales_matrix_from_stands(
+            period, sales_filters
+        )
+        return templates.TemplateResponse(
+            request,
+            "partials/sales_matrix_block.html",
+            {
+                "period_label": period.label,
+                "sales_matrix_cols": sales_matrix_cols,
+                "sales_matrix_rows": sales_matrix_rows,
+            },
+        )
+
+    @app.get("/analytics/partials/inactive-stands", response_class=HTMLResponse)
+    async def analytics_inactive_stands_partial(
+        request: Request,
+        session: AsyncSession = Depends(get_session),
+        service: AnalyticsService = Depends(analytics_service),
+        _auth: Response | None = Depends(require_auth),
+    ) -> HTMLResponse:
+        user = await load_web_user(request, session)
+        require_nav(user, "analytics")
+        manager_id = scoped_manager_filter(user, query_int(request, "manager_id"))
+        sales_filters = SalesFilters(
+            manager_id=manager_id,
+            region_id=query_int(request, "region_id"),
+            city=query_str(request, "city"),
+            stand_id=query_int(request, "stand_id"),
+        )
+        inactive_filters = sales_filters_to_client(sales_filters)
+        inactive_3, inactive_6 = await service.stands_not_worked(inactive_filters)
+        stands_not_worked_rows = sorted(
+            [*inactive_3, *inactive_6],
+            key=lambda r: (
+                r.period_label,
+                r.stand_name.casefold(),
+                r.client_label.casefold(),
+            ),
+        )
+        return templates.TemplateResponse(
+            request,
+            "partials/inactive_stands_block.html",
+            page_ctx(
+                user,
+                stands_not_worked_rows=stands_not_worked_rows,
+                stands_not_worked_count_3=len(inactive_3),
+                stands_not_worked_count_6=len(inactive_6),
+            ),
+        )
 
     @app.get("/sales/{sale_id}/edit", response_class=HTMLResponse)
     async def sale_edit_page(
@@ -579,6 +718,7 @@ def register_panel_routes(
         session: AsyncSession = Depends(get_session),
         service: DashboardService = Depends(dashboard_service),
         _auth: Response | None = Depends(require_auth),
+        page: int = 1,
     ) -> HTMLResponse:
         user = await load_web_user(request, session)
         require_nav(user, "reserves")
@@ -592,9 +732,22 @@ def register_panel_routes(
         )
 
         now = datetime.now(timezone.utc)
+        per_page = DashboardService.RESERVES_PER_PAGE
+        filters = [Reserve.cancelled_at.is_(None), Reserve.expires_at > now]
+        if manager_id is not None:
+            filters.append(Reserve.manager_id == manager_id)
+
+        total_result = await session.execute(
+            select(func.count()).select_from(Reserve).where(*filters)
+        )
+        total = int(total_result.scalar_one())
+        total_pages = max(1, (total + per_page - 1) // per_page)
+        page = max(1, min(page, total_pages))
+        offset = (page - 1) * per_page
+
         stmt = (
             select(Reserve)
-            .where(Reserve.cancelled_at.is_(None), Reserve.expires_at > now)
+            .where(*filters)
             .options(
                 selectinload(Reserve.manager),
                 selectinload(Reserve.created_by),
@@ -602,10 +755,9 @@ def register_panel_routes(
                 selectinload(Reserve.region),
             )
             .order_by(Reserve.expires_at.asc())
+            .limit(per_page)
+            .offset(offset)
         )
-        if manager_id is not None:
-            stmt = stmt.where(Reserve.manager_id == manager_id)
-
         result = await session.execute(stmt)
         reserves = list(result.scalars().all())
 
@@ -620,6 +772,9 @@ def register_panel_routes(
                 selected_manager_id=manager_id,
                 show_reserves_manager=show_reserves_manager_column(user),
                 can_filter_reserves=can_filter_reserves_managers(user),
+                page=page,
+                total_pages=total_pages,
+                reserves_total=total,
             ),
         )
 
@@ -856,6 +1011,30 @@ def register_panel_routes(
         )
         if filter_manager_id is not None:
             stmt = stmt.where(Task.assignee_id == filter_manager_id)
+        if kind_filter:
+            stmt = stmt.where(Task.kind == kind_filter)
+        if status_filter == TASK_STATUS_COMPLETED:
+            if show_archive:
+                stmt = stmt.where(
+                    (Task.completed_at.is_not(None)) | (Task.deleted_at.is_not(None))
+                )
+            else:
+                stmt = stmt.where(
+                    Task.completed_at.is_not(None),
+                    Task.deleted_at.is_(None),
+                )
+        elif status_filter == TASK_STATUS_OVERDUE:
+            stmt = stmt.where(
+                Task.deleted_at.is_(None),
+                Task.completed_at.is_(None),
+                Task.deadline < today,
+            )
+        else:
+            stmt = stmt.where(
+                Task.deleted_at.is_(None),
+                Task.completed_at.is_(None),
+            )
+        stmt = stmt.limit(500)
         result = await session.execute(stmt)
         tasks = list(result.scalars().all())
 

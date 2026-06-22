@@ -270,47 +270,13 @@
   </div>
 </section>
 
-<section class="card">
+<section class="card" id="sales-matrix-section">
   <h2>Продажі (матриця) — {{ period_label }}</h2>
-  <p class="matrix-legend">
-    <span class="matrix-legend__item"><span class="matrix-cell matrix-cell--sale matrix-legend__sample">12</span> продаж, кв. м</span>
-    <span class="matrix-legend__item"><span class="matrix-cell matrix-cell--no_sale matrix-legend__sample">0</span> стенд є, продажу за період немає</span>
-    <span class="matrix-legend__item"><span class="matrix-cell matrix-cell--na matrix-legend__sample">·</span> стенду у клієнта немає</span>
-  </p>
-  <div class="table-wrap matrix-wrap">
-    <table class="table--darkhead matrix-table">
-      <thead>
-        <tr>
-          <th class="sticky-col">Торгова точка</th>
-          {% for c in sales_matrix_cols %}
-          <th>
-            {{ c.label }}<br>
-            <span class="sales-matrix-th-meta">{{ c.total_points }} тт · {{ c.worked_points }} спрацювало · {{ c.pct }}%</span>
-          </th>
-          {% endfor %}
-          <th>Всього</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in sales_matrix_rows %}
-        <tr>
-          <td class="sticky-col"><strong>{{ row['client'] }}</strong></td>
-          {% for c in sales_matrix_cols %}
-          {% set cell = row.cells[c.key] %}
-          <td class="matrix-cell matrix-cell--{{ cell.kind }}">
-            {% if cell.kind == 'sale' %}{{ format_qty(cell.quantity, decimals=2) }}
-            {% elif cell.kind == 'no_sale' %}0
-            {% else %}<span class="matrix-na" aria-label="Стенду немає">·</span>{% endif %}
-          </td>
-          {% endfor %}
-          <td><strong>{% if row.total and row.total != 0 %}{{ format_qty(row.total, decimals=2) }}{% else %}0{% endif %}</strong></td>
-        </tr>
-        {% else %}
-        <tr class="empty-row"><td colspan="{{ sales_matrix_cols|length + 2 }}">Немає даних</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+  <p class="muted">Велика таблиця завантажується окремо, щоб сторінка відкривалась швидше.</p>
+  <button type="button" class="btn btn-secondary btn-sm" id="load-sales-matrix"
+          data-url="{{ sales_matrix_partial_url }}"
+          data-label="Завантажити матрицю">Завантажити матрицю</button>
+  <div id="sales-matrix-container" class="lazy-partial-container"></div>
 </section>
 
 <section class="card">
@@ -367,44 +333,13 @@
   </div>
 </section>
 
-<section class="card">
+<section class="card" id="inactive-stands-section">
   <h2>Стенди без продажів (3 та 6 місяців)</h2>
-  <p class="muted">
-    Встановлені стенди з карток клієнтів, по яких не було продажів за
-    <strong>останні 3 міс.</strong> ({{ stands_not_worked_count_3 }} поз.) та
-    <strong>останні 6 міс.</strong> ({{ stands_not_worked_count_6 }} поз.).
-    Фільтри зверху застосовуються до цієї таблиці (крім торгової марки).
-  </p>
-  <div class="table-wrap">
-    <table class="table--darkhead">
-      <thead>
-        <tr>
-          <th>Період</th>
-          <th>Торгова марка (стенд)</th>
-          <th>Клієнт (ТТ)</th>
-          <th>К-сть</th>
-          {% if can_filter_managers %}<th>Менеджер</th>{% endif %}
-          <th>Область</th>
-          <th>Місто</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for r in stands_not_worked_rows %}
-        <tr>
-          <td>{{ r.period_label }}</td>
-          <td>{{ r.stand_name }}</td>
-          <td><a href="/clients/{{ r.client_id }}">{{ r.client_label }}</a></td>
-          <td>{{ r.placement_count }}</td>
-          {% if can_filter_managers %}<td>{{ r.manager_name }}</td>{% endif %}
-          <td>{{ r.region_name }}</td>
-          <td>{{ r.city }}</td>
-        </tr>
-        {% else %}
-        <tr class="empty-row"><td colspan="{% if can_filter_managers %}7{% else %}6{% endif %}">Немає стендів без продажів за обраними фільтрами</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+  <p class="muted">Завантажується окремо — важкий звіт по всіх стендах.</p>
+  <button type="button" class="btn btn-secondary btn-sm" id="load-inactive-stands"
+          data-url="{{ inactive_stands_partial_url }}"
+          data-label="Завантажити таблицю">Завантажити таблицю</button>
+  <div id="inactive-stands-container" class="lazy-partial-container"></div>
 </section>
 
 {% if can_create_sale %}
@@ -558,6 +493,9 @@
 {% block scripts %}
 {% if section == 'stands' %}
 <script src="/static/stands.js"></script>
+{% endif %}
+{% if section == 'sales' %}
+<script src="/static/analytics_lazy.js"></script>
 {% endif %}
 {% if section == 'sales' and can_create_sale %}
 <script src="/static/cascade_form.js"></script>

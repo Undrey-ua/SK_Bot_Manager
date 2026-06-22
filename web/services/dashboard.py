@@ -45,6 +45,9 @@ class ClientSalesBrandRow:
 
 
 class DashboardService:
+    CLIENTS_PER_PAGE = 50
+    RESERVES_PER_PAGE = 50
+
     def __init__(self, session: AsyncSession) -> None:
         self._visits = VisitRepository(session)
         self._clients = ClientRepository(session)
@@ -81,6 +84,40 @@ class DashboardService:
 
     async def list_clients(self) -> list[Client]:
         return await self._clients.list_all()
+
+    async def list_clients_for_filters(
+        self,
+        *,
+        manager_id: int | None = None,
+    ) -> list[Client]:
+        return await self._clients.list_for_filter_options(manager_id=manager_id)
+
+    async def list_clients_page(
+        self,
+        filters,
+        *,
+        page: int = 1,
+        per_page: int | None = None,
+    ) -> tuple[list[Client], int, int, int]:
+        per_page = per_page or self.CLIENTS_PER_PAGE
+        total = await self._clients.count_filtered(
+            manager_id=filters.manager_id,
+            region_id=filters.region_id,
+            city=filters.city or None,
+            stand_id=filters.stand_id,
+        )
+        total_pages = max(1, (total + per_page - 1) // per_page)
+        page = max(1, min(page, total_pages))
+        offset = (page - 1) * per_page
+        clients = await self._clients.list_filtered(
+            manager_id=filters.manager_id,
+            region_id=filters.region_id,
+            city=filters.city or None,
+            stand_id=filters.stand_id,
+            limit=per_page,
+            offset=offset,
+        )
+        return clients, total, page, total_pages
 
     async def list_active_stands(self) -> list[Stand]:
         return await self._stands.list_active()
@@ -150,11 +187,12 @@ class DashboardService:
         now = datetime.now(timezone.utc)
         start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
         start_of_week = start_of_day - timedelta(days=start_of_day.weekday())
-        return VisitStats(
-            total=await self._visits.count(manager_id=manager_id),
-            today=await self._visits.count_since(start_of_day, manager_id=manager_id),
-            week=await self._visits.count_since(start_of_week, manager_id=manager_id),
+        total, today, week = await self._visits.stats_summary(
+            start_of_day=start_of_day,
+            start_of_week=start_of_week,
+            manager_id=manager_id,
         )
+        return VisitStats(total=total, today=today, week=week)
 
     async def visits_per_manager(self) -> list[ManagerVisitCount]:
         managers = await self._users.list_all()
