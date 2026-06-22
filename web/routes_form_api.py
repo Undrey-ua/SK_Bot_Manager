@@ -18,7 +18,6 @@ from web.page_context import load_web_user
 from web.roles import (
     can_pick_reserve_manager,
     can_sale_from_reserve,
-    form_owner_manager_id,
     nav_allowed,
     resolve_reserve_form_manager_id,
 )
@@ -116,7 +115,8 @@ def register_form_api_routes(
         if client_id is None:
             raise HTTPException(status_code=400, detail="client_id required")
 
-        manager_id = form_owner_manager_id(user)
+        requested = query_int(request, "manager_id")
+        manager_id = await _validated_form_manager_id(session, user, requested)
         client = await ClientRepository(session).get_by_id(client_id)
         if client is None or client.manager_id != manager_id:
             raise HTTPException(status_code=404, detail="Клієнта не знайдено")

@@ -74,9 +74,13 @@
       document.body.classList.add("modal-open");
       showError("");
       if (managerPick) {
-        resetRegions();
-        resetClients();
-        if (brandSel) resetBrands();
+        if (managerSel && managerSel.value) {
+          loadRegions();
+        } else {
+          resetRegions();
+          resetClients();
+          if (brandSel) resetBrands();
+        }
       } else {
         loadRegions();
       }
@@ -164,7 +168,9 @@
       brandSel.disabled = true;
       fillSelect(brandSel, [], "Завантаження…", "id", "name");
       try {
-        const brands = await fetchJson(`/api/form/brands?client_id=${clientId}`);
+        const brands = await fetchJson(
+          `/api/form/brands?client_id=${encodeURIComponent(clientId)}${managerQuery()}`
+        );
         fillSelect(brandSel, brands, "Оберіть марку", "id", "name");
         brandSel.disabled = brands.length === 0;
         if (brands.length === 0) {

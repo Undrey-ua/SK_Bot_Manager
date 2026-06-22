@@ -53,12 +53,12 @@ from web.roles import (
     can_manage_sales_plans,
     can_manage_tasks,
     can_pick_reserve_manager,
+    resolve_reserve_form_manager_id,
     can_sale_from_reserve,
     data_owner_manager_id,
     form_owner_manager_id,
     reserve_owner_manager_id,
     reserves_scope_manager_id,
-    resolve_reserve_form_manager_id,
     show_reserves_manager_column,
 )
 from web.sales_urls import analytics_sales_return_url
@@ -511,15 +511,29 @@ def register_panel_routes(
         quantity: str = Form(...),
         sold_at: str = Form(...),
         comment: str = Form(""),
+        manager_id: str = Form(""),
         return_url: str = Form("/analytics?section=sales"),
     ) -> RedirectResponse:
         user = await load_web_user(request, session)
         require_nav(user, "analytics")
         require_sale_create(user)
 
-        owner_id = form_owner_manager_id(user)
+        requested_manager_id = (
+            int(manager_id.strip())
+            if can_pick_reserve_manager(user) and manager_id.strip().isdigit()
+            else None
+        )
+        if can_pick_reserve_manager(user) and requested_manager_id is None:
+            raise HTTPException(status_code=400, detail="Оберіть менеджера")
+        try:
+            target_manager_id = resolve_reserve_form_manager_id(
+                user, requested_manager_id
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Оберіть менеджера") from exc
+
         client = await ClientRepository(session).get_by_id(client_id)
-        if client is None or client.manager_id != owner_id:
+        if client is None or client.manager_id != target_manager_id:
             raise HTTPException(status_code=400, detail="Невірна торгова точка")
 
         from bot.utils.client_brands import brands_for_client
@@ -543,7 +557,7 @@ def register_panel_routes(
             raise HTTPException(status_code=400, detail="Невірна дата продажу") from exc
 
         await SaleRepository(session).create(
-            manager_id=user.id,
+            manager_id=target_manager_id,
             client_id=client_id,
             brand_id=brand_id,
             quantity=qty,

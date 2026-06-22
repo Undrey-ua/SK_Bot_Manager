@@ -5,13 +5,26 @@
       <h2 id="sale-modal-title">Додати продаж</h2>
       <button type="button" class="modal__close" data-close-modal aria-label="Закрити">×</button>
     </header>
-    <p class="modal__hint muted">Область → клієнт (ТТ) → бренд → кількість → коментар (необовʼязково)</p>
+    <p class="modal__hint muted">
+      {% if can_pick_reserve_manager %}Менеджер → область → клієнт (ТТ) → бренд → кількість → коментар (необовʼязково)
+      {% else %}Область → клієнт (ТТ) → бренд → кількість → коментар (необовʼязково){% endif %}
+    </p>
     <form method="post" action="/sales/new" id="sale-form" class="stand-move-form">
       <input type="hidden" name="sold_at" id="sale-sold-at" value="{{ sale_default_sold_at }}">
       <input type="hidden" name="return_url" id="sale-return-url" value="{{ sales_return_url }}">
+      {% if can_pick_reserve_manager %}
+      <label>Менеджер
+        <select name="manager_id" id="sale-manager" required>
+          <option value="">Оберіть менеджера</option>
+          {% for m in managers %}
+          <option value="{{ m.id }}" {% if selected_manager_id == m.id %}selected{% endif %}>{{ m.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      {% endif %}
       <label>Область
-        <select id="sale-region" required>
-          <option value="">Завантаження…</option>
+        <select id="sale-region" required {% if can_pick_reserve_manager %}disabled{% endif %}>
+          <option value="">{% if can_pick_reserve_manager %}Спочатку оберіть менеджера{% else %}Завантаження…{% endif %}</option>
         </select>
       </label>
       <label>Клієнт (ТТ)
