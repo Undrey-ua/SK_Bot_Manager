@@ -10,6 +10,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from bot.container import build_container
@@ -116,6 +117,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     app = FastAPI(title="SK Bot Manager — Панель керівника", docs_url=None, redoc_url=None)
 
+    app.add_middleware(GZipMiddleware, minimum_size=500)
     app.add_middleware(
         SessionMiddleware,
         secret_key=session_secret(settings),

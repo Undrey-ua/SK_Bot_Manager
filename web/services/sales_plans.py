@@ -72,14 +72,28 @@ class SalesPlanService:
         month: int,
     ) -> list[SalesPlanProgress]:
         managers = filter_regional_managers(await self._users.list_all())
+        if not managers:
+            return []
+
+        period = month_range(year, month)
+        plans = await self._plans.list_for_period(year=year, month=month)
+        plan_by_manager = {p.manager_id: p.target_sqm for p in plans}
+        actual_by_manager = await self._sales.sum_quantity_by_manager_between(
+            period.start,
+            period.end,
+        )
+
         rows: list[SalesPlanProgress] = []
         for m in managers:
+            target = plan_by_manager.get(m.id)
+            actual = actual_by_manager.get(m.id, Decimal(0))
             rows.append(
-                await self.progress_for_manager(
-                    m.id,
-                    m.name,
-                    year=year,
-                    month=month,
+                SalesPlanProgress(
+                    manager_id=m.id,
+                    manager_name=m.name,
+                    target=target,
+                    actual=actual,
+                    pct=plan_progress_pct(actual, target),
                 )
             )
         return rows

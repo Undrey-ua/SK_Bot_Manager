@@ -16,6 +16,7 @@ def create_engine(database_url: str) -> AsyncEngine:
         database_url,
         echo=False,
         pool_pre_ping=True,
+        pool_recycle=300,
         connect_args={
             "statement_cache_size": 0,
             "prepared_statement_cache_size": 0,

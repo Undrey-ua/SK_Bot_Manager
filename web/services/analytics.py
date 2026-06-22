@@ -108,6 +108,31 @@ class AnalyticsService:
         self._session = session
         self._sales = SaleRepository(session)
         self._users = UserRepository(session)
+        self._sales_cache: dict[tuple, list[Sale]] = {}
+        self._clients_with_stands: list[Client] | None = None
+        self._stand_names: dict[int, str] | None = None
+        self._stand_col_match_cache: dict[tuple[str, str], list[str]] = {}
+
+    @staticmethod
+    def _sales_cache_key(
+        date_range: DateRange,
+        filters: SalesFilters | None,
+    ) -> tuple:
+        filter_key = ()
+        if filters is not None:
+            filter_key = (
+                filters.manager_id,
+                filters.region_id,
+                filters.city,
+                filters.stand_id,
+                filters.brand_id,
+            )
+        return (date_range.start, date_range.end, filter_key)
+
+    async def _cached_stand_names(self) -> dict[int, str]:
+        if self._stand_names is None:
+            self._stand_names = await self._stand_names_by_id()
+        return self._stand_names
 
     async def list_managers(self) -> list[User]:
         users = await self._users.list_all()
@@ -164,24 +189,38 @@ class AnalyticsService:
         date_range: DateRange,
         filters: SalesFilters | None = None,
     ) -> list[Sale]:
+        cache_key = self._sales_cache_key(date_range, filters)
+        if cache_key in self._sales_cache:
+            return self._sales_cache[cache_key]
+
         manager_id = filters.manager_id if filters else None
         sales = await self._sales.list_between(
             date_range.start,
             date_range.end,
             manager_id=manager_id,
         )
-        if filters is None or not self._needs_sale_post_filter(filters):
-            return sales
-        stand_names = (
-            await self._stand_names_by_id() if filters.stand_id is not None else {}
-        )
-        return [s for s in sales if self._sale_matches(s, filters, stand_names)]
+        if filters is not None and self._needs_sale_post_filter(filters):
+            stand_names = (
+                await self._cached_stand_names()
+                if filters.stand_id is not None
+                else {}
+            )
+            sales = [s for s in sales if self._sale_matches(s, filters, stand_names)]
+
+        self._sales_cache[cache_key] = sales
+        return sales
 
     async def sales_total(
         self,
         date_range: DateRange,
         filters: SalesFilters | None = None,
     ) -> Decimal:
+        if filters is None or not self._needs_sale_post_filter(filters):
+            return await self._sales.sum_quantity_between(
+                date_range.start,
+                date_range.end,
+                manager_id=filters.manager_id if filters else None,
+            )
         sales = await self._sales_in_range(date_range, filters)
         return sum((s.quantity for s in sales if s.quantity), Decimal(0))
 
@@ -404,9 +443,8 @@ class AnalyticsService:
         total_points: dict[str, int] = defaultdict(int)
         worked_points: dict[str, int] = defaultdict(int)
         for client_id, stand_name in placements:
-            for col in col_keys_all:
-                if not self._stand_key_matches_matrix_col(stand_name, col):
-                    continue
+            matching_cols = self._matching_matrix_cols_cached(stand_name, col_keys_all)
+            for col in matching_cols:
                 total_points[col] += 1
                 if sales_by_client_col.get((client_id, col), Decimal(0)) > 0:
                     worked_points[col] += 1
@@ -519,7 +557,36 @@ class AnalyticsService:
         if filters and filters.manager_id is not None:
             managers = [m for m in managers if m.id == filters.manager_id]
 
-        rows: list[CompareRow] = []
+        if filters is None or not self._needs_sale_post_filter(filters):
+            report_totals = await self._sales.sum_quantity_by_manager_between(
+                report_range.start,
+                report_range.end,
+            )
+            base_totals = await self._sales.sum_quantity_by_manager_between(
+                base_range.start,
+                base_range.end,
+            )
+            rows: list[CompareRow] = []
+            total_report = Decimal(0)
+            total_base = Decimal(0)
+            for manager in managers:
+                report_total = report_totals.get(manager.id, Decimal(0))
+                base_total = base_totals.get(manager.id, Decimal(0))
+                rows.append(
+                    CompareRow(
+                        label=manager.name,
+                        current=report_total,
+                        previous=base_total,
+                    )
+                )
+                total_report += report_total
+                total_base += base_total
+            rows.append(
+                CompareRow(label="Разом", current=total_report, previous=total_base)
+            )
+            return rows
+
+        rows = []
         total_report = Decimal(0)
         total_base = Decimal(0)
         for manager in managers:
@@ -630,6 +697,8 @@ class AnalyticsService:
         )
 
     async def _all_clients_with_stands(self) -> list[Client]:
+        if self._clients_with_stands is not None:
+            return self._clients_with_stands
         result = await self._session.execute(
             select(Client)
             .options(
@@ -638,7 +707,8 @@ class AnalyticsService:
                 selectinload(Client.stand_links).selectinload(ClientStand.stand),
             )
         )
-        return list(result.scalars().all())
+        self._clients_with_stands = list(result.scalars().all())
+        return self._clients_with_stands
 
     async def _clients_for_stands(self, filters: ClientFilters | None = None) -> list[Client]:
         clients = await self._all_clients_with_stands()
@@ -869,16 +939,44 @@ class AnalyticsService:
         )
         return rows
 
-    def _placement_has_sales(
+    @classmethod
+    def _matching_matrix_cols(cls, stand_name: str, col_keys: list[str]) -> list[str]:
+        return [col for col in col_keys if cls._stand_key_matches_matrix_col(stand_name, col)]
+
+    def _matching_matrix_cols_cached(
+        self,
+        stand_name: str,
+        col_keys: list[str],
+    ) -> list[str]:
+        cache_key = (stand_name, tuple(col_keys))
+        if cache_key not in self._stand_col_match_cache:
+            self._stand_col_match_cache[cache_key] = self._matching_matrix_cols(
+                stand_name, col_keys
+            )
+        return self._stand_col_match_cache[cache_key]
+
+    def _active_sale_cols_by_client(
+        self,
+        sales: list[Sale],
+        *,
+        since: date | None = None,
+    ) -> dict[int, set[str]]:
+        by_client: dict[int, set[str]] = defaultdict(set)
+        for s in sales:
+            if since is not None and s.sold_at < since:
+                continue
+            if s.quantity is None or s.quantity <= 0:
+                continue
+            by_client[s.client_id].add(self._sales_matrix_col_key_from_brand(s.brand.name))
+        return by_client
+
+    def _placement_has_sales_indexed(
         self,
         client_id: int,
         stand_name: str,
-        sales: list[Sale],
+        active_by_client: dict[int, set[str]],
     ) -> bool:
-        for s in sales:
-            if s.client_id != client_id or s.quantity is None or s.quantity <= 0:
-                continue
-            col = self._sales_matrix_col_key_from_brand(s.brand.name)
+        for col in active_by_client.get(client_id, ()):
             if self._stand_key_matches_matrix_col(stand_name, col):
                 return True
         return False
@@ -903,12 +1001,20 @@ class AnalyticsService:
         rows3: list[InactiveStandRow] = []
         rows6: list[InactiveStandRow] = []
 
-        for months, bucket in ((3, rows3), (6, rows6)):
-            period = rolling_months_range(months)
-            inactive_sales_filter = (
-                SalesFilters(manager_id=filters.manager_id) if filters else None
-            )
-            sales = await self._sales_in_range(period, inactive_sales_filter)
+        period3 = rolling_months_range(3)
+        period6 = rolling_months_range(6)
+        inactive_sales_filter = (
+            SalesFilters(manager_id=filters.manager_id) if filters else None
+        )
+        sales6 = await self._sales_in_range(period6, inactive_sales_filter)
+        active6 = self._active_sale_cols_by_client(sales6)
+        active3 = self._active_sale_cols_by_client(sales6, since=period3.start)
+
+        for months, bucket, active_index in (
+            (3, rows3, active3),
+            (6, rows6, active6),
+        ):
+            period = period3 if months == 3 else period6
             for client in clients:
                 manager_name = client.manager.name if client.manager else "—"
                 region_name = client.region.name if client.region else "—"
@@ -921,7 +1027,9 @@ class AnalyticsService:
                         continue
                     if filters and filters.stand_id is not None and link.stand_id != filters.stand_id:
                         continue
-                    if self._placement_has_sales(client.id, stand.name, sales):
+                    if self._placement_has_sales_indexed(
+                        client.id, stand.name, active_index
+                    ):
                         continue
                     bucket.append(
                         InactiveStandRow(

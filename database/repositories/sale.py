@@ -78,6 +78,19 @@ class SaleRepository(BaseRepository):
         result = await self._session.execute(stmt)
         return Decimal(str(result.scalar_one()))
 
+    async def sum_quantity_by_manager_between(
+        self,
+        start: date,
+        end: date,
+    ) -> dict[int, Decimal]:
+        stmt = (
+            select(Sale.manager_id, func.coalesce(func.sum(Sale.quantity), 0))
+            .where(Sale.sold_at >= start, Sale.sold_at < end)
+            .group_by(Sale.manager_id)
+        )
+        result = await self._session.execute(stmt)
+        return {row[0]: Decimal(str(row[1])) for row in result.all()}
+
     async def list_for_client_between(
         self,
         client_id: int,
