@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -52,11 +52,23 @@ class ReserveRepository(BaseRepository):
         now = datetime.now(timezone.utc)
         result = await self._session.execute(
             select(Reserve)
-            .where(Reserve.cancelled_at.is_(None), Reserve.expires_at > now)
+            .where(
+                Reserve.cancelled_at.is_(None),
+                Reserve.sold_at.is_(None),
+                Reserve.expires_at > now,
+            )
             .options(*self._detail_options())
             .order_by(Reserve.expires_at.asc())
         )
         return list(result.scalars().all())
+
+    @staticmethod
+    def list_visible_filter(now: datetime):
+        """Не скасовані: активні або з продажем."""
+        return (
+            Reserve.cancelled_at.is_(None),
+            or_(Reserve.sold_at.isnot(None), Reserve.expires_at > now),
+        )
 
     async def get_by_id(self, reserve_id: int) -> Reserve | None:
         result = await self._session.execute(
@@ -68,15 +80,23 @@ class ReserveRepository(BaseRepository):
 
     async def cancel(self, reserve_id: int) -> Reserve | None:
         reserve = await self.get_by_id(reserve_id)
-        if reserve is None:
+        if reserve is None or reserve.sold_at is not None:
             return None
         reserve.cancelled_at = datetime.now(timezone.utc)
         await self._session.flush()
         return reserve
 
+    async def mark_sold(self, reserve_id: int) -> Reserve | None:
+        reserve = await self.get_by_id(reserve_id)
+        if reserve is None or reserve.sold_at is not None or reserve.cancelled_at is not None:
+            return None
+        reserve.sold_at = datetime.now(timezone.utc)
+        await self._session.flush()
+        return reserve
+
     async def extend(self, reserve_id: int, ttl_days: int = 7) -> Reserve | None:
         reserve = await self.get_by_id(reserve_id)
-        if reserve is None:
+        if reserve is None or reserve.sold_at is not None:
             return None
         now = datetime.now(timezone.utc)
         base = reserve.expires_at if reserve.expires_at > now else now
@@ -92,6 +112,7 @@ class ReserveRepository(BaseRepository):
             select(Reserve)
             .where(
                 Reserve.cancelled_at.is_(None),
+                Reserve.sold_at.is_(None),
                 Reserve.expires_at <= now,
                 Reserve.expiry_notified_at.is_(None),
             )

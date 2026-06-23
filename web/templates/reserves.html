@@ -59,11 +59,12 @@
         <td>{{ format_qty(r.quantity, decimals=2) }}</td>
         <td class="col-datetime">{{ format_dt(r.expires_at) }}</td>
         <td>
-          {% if r.cancelled_at %}скасовано
+          {% if r.sold_at %}<span class="reserve-status reserve-status--sold">Продаж</span>
+          {% elif r.cancelled_at %}скасовано
           {% else %}активний{% endif %}
         </td>
         <td class="table-actions">
-          {% if can_manage_reserve(current_user, manager_id=r.manager_id) and not r.cancelled_at %}
+          {% if can_manage_reserve(current_user, manager_id=r.manager_id) and not r.cancelled_at and not r.sold_at %}
           {% if can_sale_from_reserve(current_user, manager_id=r.manager_id) %}
           <button type="button" class="btn btn-primary btn-sm" data-open-reserve-sale data-reserve-id="{{ r.id }}">Продаж</button>
           {% endif %}
@@ -83,7 +84,7 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="{% if show_reserves_manager %}9{% else %}8{% endif %}">Немає активних резервів</td></tr>
+      <tr><td colspan="{% if show_reserves_manager %}9{% else %}8{% endif %}">Немає резервів</td></tr>
       {% endfor %}
     </tbody>
   </table>

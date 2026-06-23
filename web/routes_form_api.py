@@ -140,6 +140,8 @@ def register_form_api_routes(
         reserve = await ReserveRepository(session).get_by_id(reserve_id)
         if reserve is None or reserve.cancelled_at is not None:
             raise HTTPException(status_code=404, detail="Резерв не знайдено")
+        if reserve.sold_at is not None:
+            raise HTTPException(status_code=400, detail="Резерв уже продано")
         if not can_sale_from_reserve(user, manager_id=reserve.manager_id):
             raise HTTPException(status_code=403, detail="Forbidden")
 

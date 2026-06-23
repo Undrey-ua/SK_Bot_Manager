@@ -219,6 +219,7 @@ class Reserve(Base):
     extended_count: Mapped[int] = mapped_column(default=0)
 
     cancelled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    sold_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     expiry_notified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     manager: Mapped["User"] = relationship(

@@ -31,15 +31,19 @@ router = Router(name="reserves")
 
 
 def _reserve_text(r) -> str:
-    return (
-        f"📦 <b>Резерв #{r.id}</b>\n\n"
-        f"Менеджер: {r.manager.name}\n"
-        f"Область: {r.region.name}\n"
-        f"Клієнт: {r.client.name}\n"
-        f"Матеріал: {r.material}\n"
-        f"Кількість: {r.quantity} кв. м\n"
-        f"Діє до: {r.expires_at.strftime('%Y-%m-%d %H:%M')} UTC"
-    )
+    lines = [
+        f"📦 <b>Резерв #{r.id}</b>\n",
+        f"Менеджер: {r.manager.name}",
+        f"Область: {r.region.name}",
+        f"Клієнт: {r.client.name}",
+        f"Матеріал: {r.material}",
+        f"Кількість: {r.quantity} кв. м",
+    ]
+    if r.sold_at:
+        lines.append(f"Статус: <b>продаж</b> ({r.sold_at.strftime('%d.%m.%Y %H:%M')} UTC)")
+    else:
+        lines.append(f"Діє до: {r.expires_at.strftime('%Y-%m-%d %H:%M')} UTC")
+    return "\n".join(lines)
 
 
 @router.callback_query(F.data == "reserve:hub")
@@ -85,7 +89,9 @@ async def reserve_show(callback: CallbackQuery, db_user: User, reserve_service: 
     if r is None:
         await callback.message.edit_text("Резерв не знайдено.", reply_markup=reserves_hub_keyboard())
         return
-    if r.manager_id == effective_manager_id(db_user):
+    if r.sold_at:
+        kb = reserve_view_keyboard(r.id)
+    elif r.manager_id == effective_manager_id(db_user):
         kb = reserve_owner_actions_keyboard(r.id)
     else:
         kb = reserve_view_keyboard(r.id)
@@ -268,6 +274,9 @@ async def reserve_cancel(callback: CallbackQuery, db_user: User, reserve_service
     if r.manager_id != effective_manager_id(db_user):
         await callback.answer("Скасувати може лише той, хто поставив резерв.", show_alert=True)
         return
+    if r.sold_at:
+        await callback.answer("Резерв уже продано", show_alert=True)
+        return
     await reserve_service.cancel(rid)
     await callback.message.edit_text("❌ Резерв скасовано.", reply_markup=reserves_hub_keyboard())
 
@@ -285,7 +294,13 @@ async def reserve_extend(callback: CallbackQuery, db_user: User, reserve_service
     if r.manager_id != effective_manager_id(db_user):
         await callback.answer("Продовжити може лише той, хто поставив резерв.", show_alert=True)
         return
+    if r.sold_at:
+        await callback.answer("Резерв уже продано", show_alert=True)
+        return
     r2 = await reserve_service.extend(rid)
+    if r2 is None:
+        await callback.answer("Не вдалося продовжити резерв", show_alert=True)
+        return
     await callback.message.edit_text(
         f"🔁 Резерв продовжено до {r2.expires_at.strftime('%Y-%m-%d %H:%M')} UTC",
         reply_markup=reserves_hub_keyboard(),
@@ -312,6 +327,9 @@ async def reserve_sale_start(
         return
     if r.manager_id != effective_manager_id(db_user):
         await callback.answer("Продаж доступний лише автору резерву.", show_alert=True)
+        return
+    if r.sold_at:
+        await callback.answer("Резерв уже продано", show_alert=True)
         return
     client = await client_service.get_by_id(r.client_id)
     if client is None:

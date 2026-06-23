@@ -1118,6 +1118,17 @@ form.filters:has(.filters__field--region) {
   cursor: help;
 }
 
+.reserve-status--sold {
+  display: inline-flex;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #166534;
+  background: rgba(22, 163, 74, 0.12);
+  border: 1px solid rgba(22, 163, 74, 0.25);
+}
+
 /* ——— Sales plans ——— */
 .tasks-top-layout {
   display: flex;

@@ -740,7 +740,7 @@ def register_panel_routes(
 
         now = datetime.now(timezone.utc)
         per_page = DashboardService.RESERVES_PER_PAGE
-        filters = [Reserve.cancelled_at.is_(None), Reserve.expires_at > now]
+        filters = list(ReserveRepository.list_visible_filter(now))
         if manager_id is not None:
             filters.append(Reserve.manager_id == manager_id)
 
@@ -761,7 +761,7 @@ def register_panel_routes(
                 selectinload(Reserve.client),
                 selectinload(Reserve.region),
             )
-            .order_by(Reserve.expires_at.asc())
+            .order_by(Reserve.sold_at.asc().nullsfirst(), Reserve.expires_at.asc())
             .limit(per_page)
             .offset(offset)
         )
@@ -892,6 +892,8 @@ def register_panel_routes(
         if reserve is None:
             raise HTTPException(status_code=404, detail="Резерв не знайдено")
         assert_reserve_manage_access(user, reserve)
+        if reserve.sold_at is not None:
+            raise HTTPException(status_code=400, detail="Резерв уже продано")
         await repo.extend(reserve_id)
         await session.commit()
         return RedirectResponse(_reserves_redirect(return_manager_id), status_code=303)
@@ -911,6 +913,8 @@ def register_panel_routes(
         if reserve is None:
             raise HTTPException(status_code=404, detail="Резерв не знайдено")
         assert_reserve_manage_access(user, reserve)
+        if reserve.sold_at is not None:
+            raise HTTPException(status_code=400, detail="Резерв уже продано")
         await repo.cancel(reserve_id)
         await session.commit()
         return RedirectResponse(_reserves_redirect(return_manager_id), status_code=303)
@@ -932,6 +936,8 @@ def register_panel_routes(
         reserve = await repo.get_by_id(reserve_id)
         if reserve is None or reserve.cancelled_at is not None:
             raise HTTPException(status_code=404, detail="Резерв не знайдено")
+        if reserve.sold_at is not None:
+            raise HTTPException(status_code=400, detail="Резерв уже продано")
         if not can_sale_from_reserve(user, manager_id=reserve.manager_id):
             raise HTTPException(status_code=403, detail="Forbidden")
 
@@ -968,6 +974,8 @@ def register_panel_routes(
             comment=comment,
             from_swatch=from_swatch,
         )
+        if await repo.mark_sold(reserve_id) is None:
+            raise HTTPException(status_code=400, detail="Не вдалося закрити резерв")
         await session.commit()
         return RedirectResponse(_reserves_redirect(return_manager_id), status_code=303)
 

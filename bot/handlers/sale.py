@@ -17,6 +17,7 @@ from bot.keyboards.sales import (
 from bot.services.brand import BrandService
 from bot.services.client import ClientService
 from bot.services.region import RegionService
+from bot.services.reserve import ReserveService
 from bot.services.sale import SaleService
 from bot.states.sale import SaleStates
 from bot.utils.dates import UK_MONTH_BY_NUM
@@ -297,6 +298,7 @@ async def pick_period(
     state: FSMContext,
     db_user: User,
     sale_service: SaleService,
+    reserve_service: ReserveService,
 ) -> None:
     await callback.answer()
     if callback.message is None:
@@ -310,6 +312,7 @@ async def pick_period(
         state=state,
         db_user=db_user,
         sale_service=sale_service,
+        reserve_service=reserve_service,
         reply_target=callback.message,
     )
 
@@ -319,6 +322,7 @@ async def _save_sale(
     state: FSMContext,
     db_user: User,
     sale_service: SaleService,
+    reserve_service: ReserveService,
     reply_target: Message,
 ) -> None:
     data = await state.get_data()
@@ -348,6 +352,12 @@ async def _save_sale(
         comment=comment,
         from_swatch=from_swatch,
     )
+    if data.get("from_reserve") and data.get("reserve_id"):
+        marked = await reserve_service.mark_sold(int(data["reserve_id"]))
+        if marked is None:
+            await reply_target.answer("Продаж збережено, але резерв не закрито. Зверніться до адміністратора.")
+            await state.clear()
+            return
     await state.clear()
     month_label = UK_MONTH_BY_NUM.get(sold_at.month, str(sold_at.month))
     comment_line = f"\nКоментар: {comment}" if comment else ""

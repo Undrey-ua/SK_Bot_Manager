@@ -41,6 +41,9 @@ class ReserveService:
     async def extend(self, reserve_id: int) -> Reserve | None:
         return await self._repo.extend(reserve_id)
 
+    async def mark_sold(self, reserve_id: int) -> Reserve | None:
+        return await self._repo.mark_sold(reserve_id)
+
     async def list_expired_needing_notify(self) -> list[Reserve]:
         return await self._repo.list_expired_needing_notify()
 
