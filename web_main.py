@@ -26,7 +26,14 @@ def main() -> None:
     app = create_app(settings)
     port = int(os.environ.get("PORT", str(settings.web_port)))
     logger.info("Web dashboard starting on port %s", port)
-    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
+    # Railway proxy тримає keep-alive ~60 с; uvicorn за замовчуванням — 5 с → інколи 502/upstream error.
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=port,
+        log_level="info",
+        timeout_keep_alive=65,
+    )
 
 
 if __name__ == "__main__":

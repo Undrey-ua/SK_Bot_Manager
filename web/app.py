@@ -117,6 +117,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     app = FastAPI(title="SK Bot Manager — Панель керівника", docs_url=None, redoc_url=None)
 
+    @app.get("/health")
+    async def health() -> dict[str, str]:
+        """Швидка перевірка для Railway (без БД і сесії)."""
+        return {"status": "ok"}
+
     app.add_middleware(GZipMiddleware, minimum_size=500)
     app.add_middleware(
         SessionMiddleware,
