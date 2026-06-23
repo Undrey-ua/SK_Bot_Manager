@@ -19,6 +19,8 @@
       .then((html) => {
         container.innerHTML = html;
         btn.hidden = true;
+        const wrap = btn.closest(".lazy-load-actions");
+        if (wrap) wrap.hidden = true;
       })
       .catch(() => {
         container.innerHTML =
