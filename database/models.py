@@ -155,6 +155,10 @@ class Client(Base):
         back_populates="client",
         cascade="all, delete-orphan",
     )
+    swatch_links: Mapped[list["ClientSwatch"]] = relationship(
+        back_populates="client",
+        cascade="all, delete-orphan",
+    )
     sales: Mapped[list["Sale"]] = relationship(back_populates="client")
 
 
@@ -167,6 +171,7 @@ class Brand(Base):
     sort_order: Mapped[int] = mapped_column(default=0)
 
     sales: Mapped[list["Sale"]] = relationship(back_populates="brand")
+    swatch_links: Mapped[list["ClientSwatch"]] = relationship(back_populates="brand")
 
 
 class Sale(Base):
@@ -179,6 +184,7 @@ class Sale(Base):
     quantity: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     sold_at: Mapped[date] = mapped_column(Date, index=True)
+    from_swatch: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -300,6 +306,18 @@ class ClientStand(Base):
 
     client: Mapped["Client"] = relationship(back_populates="stand_links")
     stand: Mapped["Stand"] = relationship(back_populates="client_links")
+
+
+class ClientSwatch(Base):
+    __tablename__ = "client_swatches"
+    __table_args__ = (UniqueConstraint("client_id", "brand_id", name="uq_client_swatch"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    client_id: Mapped[int] = mapped_column(ForeignKey("clients.id"), index=True)
+    brand_id: Mapped[int] = mapped_column(ForeignKey("brands.id"), index=True)
+
+    client: Mapped["Client"] = relationship(back_populates="swatch_links")
+    brand: Mapped["Brand"] = relationship(back_populates="swatch_links")
 
 
 class ManagerStandStock(Base):

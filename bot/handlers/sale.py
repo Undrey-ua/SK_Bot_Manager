@@ -156,22 +156,34 @@ async def pick_client(
         await _edit_step(
             callback.message,
             f"💰 <b>Додати продаж</b>\n\n"
-            f"Клієнт <b>{client.name}</b> — немає стендів.\n"
-            "Додайте стенди в картці клієнта (для BIG — стенд BIG).",
+            f"Клієнт <b>{client.name}</b> — немає стендів і свотчів.\n"
+            "Додайте стенди або нарізки зразків у картці клієнта.",
             reply_markup=kb,
         )
         return
 
+    from bot.utils.client_brands import brands_from_stands, brands_from_swatches
+
+    all_brands = await brand_service.list_active()
+    stand_brand_ids = {b.id for b in brands_from_stands(client, all_brands)}
+    swatch_brand_ids = {b.id for b in brands_from_swatches(client, all_brands)}
     await state.update_data(
         client_id=client.id,
         client_name=client.name,
         allowed_brand_ids=[b.id for b in brands],
+        stand_brand_ids=list(stand_brand_ids),
+        swatch_brand_ids=list(swatch_brand_ids),
     )
     await state.set_state(SaleStates.select_brand)
+    hint = "за стендами клієнта"
+    if swatch_brand_ids and not stand_brand_ids:
+        hint = "за свотчами клієнта"
+    elif swatch_brand_ids:
+        hint = "за стендами та свотчами клієнта"
     await _edit_step(
         callback.message,
         f"Клієнт: <b>{client.name}</b>\n\n"
-        "Оберіть торгову марку (за стендами клієнта):",
+        f"Оберіть торгову марку ({hint}):",
         reply_markup=sale_brands_keyboard(brands),
     )
 
@@ -322,13 +334,19 @@ async def _save_sale(
         prefix = f"Продаж з резерву #{data['reserve_id']}"
         comment = f"{prefix}\n{comment}" if comment else prefix
 
+    brand_id = int(data["brand_id"])
+    stand_ids = set(data.get("stand_brand_ids") or [])
+    swatch_ids = set(data.get("swatch_brand_ids") or [])
+    from_swatch = brand_id in swatch_ids and brand_id not in stand_ids
+
     sale = await sale_service.create(
         manager_id=db_user.id,
         client_id=int(data["client_id"]),
-        brand_id=int(data["brand_id"]),
+        brand_id=brand_id,
         quantity=Decimal(data["quantity"]),
         sold_at=sold_at,
         comment=comment,
+        from_swatch=from_swatch,
     )
     await state.clear()
     month_label = UK_MONTH_BY_NUM.get(sold_at.month, str(sold_at.month))
@@ -418,12 +436,26 @@ async def back_brand(
         await callback.answer("Клієнта не знайдено", show_alert=True)
         return
     brands = await brand_service.brands_for_client_stands(client)
-    await state.update_data(allowed_brand_ids=[b.id for b in brands])
+    from bot.utils.client_brands import brands_from_stands, brands_from_swatches
+
+    all_brands = await brand_service.list_active()
+    stand_brand_ids = {b.id for b in brands_from_stands(client, all_brands)}
+    swatch_brand_ids = {b.id for b in brands_from_swatches(client, all_brands)}
+    await state.update_data(
+        allowed_brand_ids=[b.id for b in brands],
+        stand_brand_ids=list(stand_brand_ids),
+        swatch_brand_ids=list(swatch_brand_ids),
+    )
     await state.set_state(SaleStates.select_brand)
+    hint = "за стендами клієнта"
+    if swatch_brand_ids and not stand_brand_ids:
+        hint = "за свотчами клієнта"
+    elif swatch_brand_ids:
+        hint = "за стендами та свотчами клієнта"
     await _edit_step(
         callback.message,
         f"Клієнт: <b>{client.name}</b>\n\n"
-        "Оберіть торгову марку (за стендами клієнта):",
+        f"Оберіть торгову марку ({hint}):",
         reply_markup=sale_brands_keyboard(brands),
     )
 

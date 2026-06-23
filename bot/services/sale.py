@@ -20,6 +20,7 @@ class SaleService:
         quantity: Decimal,
         sold_at: date | None = None,
         comment: str | None = None,
+        from_swatch: bool = False,
     ) -> Sale:
         return await self._repo.create(
             manager_id=manager_id,
@@ -28,4 +29,5 @@ class SaleService:
             quantity=quantity,
             sold_at=sold_at or date.today(),
             comment=comment,
+            from_swatch=from_swatch,
         )

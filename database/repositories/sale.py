@@ -31,6 +31,7 @@ class SaleRepository(BaseRepository):
         quantity: Decimal,
         sold_at: date,
         comment: str | None,
+        from_swatch: bool = False,
     ) -> Sale:
         sale = Sale(
             manager_id=manager_id,
@@ -39,6 +40,7 @@ class SaleRepository(BaseRepository):
             quantity=quantity,
             sold_at=sold_at,
             comment=comment,
+            from_swatch=from_swatch,
         )
         self._session.add(sale)
         await self._session.flush()
@@ -129,6 +131,7 @@ class SaleRepository(BaseRepository):
         quantity: Decimal,
         sold_at: date,
         comment: str | None,
+        from_swatch: bool | None = None,
     ) -> Sale | None:
         sale = await self.get_by_id(sale_id)
         if sale is None:
@@ -138,6 +141,8 @@ class SaleRepository(BaseRepository):
         sale.quantity = quantity
         sale.sold_at = sold_at
         sale.comment = comment
+        if from_swatch is not None:
+            sale.from_swatch = from_swatch
         await self._session.flush()
         return sale
 

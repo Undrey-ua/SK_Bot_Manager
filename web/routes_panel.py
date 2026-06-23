@@ -594,9 +594,13 @@ def register_panel_routes(
         if client is None or client.manager_id != manager_id:
             raise HTTPException(status_code=400, detail="Невірна торгова точка")
 
-        brands = {b.id: b for b in await dashboard.list_active_brands()}
-        if brand_id not in brands:
+        from bot.utils.client_brands import brands_for_client, sale_is_from_swatch
+
+        all_brands = await dashboard.list_active_brands()
+        allowed_ids = {b.id for b in brands_for_client(client, all_brands)}
+        if brand_id not in allowed_ids:
             raise HTTPException(status_code=400, detail="Невірна торгова марка")
+        from_swatch = sale_is_from_swatch(client, brand_id, all_brands)
 
         try:
             qty = Decimal(quantity.replace(",", ".").strip())
@@ -617,6 +621,7 @@ def register_panel_routes(
             quantity=qty,
             sold_at=sale_date,
             comment=comment.strip() or None,
+            from_swatch=from_swatch,
         )
         await session.commit()
         safe_return = return_url if return_url.startswith("/analytics") else "/analytics?section=sales"
@@ -675,13 +680,14 @@ def register_panel_routes(
         if client is None or client.manager_id != target_manager_id:
             raise HTTPException(status_code=400, detail="Невірна торгова точка")
 
-        from bot.utils.client_brands import brands_for_client
+        from bot.utils.client_brands import brands_for_client, sale_is_from_swatch
         from database.repositories.brand import BrandRepository
 
         all_brands = await BrandRepository(session).list_active()
         allowed_ids = {b.id for b in brands_for_client(client, all_brands)}
         if brand_id not in allowed_ids:
             raise HTTPException(status_code=400, detail="Невірна торгова марка")
+        from_swatch = sale_is_from_swatch(client, brand_id, all_brands)
 
         try:
             qty = Decimal(quantity.replace(",", ".").strip())
@@ -702,6 +708,7 @@ def register_panel_routes(
             quantity=qty,
             sold_at=sale_date,
             comment=comment.strip() or None,
+            from_swatch=from_swatch,
         )
         await session.commit()
         safe_return = return_url if return_url.startswith("/analytics") else "/analytics?section=sales"
@@ -932,13 +939,14 @@ def register_panel_routes(
         if client is None:
             raise HTTPException(status_code=400, detail="Клієнта не знайдено")
 
-        from bot.utils.client_brands import brands_for_client
+        from bot.utils.client_brands import brands_for_client, sale_is_from_swatch
         from database.repositories.brand import BrandRepository
 
         all_brands = await BrandRepository(session).list_active()
         allowed_ids = {b.id for b in brands_for_client(client, all_brands)}
         if brand_id not in allowed_ids:
             raise HTTPException(status_code=400, detail="Невірна торгова марка")
+        from_swatch = sale_is_from_swatch(client, brand_id, all_brands)
 
         try:
             qty = Decimal(quantity.replace(",", ".").strip())
@@ -958,6 +966,7 @@ def register_panel_routes(
             quantity=qty,
             sold_at=sold_at,
             comment=comment,
+            from_swatch=from_swatch,
         )
         await session.commit()
         return RedirectResponse(_reserves_redirect(return_manager_id), status_code=303)

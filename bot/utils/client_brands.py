@@ -51,8 +51,8 @@ def _big_brands_for_stand(stand_name: str, brand_by_name: dict[str, Brand]) -> l
     return [matched] if matched else []
 
 
-def brands_for_client(client: Client, all_brands: list[Brand]) -> list[Brand]:
-    """Бренди, доступні для продажу за стендами клієнта."""
+def brands_from_stands(client: Client, all_brands: list[Brand]) -> list[Brand]:
+    """Бренди, доступні за стендами клієнта."""
     active_brands = [b for b in all_brands if b.is_active]
     brand_by_name = {b.name: b for b in active_brands}
     seen: set[int] = set()
@@ -76,6 +76,42 @@ def brands_for_client(client: Client, all_brands: list[Brand]) -> list[Brand]:
                 result.append(brand)
 
     return sorted(result, key=lambda b: (b.sort_order, b.name))
+
+
+def brands_from_swatches(client: Client, all_brands: list[Brand]) -> list[Brand]:
+    """Бренди, для яких на ТТ є нарізки зразків (свотчі)."""
+    active_by_id = {b.id: b for b in all_brands if b.is_active}
+    result: list[Brand] = []
+    seen: set[int] = set()
+    for link in getattr(client, "swatch_links", ()):
+        brand = link.brand if link.brand is not None else active_by_id.get(link.brand_id)
+        if brand is None or not brand.is_active or brand.id in seen:
+            continue
+        seen.add(brand.id)
+        result.append(brand)
+    return sorted(result, key=lambda b: (b.sort_order, b.name))
+
+
+def brands_for_client(client: Client, all_brands: list[Brand]) -> list[Brand]:
+    """Бренди для продажу: стенди + свотчі."""
+    seen: set[int] = set()
+    result: list[Brand] = []
+    for brand in brands_from_stands(client, all_brands) + brands_from_swatches(
+        client, all_brands
+    ):
+        if brand.id not in seen:
+            seen.add(brand.id)
+            result.append(brand)
+    return sorted(result, key=lambda b: (b.sort_order, b.name))
+
+
+def sale_is_from_swatch(client: Client, brand_id: int, all_brands: list[Brand]) -> bool:
+    """Продаж зі свотчу, якщо бренд є в свотчах і не покритий стендом."""
+    stand_ids = {b.id for b in brands_from_stands(client, all_brands)}
+    if brand_id in stand_ids:
+        return False
+    swatch_ids = {b.id for b in brands_from_swatches(client, all_brands)}
+    return brand_id in swatch_ids
 
 
 def brand_button_label(brand: Brand) -> str:

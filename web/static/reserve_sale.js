@@ -68,7 +68,7 @@
       }
       fillBrands(data.brands || []);
       if (!data.brands || data.brands.length === 0) {
-        showError("У клієнта немає стендів з відомими брендами");
+        showError("У клієнта немає стендів і свотчів із відомими брендами");
       }
     } catch (e) {
       showError(e.message || "Не вдалося завантажити дані резерву");

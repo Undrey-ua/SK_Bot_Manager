@@ -13,6 +13,7 @@ from bot.services.storage import StorageError, StorageService
 from config.settings import get_settings
 from database.models import UserRole, Visit, VisitType
 from database.repositories.visit_task_type import VisitTaskTypeRepository
+from database.repositories.brand import BrandRepository
 from database.repositories.region import RegionRepository
 from database.repositories.stand import StandRepository
 from database.repositories.visit import VisitRepository
@@ -382,6 +383,7 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
                 form_manager_id = mgrs[0].id
         regions = await RegionRepository(session).list_by_manager(form_manager_id)
         stands = await StandRepository(session).list_active()
+        brands = await BrandRepository(session).list_active()
         return templates.TemplateResponse(
             request,
             "client_form.html",
@@ -391,7 +393,9 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
                 client=None,
                 regions=regions,
                 stands=stands,
+                brands=brands,
                 selected_stand_ids=[],
+                selected_swatch_brand_ids=[],
                 form_action="/clients/new",
                 submit_label="Створити",
                 form_manager_id=form_manager_id,
@@ -412,6 +416,7 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
         comment: str = Form(""),
         contacts: str = Form(""),
         stand_id: list[int] = Form(default=[]),
+        swatch_brand_id: list[int] = Form(default=[]),
         form_manager_id: str = Form(""),
         cover_photo: UploadFile | None = File(None),
     ):
@@ -420,6 +425,12 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
         if user.is_leader:
             raise HTTPException(status_code=403, detail="Forbidden")
         stand_ids = stand_id
+        swatch_brand_ids = swatch_brand_id
+        if not stand_ids and not swatch_brand_ids:
+            raise HTTPException(
+                status_code=400,
+                detail="Оберіть хоча б один стенд або свотч",
+            )
         target_manager_id = user.id
         if user.is_admin and form_manager_id.strip().isdigit():
             target_manager_id = int(form_manager_id.strip())
@@ -440,6 +451,7 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
             comment=comment.strip() or None,
             contacts=contacts.strip() or None,
             stand_ids=stand_ids,
+            swatch_brand_ids=swatch_brand_ids,
         )
         try:
             photo_url = await upload_client_cover(
@@ -470,7 +482,9 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
             raise HTTPException(status_code=404)
         regions = await RegionRepository(session).list_by_manager(client.manager_id)
         stands = await StandRepository(session).list_active()
+        brands = await BrandRepository(session).list_active()
         selected = [link.stand_id for link in client.stand_links]
+        selected_swatches = [link.brand_id for link in client.swatch_links]
         return templates.TemplateResponse(
             request,
             "client_form.html",
@@ -480,7 +494,9 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
                 client=client,
                 regions=regions,
                 stands=stands,
+                brands=brands,
                 selected_stand_ids=selected,
+                selected_swatch_brand_ids=selected_swatches,
                 form_action=f"/clients/{client_id}/edit",
                 submit_label="Зберегти",
             ),
@@ -500,6 +516,7 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
         comment: str = Form(""),
         contacts: str = Form(""),
         stand_id: list[int] = Form(default=[]),
+        swatch_brand_id: list[int] = Form(default=[]),
         cover_photo: UploadFile | None = File(None),
         remove_photo: str = Form(""),
     ):
@@ -512,6 +529,12 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
         if client is None:
             raise HTTPException(status_code=404)
         stand_ids = stand_id
+        swatch_brand_ids = swatch_brand_id
+        if not stand_ids and not swatch_brand_ids:
+            raise HTTPException(
+                status_code=400,
+                detail="Оберіть хоча б один стенд або свотч",
+            )
         region = await RegionRepository(session).get_by_id(region_id)
         if region is None or region.manager_id != client.manager_id:
             raise HTTPException(status_code=400)
@@ -545,6 +568,7 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
             contacts=contacts.strip() or None,
             photo_url=photo_url,
             update_photo=update_photo,
+            swatch_brand_ids=swatch_brand_ids,
         )
         await session.commit()
         return RedirectResponse(f"/clients/{client_id}", status_code=303)

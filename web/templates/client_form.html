@@ -72,6 +72,18 @@
         {% endfor %}
       </div>
     </fieldset>
+    <fieldset class="stands-picker">
+      <legend>Свотчі (нарізки зразків)</legend>
+      <p class="muted client-form-hint">Для торгових точок без стенду. Продажі зі свотчів не впливають на статистику стендів.</p>
+      <div class="stands-picker__grid">
+        {% for b in brands %}
+        <label class="stands-picker__item">
+          <input type="checkbox" name="swatch_brand_id" value="{{ b.id }}" {% if b.id in selected_swatch_brand_ids %}checked{% endif %}>
+          {{ b.name }}
+        </label>
+        {% endfor %}
+      </div>
+    </fieldset>
     <div class="task-form__actions">
       <button type="submit" class="btn btn-primary">{{ submit_label }}</button>
       <a href="{% if client %}/clients/{{ client.id }}{% else %}/clients{% endif %}" class="btn btn-secondary">Скасувати</a>

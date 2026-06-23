@@ -210,6 +210,11 @@ class AnalyticsService:
         self._sales_cache[cache_key] = sales
         return sales
 
+    @staticmethod
+    def _stand_stats_sales(sales: list[Sale]) -> list[Sale]:
+        """Продажі зі свотчів не враховуються в матриці та конверсії стендів."""
+        return [s for s in sales if not s.from_swatch]
+
     async def sales_total(
         self,
         date_range: DateRange,
@@ -411,6 +416,7 @@ class AnalyticsService:
             clients = filter_clients(clients, client_filters)
 
         sales = await self._sales_in_range(date_range, filters)
+        sales = self._stand_stats_sales(sales)
 
         # sales by client & normalized matrix column key
         sales_by_client_col: dict[tuple[int, str], Decimal] = defaultdict(Decimal)
@@ -623,6 +629,8 @@ class AnalyticsService:
         """
         pairs: set[tuple[int, str]] = set()
         for s in sales:
+            if s.from_swatch:
+                continue
             if s.quantity is None or s.quantity <= 0:
                 continue
             col = AnalyticsService._sales_matrix_col_key_from_brand(s.brand.name)
@@ -635,8 +643,12 @@ class AnalyticsService:
         base_range: DateRange,
         filters: SalesFilters | None = None,
     ) -> list[CompareRow]:
-        report_sales = await self._sales_in_range(report_range, filters)
-        base_sales = await self._sales_in_range(base_range, filters)
+        report_sales = self._stand_stats_sales(
+            await self._sales_in_range(report_range, filters)
+        )
+        base_sales = self._stand_stats_sales(
+            await self._sales_in_range(base_range, filters)
+        )
 
         report_shops = len({s.client_id for s in report_sales if s.quantity and s.quantity > 0})
         base_shops = len({s.client_id for s in base_sales if s.quantity and s.quantity > 0})
@@ -963,6 +975,8 @@ class AnalyticsService:
     ) -> dict[int, set[str]]:
         by_client: dict[int, set[str]] = defaultdict(set)
         for s in sales:
+            if s.from_swatch:
+                continue
             if since is not None and s.sold_at < since:
                 continue
             if s.quantity is None or s.quantity <= 0:
@@ -1063,8 +1077,10 @@ class AnalyticsService:
         manager_id: int | None,
     ) -> list[AggRow]:
         mgr_filter = SalesFilters(manager_id=manager_id) if manager_id else None
-        sales = await self._sales_in_range(date_range, mgr_filter)
-        clients_with_sales = {s.client_id for s in sales}
+        sales = self._stand_stats_sales(
+            await self._sales_in_range(date_range, mgr_filter)
+        )
+        clients_with_sales = {s.client_id for s in sales if s.quantity and s.quantity > 0}
         clients = await self._all_clients_with_stands()
         if manager_id is not None:
             clients = [c for c in clients if c.manager_id == manager_id]
@@ -1096,7 +1112,9 @@ class AnalyticsService:
         manager_id: int | None,
     ) -> list[AggRow]:
         mgr_filter = SalesFilters(manager_id=manager_id) if manager_id else None
-        sales = await self._sales_in_range(date_range, mgr_filter)
+        sales = self._stand_stats_sales(
+            await self._sales_in_range(date_range, mgr_filter)
+        )
         clients = await self._all_clients_with_stands()
         if manager_id is not None:
             clients = [c for c in clients if c.manager_id == manager_id]

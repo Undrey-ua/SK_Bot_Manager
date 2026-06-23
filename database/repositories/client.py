@@ -4,7 +4,7 @@ from sqlalchemy import exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from database.models import Client, ClientStand
+from database.models import Client, ClientStand, ClientSwatch
 from database.repositories.base import BaseRepository
 
 
@@ -17,6 +17,7 @@ class ClientRepository(BaseRepository):
         return (
             selectinload(Client.region),
             selectinload(Client.stand_links).selectinload(ClientStand.stand),
+            selectinload(Client.swatch_links).selectinload(ClientSwatch.brand),
         )
 
     @staticmethod
@@ -25,6 +26,7 @@ class ClientRepository(BaseRepository):
             selectinload(Client.manager),
             selectinload(Client.region),
             selectinload(Client.stand_links).selectinload(ClientStand.stand),
+            selectinload(Client.swatch_links).selectinload(ClientSwatch.brand),
         )
 
     async def list_all(self) -> list[Client]:
@@ -168,6 +170,7 @@ class ClientRepository(BaseRepository):
         city: str | None = None,
         contacts: str | None = None,
         photo_url: str | None = None,
+        swatch_brand_ids: list[int] | None = None,
     ) -> Client:
         client = Client(
             manager_id=manager_id,
@@ -184,6 +187,10 @@ class ClientRepository(BaseRepository):
         for stand_id in stand_ids:
             self._session.add(
                 ClientStand(client_id=client.id, stand_id=stand_id, quantity=1)
+            )
+        for brand_id in swatch_brand_ids or []:
+            self._session.add(
+                ClientSwatch(client_id=client.id, brand_id=brand_id)
             )
         await self._session.flush()
         return await self.get_by_id(client.id)  # type: ignore[return-value]
@@ -202,6 +209,7 @@ class ClientRepository(BaseRepository):
         contacts: str | None = None,
         photo_url: str | None = None,
         update_photo: bool = False,
+        swatch_brand_ids: list[int] | None = None,
     ) -> Client | None:
         client = await self.get_by_id(client_id)
         if client is None:
@@ -223,6 +231,13 @@ class ClientRepository(BaseRepository):
             qty = max(1, int(qty_map.get(stand_id, 1)))
             self._session.add(
                 ClientStand(client_id=client.id, stand_id=stand_id, quantity=qty)
+            )
+
+        client.swatch_links.clear()
+        await self._session.flush()
+        for brand_id in swatch_brand_ids or []:
+            self._session.add(
+                ClientSwatch(client_id=client.id, brand_id=brand_id)
             )
         await self._session.flush()
         return await self.get_by_id(client.id)

@@ -31,6 +31,15 @@
         {% endfor %}
       </div>
       {% endif %}
+      {% if client.swatch_links %}
+      <div class="stand-badges" aria-label="Свотчі">
+        {% for link in client.swatch_links %}
+        {% if link.brand and link.brand.is_active %}
+        <span class="swatch-badge">Свотч: {{ link.brand.name }}</span>
+        {% endif %}
+        {% endfor %}
+      </div>
+      {% endif %}
     </div>
   </div>
   <div class="page-actions client-hero-actions">

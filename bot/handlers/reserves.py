@@ -321,11 +321,16 @@ async def reserve_sale_start(
     if not brands:
         await callback.message.edit_text(
             f"💰 <b>Продаж із резерву</b>\n\n"
-            f"У клієнта <b>{client.name}</b> немає стендів із відомими брендами.",
+            f"У клієнта <b>{client.name}</b> немає стендів і свотчів із відомими брендами.",
             reply_markup=reserves_hub_keyboard(),
         )
         return
     from bot.keyboards.sales import sale_brands_keyboard
+    from bot.utils.client_brands import brands_from_stands, brands_from_swatches
+
+    all_brands = await brand_service.list_active()
+    stand_brand_ids = {b.id for b in brands_from_stands(client, all_brands)}
+    swatch_brand_ids = {b.id for b in brands_from_swatches(client, all_brands)}
 
     await state.clear()
     await state.update_data(
@@ -335,12 +340,19 @@ async def reserve_sale_start(
         client_name=r.client.name,
         reserve_qty=str(r.quantity),
         allowed_brand_ids=[b.id for b in brands],
+        stand_brand_ids=list(stand_brand_ids),
+        swatch_brand_ids=list(swatch_brand_ids),
     )
     await state.set_state("reserve_sale:brand")
+    hint = "за стендами клієнта"
+    if swatch_brand_ids and not stand_brand_ids:
+        hint = "за свотчами клієнта"
+    elif swatch_brand_ids:
+        hint = "за стендами та свотчами клієнта"
     await callback.message.edit_text(
         f"💰 <b>Продаж із резерву</b>\n\n"
         f"Клієнт: <b>{r.client.name}</b>\n\n"
-        "Оберіть торгову марку (за стендами клієнта):",
+        f"Оберіть торгову марку ({hint}):",
         reply_markup=sale_brands_keyboard(brands),
     )
 

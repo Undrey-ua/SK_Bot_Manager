@@ -910,6 +910,18 @@ form.filters:has(.filters__field--region) {
   border: 1px solid #c7d2fe;
 }
 
+.swatch-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
 .client-contacts {
   white-space: pre-wrap;
   line-height: 1.5;
