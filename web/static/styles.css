@@ -2230,6 +2230,8 @@ form.filters:has(.filters__field--region) {
 }
 
 .lazy-load-actions {
+  display: flex;
+  justify-content: flex-end;
   margin: 0.75rem 0 1rem;
 }
 
