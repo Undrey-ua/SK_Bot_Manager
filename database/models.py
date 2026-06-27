@@ -150,7 +150,10 @@ class Client(Base):
 
     manager: Mapped["User"] = relationship(back_populates="clients")
     region: Mapped["ManagerRegion"] = relationship(back_populates="clients")
-    visits: Mapped[list["Visit"]] = relationship(back_populates="client")
+    visits: Mapped[list["Visit"]] = relationship(
+        back_populates="client",
+        passive_deletes=True,
+    )
     stand_links: Mapped[list["ClientStand"]] = relationship(
         back_populates="client",
         cascade="all, delete-orphan",
@@ -159,7 +162,10 @@ class Client(Base):
         back_populates="client",
         cascade="all, delete-orphan",
     )
-    sales: Mapped[list["Sale"]] = relationship(back_populates="client")
+    sales: Mapped[list["Sale"]] = relationship(
+        back_populates="client",
+        passive_deletes=True,
+    )
 
 
 class Brand(Base):

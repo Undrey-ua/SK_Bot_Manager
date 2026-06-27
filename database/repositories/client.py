@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import exists, func, select
+from sqlalchemy import delete, exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -243,9 +243,15 @@ class ClientRepository(BaseRepository):
         return await self.get_by_id(client.id)
 
     async def delete(self, client_id: int) -> bool:
-        client = await self.get_by_id(client_id)
-        if client is None:
+        exists_id = await self._session.scalar(
+            select(Client.id).where(Client.id == client_id)
+        )
+        if exists_id is None:
             return False
-        await self._session.delete(client)
+        # Core DELETE — БД каскадно прибирає продажі, візити, резерви тощо.
+        # ORM session.delete() намагається обнулити NOT NULL FK і падає.
+        result = await self._session.execute(
+            delete(Client).where(Client.id == client_id)
+        )
         await self._session.flush()
-        return True
+        return bool(result.rowcount)
