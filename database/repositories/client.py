@@ -241,3 +241,11 @@ class ClientRepository(BaseRepository):
             )
         await self._session.flush()
         return await self.get_by_id(client.id)
+
+    async def delete(self, client_id: int) -> bool:
+        client = await self.get_by_id(client_id)
+        if client is None:
+            return False
+        await self._session.delete(client)
+        await self._session.flush()
+        return True

@@ -14,6 +14,7 @@ from config.settings import get_settings
 from database.models import UserRole, Visit, VisitType
 from database.repositories.visit_task_type import VisitTaskTypeRepository
 from database.repositories.brand import BrandRepository
+from database.repositories.client import ClientRepository
 from database.repositories.region import RegionRepository
 from database.repositories.stand import StandRepository
 from database.repositories.visit import VisitRepository
@@ -25,6 +26,7 @@ from web.auth import (
 )
 from web.deps import query_int, query_str
 from web.page_context import load_web_user, page_ctx, scoped_manager_filter
+from web.ttl_cache import invalidate_sales_analytics_cache
 from web.roles import (
     can_allocate_stand_stock,
     can_filter_managers,
@@ -572,6 +574,25 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
         )
         await session.commit()
         return RedirectResponse(f"/clients/{client_id}", status_code=303)
+
+    @app.post("/clients/{client_id}/delete")
+    async def client_delete(
+        request: Request,
+        client_id: int,
+        session: AsyncSession = Depends(get_session),
+        _auth=Depends(require_auth),
+    ):
+        user = await load_web_user(request, session)
+        require_nav(user, "clients")
+        if user.is_leader:
+            raise HTTPException(status_code=403, detail="Forbidden")
+        await assert_client_access(session, user, client_id)
+        deleted = await ClientRepository(session).delete(client_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Клієнта не знайдено")
+        await session.commit()
+        invalidate_sales_analytics_cache()
+        return RedirectResponse("/clients?deleted=1", status_code=303)
 
     @app.get("/visits/{visit_id}/edit", response_class=HTMLResponse)
     async def visit_edit_page(

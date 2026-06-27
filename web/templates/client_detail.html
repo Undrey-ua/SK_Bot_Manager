@@ -45,6 +45,10 @@
   <div class="page-actions client-hero-actions">
     {% if not is_leader %}
     <a class="btn btn-secondary" href="/clients/{{ client.id }}/edit">Редагувати</a>
+    <form method="post" action="/clients/{{ client.id }}/delete" class="client-delete-form"
+          onsubmit="return confirm('Видалити торгову точку «{{ client.name | e }}»?\n\nТакож будуть видалені повʼязані продажі, візити та резерви. Дію не можна скасувати.');">
+      <button type="submit" class="btn btn-danger">Видалити</button>
+    </form>
     {% endif %}
     <a class="btn btn-primary" href="/clients/{{ client.id }}/visits">
       Історія візитів ({{ visit_count }})

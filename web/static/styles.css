@@ -1063,6 +1063,11 @@ form.filters:has(.filters__field--region) {
   align-self: flex-start;
 }
 
+.client-delete-form {
+  margin: 0;
+  display: inline-flex;
+}
+
 .stand-badges {
   display: flex;
   flex-wrap: wrap;
