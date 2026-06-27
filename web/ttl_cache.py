@@ -49,3 +49,14 @@ async def get_or_load(
     value = await loader()
     set_cached(key, value, ttl=ttl)
     return value
+
+
+def invalidate_prefix(prefix: str) -> None:
+    for key in list(_store):
+        if key.startswith(prefix):
+            _store.pop(key, None)
+
+
+def invalidate_sales_analytics_cache() -> None:
+    """Скинути кеш блоку продажів після create/update/delete."""
+    invalidate_prefix("sales-bundle:")

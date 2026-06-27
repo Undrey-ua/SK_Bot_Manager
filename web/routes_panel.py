@@ -80,7 +80,7 @@ from web.services.tasks_board import (
     TASK_STATUS_OVERDUE,
     build_tasks_board,
 )
-from web.ttl_cache import get_or_load
+from web.ttl_cache import get_or_load, invalidate_sales_analytics_cache
 from web.utils import (
     client_stands_map_json,
     parse_manager_task_kind_filter,
@@ -624,6 +624,7 @@ def register_panel_routes(
             from_swatch=from_swatch,
         )
         await session.commit()
+        invalidate_sales_analytics_cache()
         safe_return = return_url if return_url.startswith("/analytics") else "/analytics?section=sales"
         return RedirectResponse(safe_return, status_code=303)
 
@@ -642,6 +643,7 @@ def register_panel_routes(
         if not deleted:
             raise HTTPException(status_code=404, detail="Продаж не знайдено")
         await session.commit()
+        invalidate_sales_analytics_cache()
         safe_return = return_url if return_url.startswith("/analytics") else "/analytics?section=sales"
         return RedirectResponse(safe_return, status_code=303)
 
@@ -711,6 +713,7 @@ def register_panel_routes(
             from_swatch=from_swatch,
         )
         await session.commit()
+        invalidate_sales_analytics_cache()
         safe_return = return_url if return_url.startswith("/analytics") else "/analytics?section=sales"
         return RedirectResponse(safe_return, status_code=303)
 
@@ -977,6 +980,7 @@ def register_panel_routes(
         if await repo.mark_sold(reserve_id) is None:
             raise HTTPException(status_code=400, detail="Не вдалося закрити резерв")
         await session.commit()
+        invalidate_sales_analytics_cache()
         return RedirectResponse(_reserves_redirect(return_manager_id), status_code=303)
 
     @app.get("/tasks", response_class=HTMLResponse)
