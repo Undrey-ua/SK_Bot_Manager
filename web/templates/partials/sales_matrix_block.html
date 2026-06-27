@@ -1,7 +1,7 @@
 <p class="matrix-legend">
   <span class="matrix-legend__item"><span class="matrix-cell matrix-cell--sale matrix-legend__sample">12</span> продаж, кв. м</span>
   <span class="matrix-legend__item"><span class="matrix-cell matrix-cell--no_sale matrix-legend__sample">0</span> стенд є, продажу за період немає</span>
-  <span class="matrix-legend__item"><span class="matrix-cell matrix-cell--na matrix-legend__sample">·</span> стенду у клієнта немає</span>
+  <span class="matrix-legend__item"><span class="matrix-cell matrix-cell--na matrix-legend__sample"><span class="matrix-na" aria-hidden="true">×</span></span> стенду у клієнта немає</span>
 </p>
 <div class="table-wrap matrix-wrap">
   <table class="table--darkhead matrix-table">
@@ -11,7 +11,7 @@
         {% for c in sales_matrix_cols %}
         <th>
           {{ c.label }}<br>
-          <span class="sales-matrix-th-meta">{{ c.total_points }} тт · {{ c.worked_points }} спрацювало · {{ c.pct }}%</span>
+          <span class="sales-matrix-th-meta">{{ c.total_points }} ТТ · {{ c.worked_points }} спрацювало · {{ c.failed_points }} ні · {{ c.pct }}%</span>
         </th>
         {% endfor %}
         <th>Всього</th>
@@ -19,14 +19,14 @@
     </thead>
     <tbody>
       {% for row in sales_matrix_rows %}
-      <tr>
+      <tr{% if not row.worked %} class="matrix-row--inactive"{% endif %}>
         <td class="sticky-col"><strong>{{ row['client'] }}</strong></td>
         {% for c in sales_matrix_cols %}
         {% set cell = row.cells[c.key] %}
         <td class="matrix-cell matrix-cell--{{ cell.kind }}">
           {% if cell.kind == 'sale' %}{{ format_qty(cell.quantity, decimals=2) }}
           {% elif cell.kind == 'no_sale' %}0
-          {% else %}<span class="matrix-na" aria-label="Стенду немає">·</span>{% endif %}
+          {% else %}<span class="matrix-na" aria-label="Стенду немає">×</span>{% endif %}
         </td>
         {% endfor %}
         <td><strong>{% if row.total and row.total != 0 %}{{ format_qty(row.total, decimals=2) }}{% else %}0{% endif %}</strong></td>

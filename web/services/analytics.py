@@ -81,6 +81,10 @@ class MatrixColumn:
             return 0
         return int(round(self.worked_points / self.total_points * 100))
 
+    @property
+    def failed_points(self) -> int:
+        return max(0, self.total_points - self.worked_points)
+
 
 @dataclass
 class MatrixCell:
@@ -492,11 +496,21 @@ class AnalyticsService:
 
         col_keys_visible_set = set(col_keys_visible)
 
-        # Лише ТТ, де за період був хоча б один продаж
         clients_with_sales: set[int] = {
             cid
             for (cid, col), qty in sales_by_client_col.items()
             if qty > 0 and col in col_keys_visible_set
+        }
+
+        def client_has_visible_stand(client: Client) -> bool:
+            return any(
+                self._client_has_stand_for_col(client, col) for col in col_keys_visible
+            )
+
+        clients_not_fired: set[int] = {
+            c.id
+            for c in clients
+            if c.id not in clients_with_sales and client_has_visible_stand(c)
         }
 
         ordered_clients = sorted(
@@ -509,9 +523,12 @@ class AnalyticsService:
                 matrix_client_label(cid).lower(),
             ),
         )
+        ordered_not_fired = sorted(
+            clients_not_fired,
+            key=lambda cid: matrix_client_label(cid).lower(),
+        )
 
-        rows: list[dict[str, object]] = []
-        for cid in ordered_clients:
+        def build_matrix_row(cid: int) -> dict[str, object]:
             client = clients_by_id.get(cid)
             cells: dict[str, MatrixCell] = {}
             total = Decimal(0)
@@ -524,16 +541,17 @@ class AnalyticsService:
                     cells[col] = MatrixCell(kind="no_sale")
                 else:
                     cells[col] = MatrixCell(kind="na")
-            if total <= 0:
-                continue
-            rows.append(
-                {
-                    "client_id": cid,
-                    "client": matrix_client_label(cid),
-                    "cells": cells,
-                    "total": total,
-                }
-            )
+            return {
+                "client_id": cid,
+                "client": matrix_client_label(cid),
+                "cells": cells,
+                "total": total,
+                "worked": total > 0,
+            }
+
+        rows: list[dict[str, object]] = [
+            build_matrix_row(cid) for cid in ordered_clients
+        ] + [build_matrix_row(cid) for cid in ordered_not_fired]
 
         return columns, rows
 

@@ -547,10 +547,18 @@ tbody td strong {
 }
 
 .matrix-cell--na .matrix-na {
-  color: #94a3b8;
-  font-size: 1.1rem;
+  color: #64748b;
+  font-size: 1rem;
   line-height: 1;
-  font-weight: 400;
+  font-weight: 700;
+}
+
+.matrix-row--inactive td {
+  color: var(--muted);
+}
+
+.matrix-row--inactive td.matrix-cell--no_sale {
+  color: #92400e;
 }
 
 .empty-row td {
