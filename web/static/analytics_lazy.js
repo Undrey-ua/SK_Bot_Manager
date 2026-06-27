@@ -18,9 +18,14 @@
       })
       .then((html) => {
         container.innerHTML = html;
-        btn.hidden = true;
         const wrap = btn.closest(".lazy-load-actions");
-        if (wrap) wrap.hidden = true;
+        if (wrap) {
+          wrap.classList.add("is-loaded");
+          wrap.setAttribute("hidden", "");
+        } else {
+          btn.classList.add("is-loaded");
+          btn.setAttribute("hidden", "");
+        }
       })
       .catch(() => {
         container.innerHTML =

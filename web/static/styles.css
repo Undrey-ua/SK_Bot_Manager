@@ -471,13 +471,79 @@ tbody td strong {
   letter-spacing: 0.02em;
 }
 
+.matrix-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  margin: 0 0 0.85rem;
+  padding: 0.65rem 0.9rem;
+  background: linear-gradient(135deg, #eef2ff 0%, #f8fafc 100%);
+  border: 1px solid #c7d2fe;
+  border-radius: 10px;
+  font-size: 0.92rem;
+  color: var(--text);
+}
+
+.matrix-summary__total strong {
+  font-size: 1.05rem;
+  color: #312e81;
+}
+
+.matrix-summary__stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.matrix-summary__stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.matrix-summary__stat strong {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.matrix-summary__stat--worked {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.matrix-summary__stat--failed {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+}
+
+.matrix-summary__stat--pct {
+  background: #eef2ff;
+  color: #3730a3;
+  border: 1px solid #a5b4fc;
+}
+
 .matrix-wrap {
   max-height: 520px;
+}
+
+.matrix-table {
+  --matrix-name-col-width: 9.5rem;
+  --matrix-stands-col-width: 13.5rem;
 }
 
 .matrix-table th,
 .matrix-table td {
   white-space: nowrap;
+  padding: 0.35rem 0.5rem;
 }
 
 .matrix-table thead th {
@@ -498,8 +564,81 @@ tbody td strong {
   background: #0b1220;
 }
 
+.matrix-table .sticky-col--name {
+  left: 0;
+  width: var(--matrix-name-col-width);
+  min-width: var(--matrix-name-col-width);
+  max-width: var(--matrix-name-col-width);
+}
+
+.matrix-table .sticky-col--stands {
+  left: var(--matrix-name-col-width);
+  width: var(--matrix-stands-col-width);
+  min-width: var(--matrix-stands-col-width);
+  max-width: var(--matrix-stands-col-width);
+  box-shadow: 4px 0 8px -2px rgba(15, 23, 42, 0.1);
+}
+
+.matrix-table thead th.sticky-col--name {
+  z-index: 6;
+}
+
+.matrix-table thead th.sticky-col--stands {
+  z-index: 5;
+}
+
 .matrix-table tbody td.sticky-col {
+  vertical-align: middle;
+}
+
+.matrix-table tbody td.sticky-col--name {
   border-right: 1px solid var(--border);
+  white-space: normal;
+  line-height: 1.35;
+}
+
+.matrix-table tbody td.sticky-col--stands {
+  border-right: 1px solid var(--border);
+  white-space: normal;
+  vertical-align: middle;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  overflow: visible;
+}
+
+.matrix-client-cell strong {
+  display: block;
+  font-weight: 600;
+  font-size: 0.82rem;
+  line-height: 1.25;
+}
+
+.matrix-stand-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  align-content: flex-start;
+  justify-content: flex-start;
+  gap: 0.2rem;
+  margin: 0;
+  overflow: visible;
+}
+
+.matrix-stand-badge {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-size: 0.62rem;
+  padding: 0.06rem 0.32rem;
+  line-height: 1.2;
+  border-radius: 999px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #eef2ff, #e0e7ff);
+  color: #3730a3;
+  border: 1px solid #c7d2fe;
+}
+
+.matrix-stands-empty {
+  font-size: 0.82rem;
 }
 
 .matrix-legend {
@@ -559,6 +698,31 @@ tbody td strong {
 
 .matrix-row--inactive td.matrix-cell--no_sale {
   color: #92400e;
+}
+
+/* Матриця: зберігаємо кольори клітинок при hover, без «синього» перефарбування рядка */
+.matrix-table tbody tr {
+  transition: none;
+}
+
+.table--darkhead.matrix-table tbody tr:hover td.sticky-col {
+  background: #eef2ff;
+}
+
+.table--darkhead.matrix-table tbody tr:hover td.matrix-cell--sale {
+  background: #f8fafc;
+}
+
+.table--darkhead.matrix-table tbody tr:hover td.matrix-cell--no_sale {
+  background: #fef3c7;
+}
+
+.table--darkhead.matrix-table tbody tr:hover td.matrix-cell--na {
+  background: #e2e8f0;
+}
+
+.table--darkhead.matrix-table tbody tr:hover td:not(.matrix-cell):not(.sticky-col) {
+  background: #f8fafc;
 }
 
 .empty-row td {
@@ -2235,6 +2399,11 @@ form.filters:has(.filters__field--region) {
 
 .compare-summary {
   margin: 0 0 1.25rem;
+}
+
+.lazy-load-actions.is-loaded,
+.lazy-load-btn.is-loaded {
+  display: none !important;
 }
 
 .lazy-load-actions {

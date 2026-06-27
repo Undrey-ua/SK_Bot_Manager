@@ -1,13 +1,26 @@
 <p class="matrix-legend">
-  <span class="matrix-legend__item"><span class="matrix-cell matrix-cell--sale matrix-legend__sample">12</span> продаж, кв. м</span>
+  <span class="matrix-legend__item"><span class="matrix-cell matrix-cell--sale matrix-legend__sample">кв. м</span> продаж за період (число в клітинці)</span>
   <span class="matrix-legend__item"><span class="matrix-cell matrix-cell--no_sale matrix-legend__sample">0</span> стенд є, продажу за період немає</span>
   <span class="matrix-legend__item"><span class="matrix-cell matrix-cell--na matrix-legend__sample"><span class="matrix-na" aria-hidden="true">×</span></span> стенду у клієнта немає</span>
 </p>
+{% set matrix_total = sales_matrix_rows|length %}
+{% set matrix_worked = sales_matrix_rows|selectattr('worked')|list|length %}
+{% set matrix_failed = matrix_total - matrix_worked %}
+{% set matrix_pct = ((matrix_worked / matrix_total * 100)|round(0)|int) if matrix_total > 0 else 0 %}
+<div class="matrix-summary">
+  <span class="matrix-summary__total">Показано <strong>{{ matrix_total }}</strong> торгових точок</span>
+  <span class="matrix-summary__stats">
+    <span class="matrix-summary__stat matrix-summary__stat--worked"><strong>{{ matrix_worked }}</strong> спрацювало</span>
+    <span class="matrix-summary__stat matrix-summary__stat--failed"><strong>{{ matrix_failed }}</strong> ні</span>
+    <span class="matrix-summary__stat matrix-summary__stat--pct"><strong>{{ matrix_pct }}%</strong></span>
+  </span>
+</div>
 <div class="table-wrap matrix-wrap">
   <table class="table--darkhead matrix-table">
     <thead>
       <tr>
-        <th class="sticky-col">Торгова точка</th>
+        <th class="sticky-col sticky-col--name">Торгова точка</th>
+        <th class="sticky-col sticky-col--stands">Стенди</th>
         {% for c in sales_matrix_cols %}
         <th>
           {{ c.label }}<br>
@@ -20,7 +33,20 @@
     <tbody>
       {% for row in sales_matrix_rows %}
       <tr{% if not row.worked %} class="matrix-row--inactive"{% endif %}>
-        <td class="sticky-col"><strong>{{ row['client'] }}</strong></td>
+        <td class="sticky-col sticky-col--name matrix-client-cell">
+          <strong>{{ row['client'] }}</strong>
+        </td>
+        <td class="sticky-col sticky-col--stands matrix-stands-cell">
+          {% if row.stand_badges %}
+          <div class="matrix-stand-badges" aria-label="Стенди">
+            {% for name in row.stand_badges %}
+            <span class="stand-badge matrix-stand-badge">{{ name }}</span>
+            {% endfor %}
+          </div>
+          {% else %}
+          <span class="muted matrix-stands-empty">—</span>
+          {% endif %}
+        </td>
         {% for c in sales_matrix_cols %}
         {% set cell = row.cells[c.key] %}
         <td class="matrix-cell matrix-cell--{{ cell.kind }}">
@@ -32,7 +58,7 @@
         <td><strong>{% if row.total and row.total != 0 %}{{ format_qty(row.total, decimals=2) }}{% else %}0{% endif %}</strong></td>
       </tr>
       {% else %}
-      <tr class="empty-row"><td colspan="{{ sales_matrix_cols|length + 2 }}">Немає даних</td></tr>
+      <tr class="empty-row"><td colspan="{{ sales_matrix_cols|length + 3 }}">Немає даних</td></tr>
       {% endfor %}
     </tbody>
   </table>

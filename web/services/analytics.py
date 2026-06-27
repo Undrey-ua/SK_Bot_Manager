@@ -494,12 +494,10 @@ class AnalyticsService:
                 return f"{name} · {c.region.name}"
             return f"{name} (#{cid})"
 
-        col_keys_visible_set = set(col_keys_visible)
-
         clients_with_sales: set[int] = {
-            cid
-            for (cid, col), qty in sales_by_client_col.items()
-            if qty > 0 and col in col_keys_visible_set
+            s.client_id
+            for s in sales
+            if s.quantity is not None and s.quantity > 0
         }
 
         def client_has_visible_stand(client: Client) -> bool:
@@ -511,6 +509,9 @@ class AnalyticsService:
             c.id
             for c in clients
             if c.id not in clients_with_sales and client_has_visible_stand(c)
+        }
+        clients_other: set[int] = {
+            c.id for c in clients if c.id not in clients_with_sales and c.id not in clients_not_fired
         }
 
         ordered_clients = sorted(
@@ -525,6 +526,10 @@ class AnalyticsService:
         )
         ordered_not_fired = sorted(
             clients_not_fired,
+            key=lambda cid: matrix_client_label(cid).lower(),
+        )
+        ordered_other = sorted(
+            clients_other,
             key=lambda cid: matrix_client_label(cid).lower(),
         )
 
@@ -544,14 +549,17 @@ class AnalyticsService:
             return {
                 "client_id": cid,
                 "client": matrix_client_label(cid),
+                "stand_badges": self._client_stand_badge_names(client),
                 "cells": cells,
                 "total": total,
-                "worked": total > 0,
+                "worked": cid in clients_with_sales,
             }
 
         rows: list[dict[str, object]] = [
             build_matrix_row(cid) for cid in ordered_clients
-        ] + [build_matrix_row(cid) for cid in ordered_not_fired]
+        ] + [build_matrix_row(cid) for cid in ordered_not_fired] + [
+            build_matrix_row(cid) for cid in ordered_other
+        ]
 
         return columns, rows
 
@@ -853,6 +861,16 @@ class AnalyticsService:
     def _stand_key_matches_matrix_col(cls, stand_name: str, col_key: str) -> bool:
         s = cls._sales_matrix_col_key_from_brand(stand_name)
         return cls._matrix_col_keys_match(s, col_key) or cls._matrix_col_keys_match(col_key, s)
+
+    @classmethod
+    def _client_stand_badge_names(cls, client: Client | None) -> list[str]:
+        if client is None:
+            return []
+        return [
+            link.stand.name
+            for link in client.stand_links
+            if link.stand is not None and link.stand.is_active
+        ]
 
     @classmethod
     def _client_has_stand_for_col(cls, client: Client, col_key: str) -> bool:
