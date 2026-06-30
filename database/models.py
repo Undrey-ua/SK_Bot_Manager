@@ -342,23 +342,60 @@ class ManagerStandStock(Base):
     stand: Mapped["Stand"] = relationship()
 
 
+class CentralStandStock(Base):
+    __tablename__ = "central_stand_stock"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    stand_id: Mapped[int] = mapped_column(
+        ForeignKey("stands.id"),
+        unique=True,
+        index=True,
+    )
+    quantity: Mapped[int] = mapped_column(default=0)
+
+    stand: Mapped["Stand"] = relationship()
+
+
+class ManagerCentralAllocation(Base):
+    __tablename__ = "manager_central_allocation"
+    __table_args__ = (
+        UniqueConstraint("manager_id", "stand_id", name="uq_manager_central_allocation"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    manager_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    stand_id: Mapped[int] = mapped_column(ForeignKey("stands.id"), index=True)
+    quantity: Mapped[int] = mapped_column(default=0)
+
+    manager: Mapped["User"] = relationship(foreign_keys=[manager_id])
+    stand: Mapped["Stand"] = relationship()
+
+
 class StandTransferOperation(str, Enum):
     MOVE = "move"
     WRITE_OFF = "write_off"
     ALLOCATE = "allocate"
     TO_WAREHOUSE = "to_warehouse"
     FROM_WAREHOUSE = "from_warehouse"
+    CENTRAL_SET = "central_set"
+    ALLOCATE_CENTRAL = "allocate_central"
+    CENTRAL_TO_REGIONAL = "central_to_regional"
 
 
 STAND_TRANSFER_OPERATION_LABELS: dict[str, str] = {
     StandTransferOperation.MOVE.value: "Переміщення",
     StandTransferOperation.WRITE_OFF.value: "Списання",
     StandTransferOperation.ALLOCATE.value: "Виділення на склад",
-    StandTransferOperation.TO_WAREHOUSE.value: "На склад",
-    StandTransferOperation.FROM_WAREHOUSE.value: "Зі складу",
+    StandTransferOperation.TO_WAREHOUSE.value: "На регіональний склад",
+    StandTransferOperation.FROM_WAREHOUSE.value: "Зі регіонального складу",
+    StandTransferOperation.CENTRAL_SET.value: "Загальна кількість (центр)",
+    StandTransferOperation.ALLOCATE_CENTRAL.value: "Розподіл на центральний (менеджер)",
+    StandTransferOperation.CENTRAL_TO_REGIONAL.value: "Центральний → регіональний",
 }
 
-WAREHOUSE_LOCATION_LABEL = "Віртуальний склад"
+CENTRAL_WAREHOUSE_LABEL = "Центральний склад"
+MANAGER_CENTRAL_LABEL = "Центральний склад менеджера"
+WAREHOUSE_LOCATION_LABEL = "Регіональний склад"
 ALLOCATE_SOURCE_LABEL = "Виділення керівником"
 
 

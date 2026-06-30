@@ -44,7 +44,7 @@
           <span>Клієнти</span>
         </a>
         {% endif %}
-        <div class="nav-group {% if active_nav == 'analytics' or active_nav == 'stand_moves' or active_nav == 'stand_warehouse' %}active{% endif %}">
+        <div class="nav-group {% if active_nav == 'analytics' %}active{% endif %}">
           <a href="/analytics?section=sales" class="nav-link {% if active_nav == 'analytics' %}active{% endif %}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
             <span>Аналітика</span>
@@ -54,11 +54,20 @@
             {% if not is_sales_manager %}
             <a href="/analytics?section=stands" class="nav-sub-link {% if analytics_section == 'stands' %}active{% endif %}">Стенди</a>
             <a href="/analytics?section=compare" class="nav-sub-link {% if analytics_section == 'compare' %}active{% endif %}">Порівняльна</a>
-            <a href="/stands/warehouse" class="nav-sub-link {% if active_nav == 'stand_warehouse' %}active{% endif %}">Склад</a>
-            <a href="/stands/moves" class="nav-sub-link {% if active_nav == 'stand_moves' %}active{% endif %}">Операції</a>
             {% endif %}
           </div>
         </div>
+        {% if can_view_stand_warehouse %}
+        <div class="nav-group {% if active_nav == 'stand_warehouse' or active_nav == 'stand_moves' %}active{% endif %}">
+          <a href="/stands/warehouse" class="nav-link {% if active_nav == 'stand_warehouse' %}active{% endif %}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+            <span>Склад</span>
+          </a>
+          <div class="nav-sub">
+            <a href="/stands/moves" class="nav-sub-link {% if active_nav == 'stand_moves' %}active{% endif %}">Операції</a>
+          </div>
+        </div>
+        {% endif %}
         <a href="/reserves" class="nav-link {% if active_nav == 'reserves' %}active{% endif %}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
           <span>Резерви</span>

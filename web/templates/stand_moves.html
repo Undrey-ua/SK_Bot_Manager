@@ -13,7 +13,7 @@
     <button type="button" class="btn btn-secondary" data-open-stand-from-warehouse>Зі складу</button>
     <button type="button" class="btn btn-danger" data-open-stand-writeoff>Списати</button>
     {% endif %}
-    <a href="/stands/warehouse" class="btn btn-secondary">Віртуальний склад</a>
+    <a href="/stands/warehouse" class="btn btn-secondary">Склад</a>
   </div>
 </header>
 
@@ -89,7 +89,7 @@
       <tbody>
         {% for row in rows %}
         {% set t = row.transfer %}
-        <tr{% if t.operation == 'write_off' %} class="row-writeoff"{% elif t.operation in ('allocate', 'to_warehouse', 'from_warehouse') %} class="row-warehouse"{% endif %}>
+        <tr{% if t.operation == 'write_off' %} class="row-writeoff"{% elif t.operation in ('allocate', 'allocate_central', 'central_set', 'central_to_regional', 'to_warehouse', 'from_warehouse') %} class="row-warehouse"{% endif %}>
           <td>{{ format_dt(t.created_at) }}</td>
           {% if can_filter_managers %}<td>{{ t.manager.name if t.manager else '—' }}</td>{% endif %}
           <td>{{ stand_transfer_operation_label(t.operation) }}</td>
@@ -101,7 +101,7 @@
             <strong>{{ row.to_label }}</strong>
             {% if t.to_was_new %}<span class="badge badge-new">нова ТТ</span>{% endif %}
             {% if row.to_city %}<br><span class="muted">{{ row.to_oblast }} · {{ row.to_city }}</span>{% endif %}
-            {% if t.note and t.operation in ('write_off', 'to_warehouse', 'allocate') %}<br><span class="muted">{{ t.note }}</span>{% endif %}
+            {% if t.note and t.operation in ('write_off', 'to_warehouse', 'allocate', 'allocate_central', 'central_set', 'central_to_regional') %}<br><span class="muted">{{ t.note }}</span>{% endif %}
           </td>
           <td>{{ t.stand.name if t.stand else '—' }}</td>
           <td>{{ t.quantity }} шт</td>

@@ -2944,6 +2944,26 @@ form.filters:has(.filters__field--region) {
 }
 
 .warehouse-hint {
+  margin-top: 0.75rem;
+}
+
+.warehouse-tier {
+  margin-bottom: 1.25rem;
+}
+
+.warehouse-tier--central {
+  border-left: 3px solid #6366f1;
+}
+
+.warehouse-tier--readonly {
+  background: #f8fafc;
+}
+
+.warehouse-form-row {
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
   margin: 0.75rem 0 0;
   font-size: 0.9rem;
 }

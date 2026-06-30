@@ -1,12 +1,14 @@
 {% extends "base.html" %}
-{% block title %}Віртуальний склад — SK Bot Manager{% endblock %}
+{% block title %}Склади стендів — SK Bot Manager{% endblock %}
 {% block content %}
 <header class="page-header page-header--row">
   <div>
-    <h1 class="page-title">Віртуальний склад</h1>
-    <p class="page-subtitle">Стенди для встановлення — {{ warehouse_scope_name }}</p>
+    <h1 class="page-title">Склади стендів</h1>
+    <p class="page-subtitle">
+      {% if can_allocate_stand_stock %}Центральний і регіональні склади{% else %}{{ warehouse_scope_name }} — центральний (перегляд) і регіональний склад{% endif %}
+    </p>
   </div>
-  {% if can_operate_stand_warehouse %}
+  {% if can_operate_stand_warehouse and show_personal_warehouses %}
   <div class="page-actions stands-actions">
     <button type="button" class="btn btn-primary" data-open-stand-from-warehouse>Зі складу на ТТ</button>
     <button type="button" class="btn btn-secondary" data-open-stand-to-warehouse>З ТТ на склад</button>
@@ -19,12 +21,12 @@
   {% endif %}
 </header>
 
-{% if can_filter_managers %}
+{% if show_manager_filter %}
 <form class="filters filters--compact clients-filters" method="get" action="/stands/warehouse">
   <label class="filters__field--manager">
     Менеджер
     <select name="manager_id" onchange="this.form.submit()">
-      <option value="">Оберіть менеджера</option>
+      <option value="">Загальний огляд</option>
       {% for m in managers %}
       <option value="{{ m.id }}" {% if selected_manager_id == m.id %}selected{% endif %}>{{ m.name }}</option>
       {% endfor %}
@@ -34,21 +36,13 @@
 {% endif %}
 
 {% if can_allocate_stand_stock %}
-<section class="card">
-  <h2>Виділити стенди на склад менеджера</h2>
-  <p class="muted">Керівник додає кількість актуальних стендів на віртуальний склад регіонального менеджера.</p>
-  <form id="allocate-form" class="allocate-form">
+<section class="card warehouse-tier warehouse-tier--central">
+  <h2>Центральний склад (загалом)</h2>
+  <p class="muted">Загальна кількість по кожній марці. Нові марки додає <strong>адміністратор</strong> у довіднику стендів.</p>
+
+  <form id="central-set-total-form" class="allocate-form warehouse-form-row">
     <label>
-      Менеджер
-      <select name="manager_id" required>
-        <option value="">Оберіть</option>
-        {% for m in managers %}
-        <option value="{{ m.id }}" {% if warehouse_manager_id == m.id %}selected{% endif %}>{{ m.name }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label>
-      Стенд (бренд)
+      Стенд (марка)
       <select name="stand_id" required>
         <option value="">Оберіть</option>
         {% for sid, sname in filter_stands %}
@@ -57,7 +51,67 @@
       </select>
     </label>
     <label>
-      Кількість (додати)
+      Загальна кількість
+      <input type="number" name="total_quantity" value="0" min="0" step="1" required>
+    </label>
+    <label>
+      Коментар
+      <input type="text" name="note" placeholder="Необовʼязково">
+    </label>
+    <button type="submit" class="btn btn-primary">Встановити</button>
+  </form>
+  <p class="modal__error" id="central-set-error" hidden></p>
+
+  <div class="table-wrap">
+    <table class="table--darkhead stands-report-table">
+      <thead>
+        <tr>
+          <th>Стенд</th>
+          <th class="stands-report-table__num">Не розподілено</th>
+          <th class="stands-report-table__num">У менеджерів (центр)</th>
+          <th class="stands-report-table__num">У менеджерів (регіон)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in central_overview_rows %}
+        <tr>
+          <td>{{ row.stand_name }}</td>
+          <td class="stands-report-table__num">{{ row.pool_quantity }}</td>
+          <td class="stands-report-table__num">{{ row.allocated_quantity }}</td>
+          <td class="stands-report-table__num">{{ row.regional_quantity }}</td>
+        </tr>
+        {% else %}
+        <tr class="empty-row"><td colspan="4">Немає даних по стендах</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card warehouse-tier">
+  <h2>Розподіл на центральний склад менеджера</h2>
+  <p class="muted">З нерозподіленого залишку центрального складу — на квоту обраного менеджера (він бачить її лише для перегляду).</p>
+  <form id="allocate-form" class="allocate-form">
+    <label>
+      Менеджер
+      <select name="manager_id" required>
+        <option value="">Оберіть</option>
+        {% for m in managers %}
+        <option value="{{ m.id }}">{{ m.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Стенд (марка)
+      <select name="stand_id" required>
+        <option value="">Оберіть</option>
+        {% for sid, sname in filter_stands %}
+        <option value="{{ sid }}">{{ sname }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Кількість
       <input type="number" name="quantity" value="1" min="1" step="1" required>
     </label>
     <label>
@@ -65,63 +119,142 @@
       <input type="text" name="note" placeholder="Необовʼязково">
     </label>
     <p class="modal__error" id="allocate-error" hidden></p>
-    <button type="submit" class="btn btn-primary">Виділити на склад</button>
+    <button type="submit" class="btn btn-primary">Розподілити</button>
   </form>
 </section>
+
+<section class="card warehouse-tier">
+  <h2>На регіональний склад менеджера</h2>
+  <p class="muted">З центральної квоти менеджера — на його регіональний склад (звідти менеджер встановлює стенди на ТТ).</p>
+  <form id="central-to-regional-form" class="allocate-form">
+    <label>
+      Менеджер
+      <select name="manager_id" required>
+        <option value="">Оберіть</option>
+        {% for m in managers %}
+        <option value="{{ m.id }}">{{ m.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Стенд (марка)
+      <select name="stand_id" required>
+        <option value="">Оберіть</option>
+        {% for sid, sname in filter_stands %}
+        <option value="{{ sid }}">{{ sname }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Кількість
+      <input type="number" name="quantity" value="1" min="1" step="1" required>
+    </label>
+    <label>
+      Коментар
+      <input type="text" name="note" placeholder="Необовʼязково">
+    </label>
+    <p class="modal__error" id="central-to-regional-error" hidden></p>
+    <button type="submit" class="btn btn-primary">Перемістити на регіональний</button>
+  </form>
+</section>
+
+{% if managers_overview_rows %}
+<section class="card warehouse-tier">
+  <h2>Зведення по менеджерах</h2>
+  <div class="table-wrap">
+    <table class="table--darkhead stands-report-table">
+      <thead>
+        <tr>
+          <th>Менеджер</th>
+          <th>Стенд</th>
+          <th class="stands-report-table__num">Центральний</th>
+          <th class="stands-report-table__num">Регіональний</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in managers_overview_rows %}
+        <tr>
+          <td>{{ row.manager_name }}</td>
+          <td>{{ row.stand_name }}</td>
+          <td class="stands-report-table__num">{{ row.central_quantity }}</td>
+          <td class="stands-report-table__num">{{ row.regional_quantity }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
 {% endif %}
 
-<section class="card">
-  <h2>На складі — {{ warehouse_scope_name }}</h2>
+{% if show_personal_warehouses %}
+<section class="card warehouse-tier">
+  <h2>Склад — {{ warehouse_scope_name }}</h2>
+  {% if can_operate_stand_warehouse %}
+  <p class="muted">Центральна квота (перегляд, розподіляє керівник) і регіональний склад для встановлення на торгові точки.</p>
+  {% else %}
+  <p class="muted">Центральна квота та регіональний склад обраного менеджера.</p>
+  {% endif %}
   <div class="table-wrap">
     <table class="table--darkhead stands-report-table">
       <thead>
         <tr>
           <th>Стенд (торгова марка)</th>
-          <th class="stands-report-table__num">К-сть</th>
+          <th class="stands-report-table__num">Центральний склад</th>
+          <th class="stands-report-table__num">Регіональний</th>
         </tr>
       </thead>
       <tbody>
-        {% for row in stock_rows %}
+        {% for row in manager_warehouse_rows %}
         <tr>
           <td>{{ row.stand_name }}</td>
-          <td class="stands-report-table__num">{{ row.quantity }}</td>
+          <td class="stands-report-table__num">{{ row.central_quantity }}</td>
+          <td class="stands-report-table__num">{{ row.regional_quantity }}</td>
         </tr>
         {% else %}
-        <tr class="empty-row"><td colspan="2">На складі немає стендів</td></tr>
+        <tr class="empty-row"><td colspan="3">Немає даних по стендах</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
-  <p class="muted warehouse-hint">Стенди на складі не враховуються в аналітиці встановлених. В аналітиці лише стенди на торгових точках.</p>
+  <p class="muted warehouse-hint">Стенди на регіональному складі не враховуються в аналітиці встановлених. В аналітиці лише стенди на торгових точках.</p>
 </section>
-
-<input type="hidden" id="warehouse-manager-id" value="{{ warehouse_manager_id }}">
-{% if warehouse_stands_json is defined %}
-<script type="application/json" id="warehouse-stands-json">{{ warehouse_stands_json | safe }}</script>
 {% endif %}
+
+{% if show_personal_warehouses and can_operate_stand_warehouse %}
 {% include "partials/stand_move_modal.html" %}
+{% endif %}
 {% endblock %}
 {% block scripts %}
+{% if show_personal_warehouses and can_operate_stand_warehouse %}
 <script src="/static/stands.js"></script>
+{% endif %}
 {% if can_allocate_stand_stock %}
 <script>
 (function () {
-  const form = document.getElementById("allocate-form");
-  const errEl = document.getElementById("allocate-error");
-  if (!form) return;
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    errEl.hidden = true;
-    try {
-      const res = await fetch("/stands/allocate", { method: "POST", body: new FormData(form) });
-      const data = await res.json();
-      if (!res.ok || !data.ok) throw new Error(data.error || "Помилка");
-      window.location.reload();
-    } catch (err) {
-      errEl.textContent = err.message || "Помилка";
-      errEl.hidden = false;
-    }
-  });
+  async function bindForm(formId, url, errId) {
+    const form = document.getElementById(formId);
+    const errEl = document.getElementById(errId);
+    if (!form) return;
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (errEl) errEl.hidden = true;
+      try {
+        const res = await fetch(url, { method: "POST", body: new FormData(form) });
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || "Помилка");
+        window.location.reload();
+      } catch (err) {
+        if (errEl) {
+          errEl.textContent = err.message || "Помилка";
+          errEl.hidden = false;
+        }
+      }
+    });
+  }
+  bindForm("central-set-total-form", "/stands/central/set-total", "central-set-error");
+  bindForm("allocate-form", "/stands/allocate", "allocate-error");
+  bindForm("central-to-regional-form", "/stands/central/to-regional", "central-to-regional-error");
 })();
 </script>
 {% endif %}

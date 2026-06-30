@@ -50,6 +50,7 @@ from web.utils import (
     task_label,
     visit_type_label,
     warehouse_stands_map_json,
+    warehouse_stands_modal_json,
 )
 
 
@@ -103,7 +104,6 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
             page_ctx(
                 user,
                 active_nav="stand_moves",
-                analytics_section="stands",
                 rows=rows,
                 move_clients=move_clients,
                 warehouse_manager_id=warehouse_owner,
@@ -220,13 +220,40 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
         require_nav(user, "stand_warehouse")
         managers = await dashboard.list_managers() if can_filter_managers(user) else []
         manager_id = scoped_manager_filter(user, query_int(request, "manager_id"))
-        if can_filter_managers(user) and manager_id is None and managers:
-            manager_id = managers[0].id
-        owner_id = _warehouse_owner_id(user, manager_id)
+        is_org_warehouse_view = can_allocate_stand_stock(user)
+        show_manager_filter = (
+            can_filter_managers(user) and user.role != UserRole.LEADER.value
+        )
+        show_personal_warehouses = (
+            not is_org_warehouse_view
+            or (show_manager_filter and manager_id is not None)
+        )
+        if show_personal_warehouses:
+            if can_filter_managers(user) and manager_id is None and managers:
+                manager_id = managers[0].id
+            owner_id = _warehouse_owner_id(user, manager_id)
+        else:
+            owner_id = data_owner_manager_id(user) or user.id
         all_clients = await dashboard.list_clients()
         stands = await dashboard.list_active_stands()
         svc = StandTransferService(session)
-        stock = await svc.list_warehouse_stock(owner_id)
+        manager_warehouse_rows = (
+            await svc.list_manager_warehouse_overview(owner_id)
+            if show_personal_warehouses
+            else []
+        )
+        central_overview = (
+            await svc.list_central_overview() if is_org_warehouse_view else []
+        )
+        manager_names = {m.id: m.name for m in managers}
+        managers_overview = (
+            await svc.list_managers_stock_overview(
+                [m.id for m in managers],
+                manager_names,
+            )
+            if is_org_warehouse_view and managers
+            else []
+        )
         opts = build_client_filter_options(
             all_clients,
             stands,
@@ -241,8 +268,11 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
             page_ctx(
                 user,
                 active_nav="stand_warehouse",
-                analytics_section="stands",
-                stock_rows=stock,
+                manager_warehouse_rows=manager_warehouse_rows,
+                central_overview_rows=central_overview,
+                managers_overview_rows=managers_overview,
+                show_personal_warehouses=show_personal_warehouses,
+                show_manager_filter=show_manager_filter,
                 warehouse_scope_name=scope_name,
                 warehouse_manager_id=owner_id,
                 move_clients=move_clients,
@@ -250,7 +280,11 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
                 selected_manager_id=manager_id,
                 filter_stands=opts.stands,
                 client_stands_json=client_stands_map_json(move_clients),
-                warehouse_stands_json=warehouse_stands_map_json(stock),
+                warehouse_stands_json=(
+                    warehouse_stands_modal_json(manager_warehouse_rows)
+                    if show_personal_warehouses
+                    else None
+                ),
             ),
         )
 
@@ -273,6 +307,64 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
         svc = StandTransferService(session)
         try:
             result = await svc.allocate_stand_stock(
+                actor=user,
+                manager_id=manager_id,
+                stand_id=stand_id,
+                quantity=quantity,
+                note=note,
+            )
+            await session.commit()
+        except ValueError as e:
+            return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
+        return JSONResponse({"ok": True, "transfer_id": result.transfer_id})
+
+    @app.post("/stands/central/set-total")
+    async def stand_central_set_total_api(
+        request: Request,
+        session: AsyncSession = Depends(get_session),
+        _auth=Depends(require_auth),
+        stand_id: int = Form(...),
+        total_quantity: int = Form(...),
+        note: str = Form(""),
+    ):
+        user = await load_web_user(request, session)
+        if not can_allocate_stand_stock(user):
+            return JSONResponse(
+                {"ok": False, "error": "Немає прав"},
+                status_code=403,
+            )
+        svc = StandTransferService(session)
+        try:
+            result = await svc.set_central_total(
+                actor=user,
+                stand_id=stand_id,
+                total_quantity=total_quantity,
+                note=note,
+            )
+            await session.commit()
+        except ValueError as e:
+            return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
+        return JSONResponse({"ok": True, "transfer_id": result.transfer_id})
+
+    @app.post("/stands/central/to-regional")
+    async def stand_central_to_regional_api(
+        request: Request,
+        session: AsyncSession = Depends(get_session),
+        _auth=Depends(require_auth),
+        manager_id: int = Form(...),
+        stand_id: int = Form(...),
+        quantity: int = Form(1),
+        note: str = Form(""),
+    ):
+        user = await load_web_user(request, session)
+        if not can_allocate_stand_stock(user):
+            return JSONResponse(
+                {"ok": False, "error": "Немає прав"},
+                status_code=403,
+            )
+        svc = StandTransferService(session)
+        try:
+            result = await svc.transfer_central_to_regional(
                 actor=user,
                 manager_id=manager_id,
                 stand_id=stand_id,

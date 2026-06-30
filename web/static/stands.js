@@ -24,6 +24,7 @@
   const warehouseJsonEl = document.getElementById("warehouse-stands-json");
   let clientStandsMap = {};
   let warehouseStands = [];
+  let warehouseEmptyHint = "";
 
   if (standsJsonEl) {
     try {
@@ -34,9 +35,16 @@
   }
   if (warehouseJsonEl) {
     try {
-      warehouseStands = JSON.parse(warehouseJsonEl.textContent || "[]");
+      const parsed = JSON.parse(warehouseJsonEl.textContent || "[]");
+      if (Array.isArray(parsed)) {
+        warehouseStands = parsed;
+      } else if (parsed && Array.isArray(parsed.items)) {
+        warehouseStands = parsed.items;
+        warehouseEmptyHint = parsed.empty_hint || "";
+      }
     } catch (_) {
       warehouseStands = [];
+      warehouseEmptyHint = "";
     }
   }
 
@@ -82,6 +90,14 @@
 
   function refreshWarehouseStandOptions() {
     fillStandOptions(warehouseStands, "Оберіть стенд зі складу");
+    if (hintEl && operationSel && operationSel.value === "from_warehouse") {
+      if (warehouseStands.length === 0 && warehouseEmptyHint) {
+        hintEl.textContent = warehouseEmptyHint;
+      }
+    }
+    if (submitBtn && operationSel && operationSel.value === "from_warehouse") {
+      submitBtn.disabled = warehouseStands.length === 0;
+    }
     syncQtyLimit();
   }
 
@@ -93,7 +109,10 @@
     if ((op === "write_off" || op === "to_warehouse") && maxQty) {
       qtyInput.max = String(maxQty);
       if (parseInt(qtyInput.value, 10) > maxQty) qtyInput.value = String(maxQty);
-    } else if (op === "move" || op === "from_warehouse") {
+    } else if (op === "from_warehouse" && maxQty) {
+      qtyInput.max = String(maxQty);
+      if (parseInt(qtyInput.value, 10) > maxQty) qtyInput.value = String(maxQty);
+    } else if (op === "move") {
       qtyInput.max = "1";
       qtyInput.value = "1";
     } else {
@@ -190,6 +209,11 @@
       submitBtn.textContent = labels[op] || "Виконати";
       submitBtn.classList.toggle("btn-danger", isWriteOff);
       submitBtn.classList.toggle("btn-primary", !isWriteOff);
+      if (isFromWarehouse) {
+        submitBtn.disabled = warehouseStands.length === 0;
+      } else {
+        submitBtn.disabled = false;
+      }
     }
 
     if (isFromWarehouse) {

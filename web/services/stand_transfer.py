@@ -10,9 +10,13 @@ from sqlalchemy.orm import selectinload
 from config.team import is_regional_manager
 from database.models import (
     ALLOCATE_SOURCE_LABEL,
+    CENTRAL_WAREHOUSE_LABEL,
+    MANAGER_CENTRAL_LABEL,
     WAREHOUSE_LOCATION_LABEL,
+    CentralStandStock,
     Client,
     ClientStand,
+    ManagerCentralAllocation,
     ManagerRegion,
     ManagerStandStock,
     Stand,
@@ -58,6 +62,37 @@ class WarehouseStockRow:
     stand_id: int
     stand_name: str
     quantity: int
+
+
+@dataclass
+class CentralOverviewRow:
+    stand_id: int
+    stand_name: str
+    pool_quantity: int
+    allocated_quantity: int
+    regional_quantity: int
+
+    @property
+    def total_quantity(self) -> int:
+        return self.pool_quantity + self.allocated_quantity
+
+
+@dataclass
+class ManagerStockOverviewRow:
+    manager_id: int
+    manager_name: str
+    stand_id: int
+    stand_name: str
+    central_quantity: int
+    regional_quantity: int
+
+
+@dataclass
+class ManagerWarehouseRow:
+    stand_id: int
+    stand_name: str
+    central_quantity: int
+    regional_quantity: int
 
 
 @dataclass
@@ -184,6 +219,348 @@ class StandTransferService:
             await self._session.delete(row)
         await self._session.flush()
         return max(0, int(row.quantity)) if row.quantity > 0 else 0
+
+    async def _central_pool_qty(self, stand_id: int) -> int:
+        result = await self._session.execute(
+            select(CentralStandStock).where(CentralStandStock.stand_id == stand_id)
+        )
+        row = result.scalar_one_or_none()
+        return max(0, int(row.quantity)) if row is not None else 0
+
+    async def _set_central_pool_qty(self, stand_id: int, quantity: int) -> int:
+        qty = max(0, int(quantity))
+        result = await self._session.execute(
+            select(CentralStandStock).where(CentralStandStock.stand_id == stand_id)
+        )
+        row = result.scalar_one_or_none()
+        if row is None:
+            if qty <= 0:
+                return 0
+            row = CentralStandStock(stand_id=stand_id, quantity=qty)
+            self._session.add(row)
+        else:
+            row.quantity = qty
+        await self._session.flush()
+        return qty
+
+    async def _sum_central_allocations(self, stand_id: int) -> int:
+        result = await self._session.execute(
+            select(ManagerCentralAllocation.quantity).where(
+                ManagerCentralAllocation.stand_id == stand_id,
+                ManagerCentralAllocation.quantity > 0,
+            )
+        )
+        return sum(int(q) for q in result.scalars().all())
+
+    async def _sum_regional_stock(self, stand_id: int) -> int:
+        result = await self._session.execute(
+            select(ManagerStandStock.quantity).where(
+                ManagerStandStock.stand_id == stand_id,
+                ManagerStandStock.quantity > 0,
+            )
+        )
+        return sum(int(q) for q in result.scalars().all())
+
+    async def _central_allocation_qty(self, manager_id: int, stand_id: int) -> int:
+        result = await self._session.execute(
+            select(ManagerCentralAllocation).where(
+                ManagerCentralAllocation.manager_id == manager_id,
+                ManagerCentralAllocation.stand_id == stand_id,
+            )
+        )
+        row = result.scalar_one_or_none()
+        return max(0, int(row.quantity)) if row is not None else 0
+
+    async def _add_central_allocation(
+        self,
+        manager_id: int,
+        stand_id: int,
+        qty: int,
+    ) -> int:
+        result = await self._session.execute(
+            select(ManagerCentralAllocation).where(
+                ManagerCentralAllocation.manager_id == manager_id,
+                ManagerCentralAllocation.stand_id == stand_id,
+            )
+        )
+        row = result.scalar_one_or_none()
+        if row is None:
+            row = ManagerCentralAllocation(
+                manager_id=manager_id,
+                stand_id=stand_id,
+                quantity=qty,
+            )
+            self._session.add(row)
+        else:
+            row.quantity = int(row.quantity) + qty
+        await self._session.flush()
+        return int(row.quantity)
+
+    async def _remove_central_allocation(
+        self,
+        manager_id: int,
+        stand_id: int,
+        qty: int,
+    ) -> int:
+        available = await self._central_allocation_qty(manager_id, stand_id)
+        if available < qty:
+            raise ValueError(
+                f"Недостатньо стендів на центральному складі менеджера "
+                f"(є {available}, потрібно {qty})"
+            )
+        result = await self._session.execute(
+            select(ManagerCentralAllocation).where(
+                ManagerCentralAllocation.manager_id == manager_id,
+                ManagerCentralAllocation.stand_id == stand_id,
+            )
+        )
+        row = result.scalar_one_or_none()
+        if row is None:
+            raise ValueError("На центральному складі менеджера немає цього стенду")
+        row.quantity = int(row.quantity) - qty
+        if row.quantity <= 0:
+            await self._session.delete(row)
+        await self._session.flush()
+        return max(0, int(row.quantity)) if row and row.quantity > 0 else 0
+
+    async def _remove_central_pool_qty(self, stand_id: int, qty: int) -> int:
+        available = await self._central_pool_qty(stand_id)
+        if available < qty:
+            raise ValueError(
+                f"Недостатньо нерозподілених стендів на центральному складі "
+                f"(є {available}, потрібно {qty})"
+            )
+        return await self._set_central_pool_qty(stand_id, available - qty)
+
+    async def list_central_overview(self) -> list[CentralOverviewRow]:
+        stands = await self._stands.list_active()
+        rows: list[CentralOverviewRow] = []
+        for stand in stands:
+            pool = await self._central_pool_qty(stand.id)
+            allocated = await self._sum_central_allocations(stand.id)
+            regional = await self._sum_regional_stock(stand.id)
+            rows.append(
+                CentralOverviewRow(
+                    stand_id=stand.id,
+                    stand_name=stand.name,
+                    pool_quantity=pool,
+                    allocated_quantity=allocated,
+                    regional_quantity=regional,
+                )
+            )
+        return rows
+
+    async def list_manager_central_stock(self, manager_id: int) -> list[WarehouseStockRow]:
+        result = await self._session.execute(
+            select(ManagerCentralAllocation)
+            .where(
+                ManagerCentralAllocation.manager_id == manager_id,
+                ManagerCentralAllocation.quantity > 0,
+            )
+            .options(selectinload(ManagerCentralAllocation.stand))
+            .order_by(ManagerCentralAllocation.stand_id)
+        )
+        rows: list[WarehouseStockRow] = []
+        for item in result.scalars().all():
+            if item.stand is None or not item.stand.is_active:
+                continue
+            rows.append(
+                WarehouseStockRow(
+                    stand_id=item.stand_id,
+                    stand_name=item.stand.name,
+                    quantity=int(item.quantity),
+                )
+            )
+        return rows
+
+    async def list_manager_warehouse_overview(
+        self,
+        manager_id: int,
+    ) -> list[ManagerWarehouseRow]:
+        stands = await self._stands.list_active()
+        central_result = await self._session.execute(
+            select(ManagerCentralAllocation).where(
+                ManagerCentralAllocation.manager_id == manager_id,
+            )
+        )
+        central_by_stand = {
+            row.stand_id: max(0, int(row.quantity))
+            for row in central_result.scalars().all()
+        }
+        regional_result = await self._session.execute(
+            select(ManagerStandStock).where(
+                ManagerStandStock.manager_id == manager_id,
+            )
+        )
+        regional_by_stand = {
+            row.stand_id: max(0, int(row.quantity))
+            for row in regional_result.scalars().all()
+        }
+        return [
+            ManagerWarehouseRow(
+                stand_id=stand.id,
+                stand_name=stand.name,
+                central_quantity=central_by_stand.get(stand.id, 0),
+                regional_quantity=regional_by_stand.get(stand.id, 0),
+            )
+            for stand in stands
+        ]
+
+    async def list_managers_stock_overview(
+        self,
+        manager_ids: list[int],
+        manager_names: dict[int, str],
+    ) -> list[ManagerStockOverviewRow]:
+        if not manager_ids:
+            return []
+        central_result = await self._session.execute(
+            select(ManagerCentralAllocation)
+            .where(
+                ManagerCentralAllocation.manager_id.in_(manager_ids),
+                ManagerCentralAllocation.quantity > 0,
+            )
+            .options(selectinload(ManagerCentralAllocation.stand))
+        )
+        regional_result = await self._session.execute(
+            select(ManagerStandStock)
+            .where(
+                ManagerStandStock.manager_id.in_(manager_ids),
+                ManagerStandStock.quantity > 0,
+            )
+            .options(selectinload(ManagerStandStock.stand))
+        )
+        central_map: dict[tuple[int, int], int] = {}
+        stand_names: dict[int, str] = {}
+        for item in central_result.scalars().all():
+            if item.stand is None or not item.stand.is_active:
+                continue
+            central_map[(item.manager_id, item.stand_id)] = int(item.quantity)
+            stand_names[item.stand_id] = item.stand.name
+        regional_map: dict[tuple[int, int], int] = {}
+        for item in regional_result.scalars().all():
+            if item.stand is None or not item.stand.is_active:
+                continue
+            regional_map[(item.manager_id, item.stand_id)] = int(item.quantity)
+            stand_names[item.stand_id] = item.stand.name
+        keys = set(central_map) | set(regional_map)
+        rows: list[ManagerStockOverviewRow] = []
+        for manager_id, stand_id in sorted(keys, key=lambda k: (k[0], k[1])):
+            rows.append(
+                ManagerStockOverviewRow(
+                    manager_id=manager_id,
+                    manager_name=manager_names.get(manager_id, f"#{manager_id}"),
+                    stand_id=stand_id,
+                    stand_name=stand_names.get(stand_id, f"#{stand_id}"),
+                    central_quantity=central_map.get((manager_id, stand_id), 0),
+                    regional_quantity=regional_map.get((manager_id, stand_id), 0),
+                )
+            )
+        return rows
+
+    async def set_central_total(
+        self,
+        *,
+        actor: WebUser,
+        stand_id: int,
+        total_quantity: int,
+        note: str | None = None,
+    ) -> StandAllocateResult:
+        self._assert_actor_may_allocate(actor)
+        stand = await self._stands.get_by_id(stand_id)
+        if stand is None or not stand.is_active:
+            raise ValueError("Стенд не знайдено")
+
+        total = max(0, int(total_quantity))
+        allocated = await self._sum_central_allocations(stand_id)
+        if total < allocated:
+            raise ValueError(
+                f"Загальна кількість не може бути меншою за вже розподілене "
+                f"({allocated} у менеджерів)"
+            )
+        pool = total - allocated
+        await self._set_central_pool_qty(stand_id, pool)
+
+        transfer = StandTransfer(
+            manager_id=actor.id,
+            from_client_id=None,
+            to_client_id=None,
+            stand_id=stand_id,
+            quantity=total,
+            operation=StandTransferOperation.CENTRAL_SET.value,
+            to_was_new=False,
+            note=(note or "").strip() or None,
+        )
+        self._session.add(transfer)
+        await self._session.flush()
+        return StandAllocateResult(transfer_id=transfer.id)
+
+    async def allocate_central_to_manager(
+        self,
+        *,
+        actor: WebUser,
+        manager_id: int,
+        stand_id: int,
+        quantity: int,
+        note: str | None = None,
+    ) -> StandAllocateResult:
+        self._assert_actor_may_allocate(actor)
+        await self._assert_field_manager_id(manager_id)
+
+        stand = await self._stands.get_by_id(stand_id)
+        if stand is None or not stand.is_active:
+            raise ValueError("Стенд не знайдено")
+
+        qty = max(1, int(quantity))
+        await self._remove_central_pool_qty(stand_id, qty)
+        await self._add_central_allocation(manager_id, stand_id, qty)
+
+        transfer = StandTransfer(
+            manager_id=manager_id,
+            from_client_id=None,
+            to_client_id=None,
+            stand_id=stand_id,
+            quantity=qty,
+            operation=StandTransferOperation.ALLOCATE_CENTRAL.value,
+            to_was_new=False,
+            note=(note or "").strip() or None,
+        )
+        self._session.add(transfer)
+        await self._session.flush()
+        return StandAllocateResult(transfer_id=transfer.id)
+
+    async def transfer_central_to_regional(
+        self,
+        *,
+        actor: WebUser,
+        manager_id: int,
+        stand_id: int,
+        quantity: int,
+        note: str | None = None,
+    ) -> StandAllocateResult:
+        self._assert_actor_may_allocate(actor)
+        await self._assert_field_manager_id(manager_id)
+
+        stand = await self._stands.get_by_id(stand_id)
+        if stand is None or not stand.is_active:
+            raise ValueError("Стенд не знайдено")
+
+        qty = max(1, int(quantity))
+        await self._remove_central_allocation(manager_id, stand_id, qty)
+        await self._add_warehouse_qty(manager_id, stand_id, qty)
+
+        transfer = StandTransfer(
+            manager_id=manager_id,
+            from_client_id=None,
+            to_client_id=None,
+            stand_id=stand_id,
+            quantity=qty,
+            operation=StandTransferOperation.CENTRAL_TO_REGIONAL.value,
+            to_was_new=False,
+            note=(note or "").strip() or None,
+        )
+        self._session.add(transfer)
+        await self._session.flush()
+        return StandAllocateResult(transfer_id=transfer.id)
 
     async def _add_client_stand_qty(
         self,
@@ -397,29 +774,14 @@ class StandTransferService:
         quantity: int,
         note: str | None = None,
     ) -> StandAllocateResult:
-        self._assert_actor_may_allocate(actor)
-        await self._assert_field_manager_id(manager_id)
-
-        stand = await self._stands.get_by_id(stand_id)
-        if stand is None or not stand.is_active:
-            raise ValueError("Стенд не знайдено")
-
-        qty = max(1, int(quantity))
-        await self._add_warehouse_qty(manager_id, stand_id, qty)
-
-        transfer = StandTransfer(
+        """Зворотна сумісність: виділення на центральний склад менеджера."""
+        return await self.allocate_central_to_manager(
+            actor=actor,
             manager_id=manager_id,
-            from_client_id=None,
-            to_client_id=None,
             stand_id=stand_id,
-            quantity=qty,
-            operation=StandTransferOperation.ALLOCATE.value,
-            to_was_new=False,
-            note=(note or "").strip() or None,
+            quantity=quantity,
+            note=note,
         )
-        self._session.add(transfer)
-        await self._session.flush()
-        return StandAllocateResult(transfer_id=transfer.id)
 
     async def move_to_warehouse(
         self,
@@ -557,6 +919,12 @@ class StandTransferService:
         op = transfer.operation
         if op == StandTransferOperation.ALLOCATE.value:
             return ALLOCATE_SOURCE_LABEL, WAREHOUSE_LOCATION_LABEL
+        if op == StandTransferOperation.CENTRAL_SET.value:
+            return "—", CENTRAL_WAREHOUSE_LABEL
+        if op == StandTransferOperation.ALLOCATE_CENTRAL.value:
+            return CENTRAL_WAREHOUSE_LABEL, MANAGER_CENTRAL_LABEL
+        if op == StandTransferOperation.CENTRAL_TO_REGIONAL.value:
+            return MANAGER_CENTRAL_LABEL, WAREHOUSE_LOCATION_LABEL
         if op == StandTransferOperation.TO_WAREHOUSE.value:
             from_name = transfer.from_client.name if transfer.from_client else "—"
             return from_name, WAREHOUSE_LOCATION_LABEL
@@ -621,7 +989,12 @@ class StandTransferService:
             fc = t.from_client
             tc = t.to_client
             if region_id is not None or city:
-                if t.operation == StandTransferOperation.ALLOCATE.value:
+                if t.operation in (
+                    StandTransferOperation.ALLOCATE.value,
+                    StandTransferOperation.CENTRAL_SET.value,
+                    StandTransferOperation.ALLOCATE_CENTRAL.value,
+                    StandTransferOperation.CENTRAL_TO_REGIONAL.value,
+                ):
                     continue
                 from_match = fc is not None and (
                     (region_id is None or fc.region_id == region_id)

@@ -203,3 +203,30 @@ def warehouse_stands_map_json(rows: list) -> str:
         for row in rows
     ]
     return json.dumps(items, ensure_ascii=False)
+
+
+def warehouse_stands_modal_json(overview_rows: list) -> str:
+    """JSON для модалки зі складу: регіональні залишки + підказка, якщо список порожній."""
+    items = [
+        {
+            "id": row.stand_id,
+            "name": row.stand_name,
+            "qty": row.regional_quantity,
+        }
+        for row in overview_rows
+        if row.regional_quantity > 0
+    ]
+    has_central = any(row.central_quantity > 0 for row in overview_rows)
+    has_regional = bool(items)
+    empty_hint = ""
+    if not has_regional and has_central:
+        empty_hint = (
+            "Стенди є на центральному складі. Керівник має перемістити їх "
+            "на регіональний перед встановленням на ТТ."
+        )
+    elif not has_regional:
+        empty_hint = "На регіональному складі немає стендів для встановлення."
+    return json.dumps(
+        {"items": items, "empty_hint": empty_hint},
+        ensure_ascii=False,
+    )
