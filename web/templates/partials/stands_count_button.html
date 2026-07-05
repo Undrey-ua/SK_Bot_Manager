@@ -1,0 +1,9 @@
+{% macro stands_count(count, bucket, title, manager='', stand='', city='', oblast='') %}
+{% if count > 0 %}
+<button type="button" class="stands-count-link" data-bucket="{{ bucket }}" data-title="{{ title }}"
+  {% if manager %}data-manager="{{ manager }}"{% endif %}
+  {% if stand %}data-stand="{{ stand }}"{% endif %}
+  {% if city %}data-city="{{ city }}"{% endif %}
+  {% if oblast %}data-oblast="{{ oblast }}"{% endif %}>{{ count }}</button>
+{% else %}{{ count }}{% endif %}
+{% endmacro %}

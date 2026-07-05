@@ -107,6 +107,16 @@ def client_display_city(client: Client) -> str:
     return city if city != "—" else "—"
 
 
+def client_legal_name(client: Client) -> str:
+    raw = getattr(client, "legal_name", None)
+    return str(raw).strip() if raw else ""
+
+
+def client_display_legal_name(client: Client) -> str:
+    name = client_legal_name(client)
+    return name if name else "—"
+
+
 def _city_from_address_and_region(client: Client) -> str | None:
     address = (client.address or "").strip()
     parts = [p.strip() for p in address.split(",") if p.strip()] if address else []

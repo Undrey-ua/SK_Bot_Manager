@@ -1,0 +1,37 @@
+<div class="stands-clients-detail">
+  <p class="muted stands-clients-detail__meta">Знайдено торгових точок: <strong>{{ rows|length }}</strong></p>
+  <div class="table-wrap">
+    <table class="table--darkhead stands-clients-detail-table">
+      <thead>
+        <tr>
+          <th>ТТ</th>
+          <th>Юридична назва</th>
+          <th>Стенди</th>
+          <th>Місто</th>
+          <th>Область</th>
+          {% if can_filter_managers %}<th>Менеджер</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td><a href="/clients/{{ row.client_id }}">{{ row.name }}</a></td>
+          <td>{% if row.legal_name %}{{ row.legal_name }}{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td>
+            {% for stand_name, qty in row.stand_lines %}
+            <span class="stand-badge">{{ stand_name }}{% if qty > 1 %} ×{{ qty }}{% endif %}</span>
+            {% endfor %}
+          </td>
+          <td>{{ row.city }}</td>
+          <td>{{ row.oblast }}</td>
+          {% if can_filter_managers %}<td>{{ row.manager }}</td>{% endif %}
+        </tr>
+        {% else %}
+        <tr class="empty-row">
+          <td colspan="{% if can_filter_managers %}6{% else %}5{% endif %}">Немає торгових точок</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>

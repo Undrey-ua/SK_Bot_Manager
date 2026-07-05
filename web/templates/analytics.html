@@ -239,13 +239,17 @@
   <div class="table-wrap">
     <table class="table--darkhead">
       <thead>
-        <tr><th>Клієнт (ТТ)</th><th>Продано, кв. м</th></tr>
+        <tr><th>Клієнт (ТТ)</th><th>Юридична назва</th><th>Продано, кв. м</th></tr>
       </thead>
       <tbody>
         {% for r in sales_by_client %}
-        <tr><td>{{ r.label }}</td><td>{{ r.value }}</td></tr>
+        <tr>
+          <td>{{ r.label }}</td>
+          <td>{% if r.extra %}{{ r.extra }}{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td>{{ r.value }}</td>
+        </tr>
         {% else %}
-        <tr class="empty-row"><td colspan="2">Немає даних</td></tr>
+        <tr class="empty-row"><td colspan="3">Немає даних</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -295,6 +299,7 @@
         <tr>
           <th>Дата додавання</th>
           <th>ТТ</th>
+          <th>Юридична назва</th>
           <th>Бренд</th>
           <th>Кількість, кв. м</th>
           <th>Коментар</th>
@@ -310,6 +315,11 @@
             {% if sale.client %}
             <a href="/clients/{{ sale.client_id }}">{{ sale.client.name }}</a>
             {% else %}—{% endif %}
+          </td>
+          <td>
+            {% if sale.client and sale.client.legal_name %}
+            {{ sale.client.legal_name }}
+            {% else %}<span class="muted">—</span>{% endif %}
           </td>
           <td>{{ sale.brand.name if sale.brand else '—' }}</td>
           <td>{{ format_qty(sale.quantity, decimals=2) }}</td>
@@ -329,7 +339,7 @@
         </tr>
         {% else %}
         <tr class="empty-row">
-          <td colspan="{% if can_filter_managers %}7{% else %}6{% endif %}">Немає продажів за обраний період і фільтри</td>
+          <td colspan="{% if can_filter_managers %}8{% else %}7{% endif %}">Немає продажів за обраний період і фільтри</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -357,6 +367,7 @@
 {% endif %}
 
 {% if section == 'stands' and not is_sales_manager %}
+{% from "partials/stands_count_button.html" import stands_count %}
 {% set agg_unit = 'шт' %}
 <div class="page-actions stands-actions">
   {% if can_operate_stand_warehouse %}
@@ -376,7 +387,7 @@
       </thead>
       <tbody>
         {% for r in stands_total_by_manager %}
-        <tr><td>{{ r.manager }}</td><td class="stands-report-table__num">{{ r.count }}</td></tr>
+        <tr><td>{{ r.manager }}</td><td class="stands-report-table__num">{{ stands_count(r.count, 'manager_total', 'Менеджер: ' ~ r.manager, manager=r.manager) }}</td></tr>
         {% else %}
         <tr class="empty-row"><td colspan="2">Немає даних</td></tr>
         {% endfor %}
@@ -401,7 +412,7 @@
         <tr>
           <td>{{ r.manager }}</td>
           <td>{{ r.stand }}</td>
-          <td class="stands-report-table__num">{{ r.count }}</td>
+          <td class="stands-report-table__num">{{ stands_count(r.count, 'manager_stand', 'Менеджер: ' ~ r.manager ~ ' · ' ~ r.stand, manager=r.manager, stand=r.stand) }}</td>
         </tr>
         {% else %}
         <tr class="empty-row"><td colspan="3">Немає даних</td></tr>
@@ -419,7 +430,7 @@
       </thead>
       <tbody>
         {% for r in stands_totals_city %}
-        <tr><td>{{ r.label }}</td><td class="stands-report-table__num">{{ r.value|int }}</td></tr>
+        <tr><td>{{ r.label }}</td><td class="stands-report-table__num">{{ stands_count(r.value|int, 'city_total', 'Місто: ' ~ r.label, city=r.label) }}</td></tr>
         {% else %}
         <tr class="empty-row"><td colspan="2">Немає даних</td></tr>
         {% endfor %}
@@ -443,7 +454,7 @@
         <tr>
           <td>{{ r.city }}</td>
           <td>{{ r.stand }}</td>
-          <td class="stands-report-table__num">{{ r.count }}</td>
+          <td class="stands-report-table__num">{{ stands_count(r.count, 'city_stand', 'Місто: ' ~ r.city ~ ' · ' ~ r.stand, city=r.city, stand=r.stand) }}</td>
         </tr>
         {% else %}
         <tr class="empty-row"><td colspan="3">Немає даних</td></tr>
@@ -461,7 +472,7 @@
       </thead>
       <tbody>
         {% for r in stands_totals_oblast %}
-        <tr><td>{{ r.label }}</td><td class="stands-report-table__num">{{ r.value|int }}</td></tr>
+        <tr><td>{{ r.label }}</td><td class="stands-report-table__num">{{ stands_count(r.value|int, 'oblast_total', 'Область: ' ~ r.label, oblast=r.label) }}</td></tr>
         {% else %}
         <tr class="empty-row"><td colspan="2">Немає даних</td></tr>
         {% endfor %}
@@ -485,7 +496,7 @@
         <tr>
           <td>{{ r.oblast }}</td>
           <td>{{ r.stand }}</td>
-          <td class="stands-report-table__num">{{ r.count }}</td>
+          <td class="stands-report-table__num">{{ stands_count(r.count, 'oblast_stand', 'Область: ' ~ r.oblast ~ ' · ' ~ r.stand, oblast=r.oblast, stand=r.stand) }}</td>
         </tr>
         {% else %}
         <tr class="empty-row"><td colspan="3">Немає даних</td></tr>
@@ -494,12 +505,14 @@
     </table>
   </div>
 </section>
+{% include "partials/stands_clients_modal.html" %}
 {% include "partials/stand_move_modal.html" %}
 {% endif %}
 {% endblock %}
 {% block scripts %}
 {% if section == 'stands' %}
 <script src="/static/stands.js"></script>
+<script src="/static/stands_drilldown.js"></script>
 {% endif %}
 {% if section == 'sales' %}
 <script src="/static/analytics_lazy.js"></script>

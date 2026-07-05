@@ -168,6 +168,7 @@ class ClientRepository(BaseRepository):
         stand_ids: list[int],
         *,
         city: str | None = None,
+        legal_name: str | None = None,
         contacts: str | None = None,
         photo_url: str | None = None,
         swatch_brand_ids: list[int] | None = None,
@@ -176,6 +177,7 @@ class ClientRepository(BaseRepository):
             manager_id=manager_id,
             region_id=region_id,
             name=name.strip(),
+            legal_name=legal_name.strip() if legal_name else None,
             address=address.strip(),
             city=city.strip() if city else None,
             comment=comment,
@@ -206,6 +208,7 @@ class ClientRepository(BaseRepository):
         stand_qty: dict[int, int] | None = None,
         *,
         city: str | None = None,
+        legal_name: str | None = None,
         contacts: str | None = None,
         photo_url: str | None = None,
         update_photo: bool = False,
@@ -217,6 +220,7 @@ class ClientRepository(BaseRepository):
 
         client.region_id = region_id
         client.name = name.strip()
+        client.legal_name = legal_name.strip() if legal_name else None
         client.address = address.strip()
         client.city = city.strip() if city else None
         client.comment = comment

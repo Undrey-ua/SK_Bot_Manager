@@ -142,6 +142,7 @@ class Client(Base):
     manager_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     region_id: Mapped[int] = mapped_column(ForeignKey("manager_regions.id"), index=True)
     name: Mapped[str] = mapped_column(String(255))
+    legal_name: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     address: Mapped[str] = mapped_column(String(500))
     city: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

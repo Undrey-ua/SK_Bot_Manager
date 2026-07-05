@@ -35,6 +35,9 @@
       <tr{% if not row.worked %} class="matrix-row--inactive"{% endif %}>
         <td class="sticky-col sticky-col--name matrix-client-cell">
           <strong>{{ row['client'] }}</strong>
+          {% if row.legal_name %}
+          <div class="matrix-client-legal muted">{{ row.legal_name }}</div>
+          {% endif %}
         </td>
         <td class="sticky-col sticky-col--stands matrix-stands-cell">
           {% if row.stand_badges %}

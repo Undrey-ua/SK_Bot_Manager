@@ -14,7 +14,7 @@ from database.models import Client, ClientStand, Sale, Stand, User, UserRole
 from database.repositories.sale import SaleRepository
 from database.repositories.user import UserRepository
 from web.analytics_periods import DateRange, rolling_months_range
-from web.client_geo import client_city, client_oblast
+from web.client_geo import client_city, client_oblast, client_legal_name
 from web.services.clients_filter import (
     ClientFilters,
     SalesFilters,
@@ -42,6 +42,18 @@ class StandReportRow:
     stand: str | None = None
     city: str | None = None
     oblast: str | None = None
+
+
+@dataclass
+class StandClientDetailRow:
+    client_id: int
+    name: str
+    legal_name: str
+    address: str
+    city: str
+    oblast: str
+    manager: str
+    stand_lines: list[tuple[str, int]]
 
 
 @dataclass
@@ -278,12 +290,24 @@ class AnalyticsService:
         filters: SalesFilters | None = None,
     ) -> list[AggRow]:
         sales = await self._sales_in_range(date_range, filters)
-        totals: dict[str, Decimal] = defaultdict(Decimal)
+        totals: dict[int, Decimal] = defaultdict(Decimal)
+        names: dict[int, str] = {}
+        legal_names: dict[int, str] = {}
         for s in sales:
-            totals[s.client.name] += s.quantity
+            totals[s.client_id] += s.quantity
+            names[s.client_id] = s.client.name
+            legal_names[s.client_id] = client_legal_name(s.client)
         return [
-            AggRow(label=k, value=v)
-            for k, v in sorted(totals.items(), key=lambda x: x[1], reverse=True)
+            AggRow(
+                label=names[cid],
+                extra=legal_names.get(cid, ""),
+                value=v,
+            )
+            for cid, v in sorted(
+                totals.items(),
+                key=lambda x: x[1],
+                reverse=True,
+            )
         ]
 
     async def sales_by_oblast(
@@ -549,6 +573,7 @@ class AnalyticsService:
             return {
                 "client_id": cid,
                 "client": matrix_client_label(cid),
+                "legal_name": client_legal_name(client) if client else "",
                 "stand_badges": self._client_stand_badge_names(client),
                 "cells": cells,
                 "total": total,
@@ -986,6 +1011,129 @@ class AnalyticsService:
             )
         )
         return rows
+
+    def _stand_lines_for_client(
+        self,
+        client: Client,
+        *,
+        stand_id: int | None,
+        stand_name: str | None,
+    ) -> list[tuple[str, int]]:
+        lines: list[tuple[str, int]] = []
+        for name, qty in self._iter_stand_placements(client, stand_id=stand_id):
+            if stand_name is not None and name != stand_name:
+                continue
+            lines.append((name, qty))
+        return lines
+
+    def _client_matches_stand_bucket(
+        self,
+        client: Client,
+        bucket: str,
+        *,
+        manager: str | None,
+        stand: str | None,
+        city: str | None,
+        oblast: str | None,
+        stand_id: int | None,
+    ) -> bool:
+        mgr = client.manager.name if client.manager else "—"
+        if bucket == "manager_total":
+            return manager is not None and mgr == manager
+        if bucket == "manager_stand":
+            if manager is None or stand is None or mgr != manager:
+                return False
+            return bool(self._stand_lines_for_client(client, stand_id=stand_id, stand_name=stand))
+        if bucket == "city_total":
+            return city is not None and client_city(client) == city
+        if bucket == "city_stand":
+            if city is None or stand is None or client_city(client) != city:
+                return False
+            return bool(self._stand_lines_for_client(client, stand_id=stand_id, stand_name=stand))
+        if bucket == "oblast_total":
+            return oblast is not None and client_oblast(client) == oblast
+        if bucket == "oblast_stand":
+            if oblast is None or stand is None or client_oblast(client) != oblast:
+                return False
+            return bool(self._stand_lines_for_client(client, stand_id=stand_id, stand_name=stand))
+        return False
+
+    async def stands_clients_detail(
+        self,
+        filters: ClientFilters | None,
+        *,
+        bucket: str,
+        manager: str | None = None,
+        stand: str | None = None,
+        city: str | None = None,
+        oblast: str | None = None,
+    ) -> list[StandClientDetailRow]:
+        clients = await self._clients_for_stands(filters)
+        stand_id = filters.stand_id if filters else None
+        rows: list[StandClientDetailRow] = []
+        for client in clients:
+            if not self._client_matches_stand_bucket(
+                client,
+                bucket,
+                manager=manager,
+                stand=stand,
+                city=city,
+                oblast=oblast,
+                stand_id=stand_id,
+            ):
+                continue
+            stand_name_filter = stand if bucket.endswith("_stand") else None
+            stand_lines = self._stand_lines_for_client(
+                client,
+                stand_id=stand_id,
+                stand_name=stand_name_filter,
+            )
+            if not stand_lines:
+                continue
+            rows.append(
+                StandClientDetailRow(
+                    client_id=client.id,
+                    name=client.name,
+                    legal_name=client_legal_name(client),
+                    address=client.address or "—",
+                    city=client_city(client),
+                    oblast=client_oblast(client),
+                    manager=client.manager.name if client.manager else "—",
+                    stand_lines=stand_lines,
+                )
+            )
+        rows.sort(
+            key=lambda r: (
+                r.manager.casefold(),
+                r.city.casefold(),
+                r.name.casefold(),
+            )
+        )
+        return rows
+
+    @classmethod
+    def stands_detail_title(
+        cls,
+        bucket: str,
+        *,
+        manager: str | None = None,
+        stand: str | None = None,
+        city: str | None = None,
+        oblast: str | None = None,
+    ) -> str:
+        if bucket == "manager_total":
+            return f"Менеджер: {manager}"
+        if bucket == "manager_stand":
+            return f"Менеджер: {manager} · Стенд: {stand}"
+        if bucket == "city_total":
+            return f"Місто: {city}"
+        if bucket == "city_stand":
+            return f"Місто: {city} · Стенд: {stand}"
+        if bucket == "oblast_total":
+            return f"Область: {oblast}"
+        if bucket == "oblast_stand":
+            return f"Область: {oblast} · Стенд: {stand}"
+        return "Торгові точки зі стендами"
 
     @classmethod
     def _matching_matrix_cols(cls, stand_name: str, col_keys: list[str]) -> list[str]:

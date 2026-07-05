@@ -18,6 +18,9 @@
     {% endif %}
     <div class="client-hero-text">
       <h1 class="page-title" style="margin:0">{{ client.name }}</h1>
+      {% if client.legal_name %}
+      <p class="client-legal-name muted">{{ client.legal_name }}</p>
+      {% endif %}
       <p class="page-subtitle" style="margin:0.35rem 0 0">
         {{ client.region.name if client.region else '—' }}
       </p>
@@ -172,6 +175,8 @@
       {% endif %}
       <dt>Область</dt>
       <dd>{{ client.region.name if client.region else '—' }}</dd>
+      <dt>Юридична назва</dt>
+      <dd>{{ client_display_legal_name(client) }}</dd>
       <dt>Адреса</dt>
       <dd>{{ client.address }}</dd>
       <dt>Місто</dt>

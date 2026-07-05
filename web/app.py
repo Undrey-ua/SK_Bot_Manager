@@ -33,7 +33,12 @@ from web.services.clients_filter import ClientFilters, build_client_filter_optio
 from web.services.dashboard import DashboardService
 from config.team import is_regional_manager
 from web.services.user_admin import user_role_label, user_roles_display
-from web.client_geo import client_city, client_display_city, client_display_comment
+from web.client_geo import (
+    client_city,
+    client_display_city,
+    client_display_comment,
+    client_display_legal_name,
+)
 from web.client_sales_periods import (
     CLIENT_SALES_PERIOD_KINDS,
     CLIENT_SALES_PERIOD_LABELS,
@@ -75,6 +80,7 @@ templates.env.globals.update(
     client_city=client_city,
     client_display_city=client_display_city,
     client_display_comment=client_display_comment,
+    client_display_legal_name=client_display_legal_name,
     format_qty=format_qty,
     format_signed_qty=format_signed_qty,
     format_signed_pct=format_signed_pct,

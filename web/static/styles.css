@@ -448,6 +448,50 @@ tbody td strong {
   white-space: nowrap;
 }
 
+.stands-count-link {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--accent, #2563eb);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.stands-count-link:hover {
+  color: #1d4ed8;
+}
+
+.client-legal-name {
+  margin: 0.2rem 0 0;
+  font-size: 0.95rem;
+}
+
+.matrix-client-legal {
+  font-size: 0.78rem;
+  margin-top: 0.15rem;
+}
+
+.modal__dialog--wide {
+  max-width: min(960px, 96vw);
+}
+
+.stands-clients-modal-body {
+  max-height: min(60vh, 520px);
+  overflow: auto;
+}
+
+.modal__actions--top {
+  margin-bottom: 0.75rem;
+  justify-content: flex-end;
+}
+
+.stands-clients-detail-table .stand-badge {
+  margin: 0.1rem 0.2rem 0.1rem 0;
+}
+
 .stands-report-table tbody td {
   vertical-align: top;
 }

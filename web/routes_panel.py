@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date as date_cls
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from decimal import Decimal, InvalidOperation
 
 from fastapi import Depends, Form, HTTPException, Request
@@ -80,6 +81,7 @@ from web.services.tasks_board import (
     TASK_STATUS_OVERDUE,
     build_tasks_board,
 )
+from web.stands_pdf import build_stands_clients_pdf
 from web.ttl_cache import get_or_load, invalidate_sales_analytics_cache
 from web.utils import (
     client_stands_map_json,
@@ -88,6 +90,39 @@ from web.utils import (
     uk_month_name,
     warehouse_stands_map_json,
 )
+
+
+_STANDS_DETAIL_BUCKETS = frozenset({
+    "manager_total",
+    "manager_stand",
+    "city_total",
+    "city_stand",
+    "oblast_total",
+    "oblast_stand",
+})
+
+
+async def _load_stands_clients_detail(request, user, service: AnalyticsService):
+    bucket = (query_str(request, "bucket") or "").strip()
+    if bucket not in _STANDS_DETAIL_BUCKETS:
+        raise HTTPException(status_code=400, detail="Invalid bucket")
+    manager_id = scoped_manager_filter(user, query_int(request, "manager_id"))
+    filters = ClientFilters(
+        manager_id=manager_id,
+        region_id=query_int(request, "region_id"),
+        city=query_str(request, "city"),
+        stand_id=query_int(request, "stand_id"),
+    )
+    city_detail = query_str(request, "city_detail") or None
+    detail_kwargs = {
+        "manager": query_str(request, "manager") or None,
+        "stand": query_str(request, "stand") or None,
+        "city": city_detail,
+        "oblast": query_str(request, "oblast") or None,
+    }
+    rows = await service.stands_clients_detail(filters, bucket=bucket, **detail_kwargs)
+    title = service.stands_detail_title(bucket, **detail_kwargs)
+    return rows, title
 
 
 def _resolve_sales_period(
@@ -531,6 +566,53 @@ def register_panel_routes(
                 stands_not_worked_count_3=len(inactive_3),
                 stands_not_worked_count_6=len(inactive_6),
             ),
+        )
+
+    @app.get("/analytics/partials/stands-clients", response_class=HTMLResponse)
+    async def analytics_stands_clients_partial(
+        request: Request,
+        session: AsyncSession = Depends(get_session),
+        service: AnalyticsService = Depends(analytics_service),
+        _auth: Response | None = Depends(require_auth),
+    ) -> HTMLResponse:
+        user = await load_web_user(request, session)
+        require_nav(user, "analytics")
+        rows, title = await _load_stands_clients_detail(request, user, service)
+        return templates.TemplateResponse(
+            request,
+            "partials/stands_clients_detail.html",
+            page_ctx(
+                user,
+                rows=rows,
+                detail_title=title,
+            ),
+        )
+
+    @app.get("/analytics/stands-clients.pdf")
+    async def analytics_stands_clients_pdf(
+        request: Request,
+        session: AsyncSession = Depends(get_session),
+        service: AnalyticsService = Depends(analytics_service),
+        _auth: Response | None = Depends(require_auth),
+    ) -> Response:
+        user = await load_web_user(request, session)
+        require_nav(user, "analytics")
+        rows, title = await _load_stands_clients_detail(request, user, service)
+        try:
+            pdf_bytes = build_stands_clients_pdf(
+                title=title,
+                rows=rows,
+                show_manager=can_filter_managers(user),
+                generated_at=datetime.now(ZoneInfo("Europe/Kyiv")),
+            )
+        except FileNotFoundError as e:
+            raise HTTPException(status_code=500, detail=str(e)) from e
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": 'attachment; filename="stands-clients.pdf"'
+            },
         )
 
     @app.get("/sales/{sale_id}/edit", response_class=HTMLResponse)
