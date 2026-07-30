@@ -2700,6 +2700,17 @@ form.filters.filters--panelled:has(.filters__field--region) {
   font-size: 1rem;
 }
 
+.compare-chart-card {
+  padding-bottom: 1.25rem;
+}
+
+.compare-chart-card .compare-total-chart,
+.compare-chart-card .compare-bars,
+.compare-chart-card .compare-chart-legend {
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
 .compare-chart-card--wide {
   grid-column: 1 / -1;
 }
@@ -2710,7 +2721,8 @@ form.filters.filters--panelled:has(.filters__field--region) {
   gap: 1.5rem;
   align-items: end;
   min-height: 220px;
-  padding: 0.5rem 0.75rem 0;
+  padding-top: 0.5rem;
+  padding-bottom: 0;
 }
 
 .compare-total-chart__col {
@@ -2823,8 +2835,8 @@ form.filters.filters--panelled:has(.filters__field--region) {
 
 .compare-bar-line {
   display: grid;
-  grid-template-columns: 1.4rem minmax(0, 1fr) auto;
-  gap: 0.45rem;
+  grid-template-columns: 1.4rem minmax(0, 1fr) minmax(4.5rem, auto);
+  gap: 0.5rem 0.65rem;
   align-items: center;
 }
 
@@ -2878,6 +2890,8 @@ form.filters.filters--panelled:has(.filters__field--region) {
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  text-align: right;
+  padding-right: 0.1rem;
 }
 
 .lazy-load-actions.is-loaded,
@@ -3289,6 +3303,13 @@ form.filters.filters--panelled:has(.filters__field--region) {
 
   .compare-charts-grid {
     grid-template-columns: 1fr;
+  }
+
+  .compare-chart-card .compare-total-chart,
+  .compare-chart-card .compare-bars,
+  .compare-chart-card .compare-chart-legend {
+    padding-left: 1rem;
+    padding-right: 1rem;
   }
 
   .compare-bar-row {
