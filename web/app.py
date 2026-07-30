@@ -6,7 +6,7 @@ from datetime import date as date_cls
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -143,6 +143,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return RedirectResponse(exc.url, status_code=303)
 
     app.mount("/static", StaticFiles(directory=str(WEB_DIR / "static")), name="static")
+
+    _favicon_path = WEB_DIR / "static" / "favicon.svg"
+
+    @app.get("/favicon.ico", include_in_schema=False)
+    async def favicon() -> FileResponse:
+        return FileResponse(_favicon_path, media_type="image/svg+xml")
 
     async def get_session() -> AsyncSession:
         async with container.session_factory() as session:
