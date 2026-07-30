@@ -53,9 +53,10 @@ def client_list_keyboard(
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for client in clients:
+        prefix = "⭐ " if client.is_potential else ""
         builder.row(
             InlineKeyboardButton(
-                text=client.name,
+                text=f"{prefix}{client.name[:58]}",
                 callback_data=f"client:view:{client.id}:{region_id}:{source}",
             )
         )

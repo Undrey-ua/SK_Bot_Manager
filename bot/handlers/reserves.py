@@ -139,7 +139,9 @@ async def reserve_pick_region(
     if region is None or region.manager_id != effective_manager_id(db_user):
         await callback.answer("Область не знайдена", show_alert=True)
         return
-    clients = await client_service.list_by_manager_and_region(effective_manager_id(db_user), region_id)
+    clients = await client_service.list_by_manager_and_region(
+        effective_manager_id(db_user), region_id, exclude_potential=True
+    )
     if not clients:
         await callback.message.edit_text(
             f"<b>{region.name}</b> — немає клієнтів. Оберіть іншу область:",

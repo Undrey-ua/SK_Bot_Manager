@@ -46,6 +46,7 @@ from web.services.stand_transfer import StandTransferService
 from web.client_media import upload_client_cover
 from web.utils import (
     UK_MONTHS,
+    client_has_equipment,
     client_stands_map_json,
     task_label,
     visit_type_label,
@@ -454,6 +455,101 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
             }
         )
 
+    @app.get("/clients/potential/new", response_class=HTMLResponse)
+    async def potential_client_new_page(
+        request: Request,
+        session: AsyncSession = Depends(get_session),
+        dashboard: DashboardService = Depends(dashboard_service),
+        _auth=Depends(require_auth),
+    ):
+        user = await load_web_user(request, session)
+        require_nav(user, "clients")
+        if user.is_leader:
+            raise HTTPException(status_code=403, detail="Forbidden")
+        managers = []
+        form_manager_id = user.id
+        if user.is_admin:
+            managers = await dashboard.list_managers()
+            mgrs = [m for m in managers if m.role == UserRole.MANAGER.value]
+            picked = query_int(request, "manager_id")
+            if picked is not None:
+                form_manager_id = picked
+            elif mgrs:
+                form_manager_id = mgrs[0].id
+        regions = await RegionRepository(session).list_by_manager(form_manager_id)
+        return templates.TemplateResponse(
+            request,
+            "client_form.html",
+            page_ctx(
+                user,
+                active_nav="clients",
+                clients_subsection="potential",
+                client=None,
+                regions=regions,
+                stands=[],
+                brands=[],
+                selected_stand_ids=[],
+                selected_swatch_brand_ids=[],
+                form_action="/clients/potential/new",
+                submit_label="Створити",
+                form_manager_id=form_manager_id,
+                form_managers=managers,
+                is_potential_form=True,
+            ),
+        )
+
+    @app.post("/clients/potential/new")
+    async def potential_client_new_save(
+        request: Request,
+        session: AsyncSession = Depends(get_session),
+        dashboard: DashboardService = Depends(dashboard_service),
+        _auth=Depends(require_auth),
+        name: str = Form(...),
+        legal_name: str = Form(""),
+        region_id: int = Form(...),
+        address: str = Form(...),
+        city: str = Form(""),
+        comment: str = Form(""),
+        contacts: str = Form(""),
+        form_manager_id: str = Form(""),
+        cover_photo: UploadFile | None = File(None),
+    ):
+        user = await load_web_user(request, session)
+        require_nav(user, "clients")
+        if user.is_leader:
+            raise HTTPException(status_code=403, detail="Forbidden")
+        target_manager_id = user.id
+        if user.is_admin and form_manager_id.strip().isdigit():
+            target_manager_id = int(form_manager_id.strip())
+
+        region = await RegionRepository(session).get_by_id(region_id)
+        if region is None or region.manager_id != target_manager_id:
+            raise HTTPException(status_code=400, detail="Invalid region")
+
+        repo = ClientRepository(session)
+        client = await repo.create(
+            manager_id=target_manager_id,
+            region_id=region_id,
+            name=name,
+            legal_name=legal_name.strip() or None,
+            address=address,
+            city=city.strip() or None,
+            comment=comment.strip() or None,
+            contacts=contacts.strip() or None,
+            stand_ids=[],
+            is_potential=True,
+        )
+        try:
+            photo_url = await upload_client_cover(
+                StorageService(get_settings()), client.id, cover_photo
+            )
+            if photo_url:
+                client.photo_url = photo_url
+        except StorageError:
+            pass
+        await session.commit()
+        return RedirectResponse(f"/clients/{client.id}", status_code=303)
+
     @app.get("/clients/new", response_class=HTMLResponse)
     async def client_new_page(
         request: Request,
@@ -484,6 +580,7 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
             page_ctx(
                 user,
                 active_nav="clients",
+                clients_subsection="active",
                 client=None,
                 regions=regions,
                 stands=stands,
@@ -581,12 +678,14 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
         brands = await BrandRepository(session).list_active()
         selected = [link.stand_id for link in client.stand_links]
         selected_swatches = [link.brand_id for link in client.swatch_links]
+        need_equipment = query_str(request, "need_equipment") == "1"
         return templates.TemplateResponse(
             request,
             "client_form.html",
             page_ctx(
                 user,
                 active_nav="clients",
+                clients_subsection="potential" if client.is_potential else "active",
                 client=client,
                 regions=regions,
                 stands=stands,
@@ -595,6 +694,7 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
                 selected_swatch_brand_ids=selected_swatches,
                 form_action=f"/clients/{client_id}/edit",
                 submit_label="Зберегти",
+                need_equipment=need_equipment,
             ),
         )
 
@@ -627,7 +727,7 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
             raise HTTPException(status_code=404)
         stand_ids = stand_id
         swatch_brand_ids = swatch_brand_id
-        if not stand_ids and not swatch_brand_ids:
+        if not stand_ids and not swatch_brand_ids and not (client and client.is_potential):
             raise HTTPException(
                 status_code=400,
                 detail="Оберіть хоча б один стенд або свотч",
@@ -654,6 +754,13 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
             except StorageError:
                 pass
 
+        is_potential = not (stand_ids or swatch_brand_ids)
+        if is_potential and not client.is_potential:
+            raise HTTPException(
+                status_code=400,
+                detail="Для діючого клієнта потрібен хоча б один стенд або свотч",
+            )
+
         await ClientRepository(session).update(
             client_id,
             region_id=region_id,
@@ -667,9 +774,64 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
             photo_url=photo_url,
             update_photo=update_photo,
             swatch_brand_ids=swatch_brand_ids,
+            is_potential=is_potential,
         )
         await session.commit()
         return RedirectResponse(f"/clients/{client_id}", status_code=303)
+
+    @app.post("/clients/{client_id}/promote")
+    async def client_promote(
+        request: Request,
+        client_id: int,
+        session: AsyncSession = Depends(get_session),
+        dashboard: DashboardService = Depends(dashboard_service),
+        _auth=Depends(require_auth),
+    ):
+        user = await load_web_user(request, session)
+        require_nav(user, "clients")
+        if user.is_leader:
+            raise HTTPException(status_code=403, detail="Forbidden")
+        await assert_client_access(session, user, client_id)
+        client = await dashboard.get_client(client_id)
+        if client is None:
+            raise HTTPException(status_code=404)
+        if not client.is_potential:
+            return RedirectResponse(f"/clients/{client_id}", status_code=303)
+        if not client_has_equipment(client):
+            return RedirectResponse(
+                f"/clients/{client_id}/edit?need_equipment=1",
+                status_code=303,
+            )
+        await ClientRepository(session).set_is_potential(client_id, is_potential=False)
+        await session.commit()
+        return RedirectResponse(f"/clients/{client_id}?promoted=1", status_code=303)
+
+    @app.post("/clients/{client_id}/demote")
+    async def client_demote(
+        request: Request,
+        client_id: int,
+        session: AsyncSession = Depends(get_session),
+        dashboard: DashboardService = Depends(dashboard_service),
+        _auth=Depends(require_auth),
+    ):
+        user = await load_web_user(request, session)
+        require_nav(user, "clients")
+        if user.is_leader:
+            raise HTTPException(status_code=403, detail="Forbidden")
+        await assert_client_access(session, user, client_id)
+        client = await dashboard.get_client(client_id)
+        if client is None:
+            raise HTTPException(status_code=404)
+        if client.is_potential:
+            return RedirectResponse(f"/clients/{client_id}", status_code=303)
+        if client_has_equipment(client):
+            raise HTTPException(
+                status_code=400,
+                detail="Спочатку зніміть усі стенди та свотчі",
+            )
+        await ClientRepository(session).set_is_potential(client_id, is_potential=True)
+        await session.commit()
+        return RedirectResponse("/clients/potential?demoted=1", status_code=303)
 
     @app.post("/clients/{client_id}/delete")
     async def client_delete(

@@ -8,8 +8,10 @@ from bot.keyboards.inline import (
     back_to_menu_keyboard,
     main_menu_keyboard,
     photos_keyboard,
+    potential_photo_keyboard,
     tasks_keyboard,
     visit_clients_keyboard,
+    visit_potential_clients_keyboard,
     visit_regions_keyboard,
     visit_type_keyboard,
 )
@@ -35,6 +37,60 @@ async def _active_task_choices(
 
 def _tasks_text(selected: list[str]) -> str:
     return ", ".join(visit_task_label(t) for t in selected) if selected else "—"
+
+
+async def _show_clients_picker(
+    message,
+    state: FSMContext,
+    db_user: User,
+    client_service: ClientService,
+    *,
+    region_id: int,
+    region_name: str,
+) -> None:
+    clients = await client_service.list_by_manager_and_region(
+        db_user.id,
+        region_id,
+        exclude_potential=True,
+    )
+    await state.set_state(VisitStates.select_client)
+    subtitle = (
+        f"Область: <b>{region_name}</b>\n\nОберіть клієнта:"
+        if clients
+        else f"Область: <b>{region_name}</b>\n\nОберіть клієнта або «Потенційний клієнт»:"
+    )
+    await message.edit_text(
+        f"➕ <b>Новий візит</b>\n\n{subtitle}",
+        reply_markup=visit_clients_keyboard(clients),
+    )
+
+
+async def _show_potential_clients_picker(
+    message,
+    state: FSMContext,
+    db_user: User,
+    client_service: ClientService,
+    *,
+    region_id: int,
+    region_name: str,
+) -> None:
+    potentials = await client_service.list_by_manager_and_region(
+        db_user.id,
+        region_id,
+        potential_only=True,
+    )
+    await state.set_state(VisitStates.select_potential_client)
+    subtitle = (
+        "Оберіть потенційного клієнта або натисніть «Новий»:"
+        if potentials
+        else "Поки немає потенційних клієнтів. Натисніть «Новий»:"
+    )
+    await message.edit_text(
+        f"➕ <b>Новий візит</b>\n\n"
+        f"Область: <b>{region_name}</b>\n"
+        f"⭐ <b>Потенційні клієнти</b>\n\n{subtitle}",
+        reply_markup=visit_potential_clients_keyboard(potentials),
+    )
 
 
 @router.callback_query(F.data == "visit:new")
@@ -86,26 +142,172 @@ async def pick_region(
         await callback.answer("Область не знайдена", show_alert=True)
         return
 
-    clients = await client_service.list_by_manager_and_region(db_user.id, region_id)
-    if not clients:
-        regions = await region_service.list_by_manager(db_user.id)
-        await callback.message.edit_text(
-            f"➕ <b>Новий візит</b>\n\n"
-            f"<b>{region.name}</b> — немає клієнтів. Оберіть іншу область:",
-            reply_markup=visit_regions_keyboard(regions),
-        )
-        await state.set_state(VisitStates.select_region)
-        return
+    clients = await client_service.list_by_manager_and_region(
+        db_user.id, region_id, exclude_potential=True
+    )
 
     await state.update_data(region_id=region_id, region_name=region.name)
     await state.set_state(VisitStates.select_client)
+    subtitle = (
+        f"Область: <b>{region.name}</b>\n\nОберіть клієнта:"
+        if clients
+        else f"Область: <b>{region.name}</b>\n\nОберіть клієнта або «Потенційний клієнт»:"
+    )
     await callback.message.edit_text(
-        f"➕ <b>Новий візит</b>\n\n"
-        f"Область: <b>{region.name}</b>\n\nОберіть клієнта:",
+        f"➕ <b>Новий візит</b>\n\n{subtitle}",
         reply_markup=visit_clients_keyboard(clients),
     )
 
 
+@router.callback_query(
+    VisitStates.select_client,
+    F.data == "visit:potential:list",
+)
+async def show_potential_clients(
+    callback: CallbackQuery,
+    state: FSMContext,
+    db_user: User,
+    client_service: ClientService,
+) -> None:
+    await callback.answer()
+    if callback.message is None:
+        return
+    data = await state.get_data()
+    region_id = data.get("region_id")
+    region_name = data.get("region_name", "")
+    if not region_id:
+        await callback.answer("Спочатку оберіть область", show_alert=True)
+        return
+    await _show_potential_clients_picker(
+        callback.message,
+        state,
+        db_user,
+        client_service,
+        region_id=int(region_id),
+        region_name=region_name,
+    )
+
+
+@router.callback_query(
+    VisitStates.select_potential_client,
+    F.data == "visit:potential:new",
+)
+async def start_potential_client(
+    callback: CallbackQuery,
+    state: FSMContext,
+) -> None:
+    await callback.answer()
+    if callback.message is None:
+        return
+    await state.update_data(potential_photo_url=None)
+    await state.set_state(VisitStates.potential_name)
+    await callback.message.edit_text(
+        "⭐ <b>Потенційний клієнт</b>\n\nВведіть назву магазину:",
+    )
+
+
+@router.message(VisitStates.potential_name, F.text)
+async def potential_name(message: Message, state: FSMContext) -> None:
+    name = message.text.strip()
+    if not name:
+        await message.answer("Введіть назву магазину:")
+        return
+    await state.update_data(potential_name=name)
+    await state.set_state(VisitStates.potential_address)
+    await message.answer("Введіть адресу:")
+
+
+@router.message(VisitStates.potential_address, F.text)
+async def potential_address(message: Message, state: FSMContext) -> None:
+    address = message.text.strip()
+    if not address:
+        await message.answer("Введіть адресу:")
+        return
+    await state.update_data(potential_address=address)
+    await state.set_state(VisitStates.potential_photo)
+    await message.answer(
+        "📷 Надішліть фото торгової точки (необовʼязково)\n"
+        "або натисніть «Пропустити фото».",
+        reply_markup=potential_photo_keyboard(),
+    )
+
+
+async def _finish_potential_and_select_type(
+    target: CallbackQuery | Message,
+    state: FSMContext,
+    db_user: User,
+    client_service: ClientService,
+) -> None:
+    data = await state.get_data()
+    client = await client_service.create_potential(
+        manager_id=db_user.id,
+        region_id=int(data["region_id"]),
+        name=data["potential_name"],
+        address=data["potential_address"],
+        photo_url=data.get("potential_photo_url"),
+    )
+    await state.update_data(client_id=client.id, client_name=client.name)
+    await state.set_state(VisitStates.select_visit_type)
+    text = (
+        f"⭐ Потенційний клієнт: <b>{client.name}</b>\n\n"
+        "Оберіть тип візиту:"
+    )
+    markup = visit_type_keyboard()
+    if isinstance(target, CallbackQuery):
+        if target.message:
+            await target.message.edit_text(text, reply_markup=markup)
+    else:
+        await target.answer(text, reply_markup=markup)
+
+
+@router.message(VisitStates.potential_photo, F.photo)
+async def potential_photo(
+    message: Message,
+    state: FSMContext,
+    bot: Bot,
+    db_user: User,
+    client_service: ClientService,
+    storage_service: StorageService,
+) -> None:
+    photo = message.photo[-1]
+    file = await bot.get_file(photo.file_id)
+    if file.file_path is None:
+        await message.answer("Не вдалося завантажити фото. Спробуйте ще раз.")
+        return
+    buffer = await bot.download_file(file.file_path)
+    if buffer is None:
+        await message.answer("Не вдалося завантажити фото. Спробуйте ще раз.")
+        return
+    extension = file.file_path.rsplit(".", 1)[-1] if "." in file.file_path else "jpg"
+    url = await storage_service.upload_photo(buffer.read(), extension=extension)
+    await state.update_data(potential_photo_url=url)
+    await _finish_potential_and_select_type(
+        message, state, db_user, client_service
+    )
+
+
+@router.callback_query(
+    VisitStates.potential_photo,
+    F.data == "visit:potential:skip_photo",
+)
+async def potential_skip_photo(
+    callback: CallbackQuery,
+    state: FSMContext,
+    db_user: User,
+    client_service: ClientService,
+) -> None:
+    await callback.answer()
+    if callback.message is None:
+        return
+    await _finish_potential_and_select_type(
+        callback, state, db_user, client_service
+    )
+
+
+@router.callback_query(
+    VisitStates.select_potential_client,
+    F.data.startswith("visit:client:"),
+)
 @router.callback_query(
     VisitStates.select_client,
     F.data.startswith("visit:client:"),
@@ -128,8 +330,9 @@ async def select_client(
 
     await state.update_data(client_id=client_id, client_name=client.name)
     await state.set_state(VisitStates.select_visit_type)
+    prefix = "⭐ Потенційний клієнт" if client.is_potential else "Клієнт"
     await callback.message.edit_text(
-        f"Клієнт: <b>{client.name}</b>\n\nОберіть тип візиту:",
+        f"{prefix}: <b>{client.name}</b>\n\nОберіть тип візиту:",
         reply_markup=visit_type_keyboard(),
     )
 
@@ -336,15 +539,39 @@ async def back_to_client(
     if not region_id:
         await callback.answer("Спочатку оберіть область", show_alert=True)
         return
-    clients = await client_service.list_by_manager_and_region(
-        db_user.id,
-        int(region_id),
+    await _show_clients_picker(
+        callback.message,
+        state,
+        db_user,
+        client_service,
+        region_id=int(region_id),
+        region_name=region_name,
     )
-    await state.set_state(VisitStates.select_client)
-    await callback.message.edit_text(
-        f"➕ <b>Новий візит</b>\n\n"
-        f"Область: <b>{region_name}</b>\n\nОберіть клієнта:",
-        reply_markup=visit_clients_keyboard(clients),
+
+
+@router.callback_query(F.data == "visit:back:potential_list")
+async def back_to_potential_list(
+    callback: CallbackQuery,
+    state: FSMContext,
+    db_user: User,
+    client_service: ClientService,
+) -> None:
+    await callback.answer()
+    if callback.message is None:
+        return
+    data = await state.get_data()
+    region_id = data.get("region_id")
+    region_name = data.get("region_name", "")
+    if not region_id:
+        await callback.answer("Спочатку оберіть область", show_alert=True)
+        return
+    await _show_potential_clients_picker(
+        callback.message,
+        state,
+        db_user,
+        client_service,
+        region_id=int(region_id),
+        region_name=region_name,
     )
 
 

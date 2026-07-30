@@ -89,8 +89,12 @@ class DashboardService:
         self,
         *,
         manager_id: int | None = None,
+        is_potential: bool | None = None,
     ) -> list[Client]:
-        return await self._clients.list_for_filter_options(manager_id=manager_id)
+        return await self._clients.list_for_filter_options(
+            manager_id=manager_id,
+            is_potential=is_potential,
+        )
 
     async def list_clients_page(
         self,
@@ -105,6 +109,7 @@ class DashboardService:
             region_id=filters.region_id,
             city=filters.city or None,
             stand_id=filters.stand_id,
+            is_potential=filters.is_potential,
         )
         total_pages = max(1, (total + per_page - 1) // per_page)
         page = max(1, min(page, total_pages))
@@ -114,6 +119,7 @@ class DashboardService:
             region_id=filters.region_id,
             city=filters.city or None,
             stand_id=filters.stand_id,
+            is_potential=filters.is_potential,
             limit=per_page,
             offset=offset,
         )

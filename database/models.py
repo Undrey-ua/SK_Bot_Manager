@@ -148,6 +148,7 @@ class Client(Base):
     comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     photo_url: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
     contacts: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    is_potential: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
     manager: Mapped["User"] = relationship(back_populates="clients")
     region: Mapped["ManagerRegion"] = relationship(back_populates="clients")

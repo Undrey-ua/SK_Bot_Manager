@@ -774,7 +774,9 @@ class AnalyticsService:
         return self._clients_with_stands
 
     async def _clients_for_stands(self, filters: ClientFilters | None = None) -> list[Client]:
-        clients = await self._all_clients_with_stands()
+        clients = [
+            c for c in await self._all_clients_with_stands() if not c.is_potential
+        ]
         if filters is not None:
             clients = filter_clients(clients, filters)
         return clients

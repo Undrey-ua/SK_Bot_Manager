@@ -1,20 +1,29 @@
 {% extends "base.html" %}
-{% block title %}{% if client %}Редагувати{% else %}Новий{% endif %} клієнт — SK Bot Manager{% endblock %}
+{% block title %}{% if is_potential_form %}Новий потенційний{% elif client %}Редагувати{% else %}Новий{% endif %} клієнт — SK Bot Manager{% endblock %}
 {% block content %}
 <nav class="breadcrumb">
+  {% if is_potential_form or (client and client.is_potential) %}
+  <a href="/clients/potential">Потенційні</a>
+  {% else %}
   <a href="/clients">Клієнти</a>
+  {% endif %}
   <span class="breadcrumb-sep">/</span>
-  <span>{% if client %}{{ client.name }}{% else %}Новий клієнт{% endif %}</span>
+  <span>{% if client %}{{ client.name }}{% elif is_potential_form %}Новий потенційний{% else %}Новий клієнт{% endif %}</span>
 </nav>
 
 <div class="client-form-page">
 <div class="card card--compact-form">
-  <h2>{% if client %}Редагувати картку{% else %}Новий клієнт{% endif %}</h2>
+  <h2>{% if client %}Редагувати картку{% elif is_potential_form %}Новий потенційний клієнт{% else %}Новий клієнт{% endif %}</h2>
+  {% if need_equipment %}
+  <p class="form-banner form-banner--warn">Щоб додати в список клієнтів, оберіть хоча б один стенд або свотч.</p>
+  {% elif is_potential_form or (client and client.is_potential) %}
+  <p class="muted client-form-hint">Стенди та свотчі необовʼязкові. Додайте обладнання пізніше, щоб перевести в діючих клієнтів.</p>
+  {% endif %}
   <p class="muted client-form-hint">Загальне фото ТТ і контакти доступні лише в веб-панелі (у Telegram-боті без змін).</p>
   <form method="post" action="{{ form_action }}" class="client-web-form" enctype="multipart/form-data">
     {% if is_admin and form_managers %}
     <label>Менеджер
-      <select name="form_manager_id" onchange="window.location='/clients/new?manager_id='+this.value">
+      <select name="form_manager_id" onchange="window.location='{% if is_potential_form %}/clients/potential/new{% else %}/clients/new{% endif %}?manager_id='+this.value">
         {% for m in form_managers %}
         {% if m.role == 'manager' %}
         <option value="{{ m.id }}" {% if form_manager_id == m.id %}selected{% endif %}>{{ m.name }}</option>
@@ -64,6 +73,7 @@
       <input type="file" name="cover_photo" accept="image/jpeg,image/png,image/webp">
       <span class="muted">JPEG, PNG або WebP. Необовʼязково.</span>
     </div>
+    {% if not is_potential_form %}
     <fieldset class="stands-picker">
       <legend>Стенди</legend>
       <div class="stands-picker__grid">
@@ -87,9 +97,10 @@
         {% endfor %}
       </div>
     </fieldset>
+    {% endif %}
     <div class="task-form__actions">
       <button type="submit" class="btn btn-primary">{{ submit_label }}</button>
-      <a href="{% if client %}/clients/{{ client.id }}{% else %}/clients{% endif %}" class="btn btn-secondary">Скасувати</a>
+      <a href="{% if client %}/clients/{{ client.id }}{% elif is_potential_form %}/clients/potential{% else %}/clients{% endif %}" class="btn btn-secondary">Скасувати</a>
     </div>
   </form>
 </div>

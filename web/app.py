@@ -47,6 +47,7 @@ from web.client_sales_periods import (
 from web.utils import (
     UK_MONTHS,
     WEEKDAY_LABELS,
+    client_has_equipment,
     client_stands,
     format_date,
     format_dt,
@@ -277,6 +278,103 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         dashboard_service=dashboard_service,
     )
 
+    async def _render_clients_list(
+        request: Request,
+        service: DashboardService,
+        user,
+        *,
+        is_potential_section: bool,
+        page: int,
+    ) -> HTMLResponse:
+        stands = await service.list_active_stands()
+        is_potential = is_potential_section
+        filters = ClientFilters(
+            manager_id=scoped_manager_filter(user, query_int(request, "manager_id")),
+            region_id=query_int(request, "region_id"),
+            city=query_str(request, "city"),
+            stand_id=query_int(request, "stand_id"),
+            is_potential=is_potential,
+        )
+        owner = data_owner_manager_id(user)
+        filter_pool_manager = filters.manager_id
+        if not can_filter_managers(user):
+            filter_pool_manager = owner
+        filter_clients_pool = await service.list_clients_for_filters(
+            manager_id=filter_pool_manager,
+            is_potential=is_potential,
+        )
+        clients, clients_total, page, total_pages = await service.list_clients_page(
+            filters,
+            page=page,
+        )
+        filter_options = build_client_filter_options(
+            filter_clients_pool,
+            stands,
+            manager_id=filters.manager_id,
+            region_id=filters.region_id,
+        )
+        has_filters = any(
+            [
+                filters.manager_id is not None,
+                filters.region_id is not None,
+                filters.city,
+                filters.stand_id is not None,
+            ]
+        )
+        list_base_path = "/clients/potential" if is_potential_section else "/clients"
+        return templates.TemplateResponse(
+            request,
+            "clients.html",
+            page_ctx(
+                user,
+                active_nav="clients",
+                clients_subsection="potential" if is_potential_section else "active",
+                is_potential_section=is_potential_section,
+                clients=clients,
+                clients_total=clients_total,
+                managers=await service.list_managers() if can_filter_managers(user) else [],
+                filter_regions=filter_options.regions,
+                filter_cities=filter_options.cities,
+                filter_stands=filter_options.stands,
+                selected_manager_id=filters.manager_id,
+                selected_region_id=filters.region_id,
+                selected_city=filters.city,
+                selected_stand_id=filters.stand_id,
+                has_filters=has_filters,
+                list_base_path=list_base_path,
+                page=page,
+                total_pages=total_pages,
+            ),
+        )
+
+    @app.get("/clients", response_class=HTMLResponse)
+    async def clients_page(
+        request: Request,
+        session: AsyncSession = Depends(get_session),
+        service: DashboardService = Depends(dashboard_service),
+        _auth: Response | None = Depends(require_auth),
+        page: int = 1,
+    ) -> HTMLResponse:
+        user = await load_web_user(request, session)
+        require_nav(user, "clients")
+        return await _render_clients_list(
+            request, service, user, is_potential_section=False, page=page
+        )
+
+    @app.get("/clients/potential", response_class=HTMLResponse)
+    async def potential_clients_page(
+        request: Request,
+        session: AsyncSession = Depends(get_session),
+        service: DashboardService = Depends(dashboard_service),
+        _auth: Response | None = Depends(require_auth),
+        page: int = 1,
+    ) -> HTMLResponse:
+        user = await load_web_user(request, session)
+        require_nav(user, "clients")
+        return await _render_clients_list(
+            request, service, user, is_potential_section=True, page=page
+        )
+
     @app.get("/clients/{client_id}", response_class=HTMLResponse)
     async def client_detail(
         request: Request,
@@ -329,6 +427,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             page_ctx(
                 user,
                 active_nav="clients",
+                clients_subsection="potential" if client.is_potential else "active",
                 client=client,
                 visit_count=await service.client_visit_count(client_id),
                 visit_gallery=await service.client_visit_gallery(client_id),
@@ -343,6 +442,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 selected_brand_id=brand_id,
                 sales_has_filters=sales_has_filters,
                 client_sales_period_labels=CLIENT_SALES_PERIOD_LABELS,
+                client_has_equipment=client_has_equipment(client),
             ),
         )
 
@@ -368,70 +468,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 active_nav="clients",
                 client=client,
                 visits=await service.list_client_visits(client_id),
-            ),
-        )
-
-    @app.get("/clients", response_class=HTMLResponse)
-    async def clients_page(
-        request: Request,
-        session: AsyncSession = Depends(get_session),
-        service: DashboardService = Depends(dashboard_service),
-        _auth: Response | None = Depends(require_auth),
-        page: int = 1,
-    ) -> HTMLResponse:
-        user = await load_web_user(request, session)
-        require_nav(user, "clients")
-        stands = await service.list_active_stands()
-        filters = ClientFilters(
-            manager_id=scoped_manager_filter(user, query_int(request, "manager_id")),
-            region_id=query_int(request, "region_id"),
-            city=query_str(request, "city"),
-            stand_id=query_int(request, "stand_id"),
-        )
-        owner = data_owner_manager_id(user)
-        filter_pool_manager = filters.manager_id
-        if not can_filter_managers(user):
-            filter_pool_manager = owner
-        filter_clients_pool = await service.list_clients_for_filters(
-            manager_id=filter_pool_manager,
-        )
-        clients, clients_total, page, total_pages = await service.list_clients_page(
-            filters,
-            page=page,
-        )
-        filter_options = build_client_filter_options(
-            filter_clients_pool,
-            stands,
-            manager_id=filters.manager_id,
-            region_id=filters.region_id,
-        )
-        has_filters = any(
-            [
-                filters.manager_id is not None,
-                filters.region_id is not None,
-                filters.city,
-                filters.stand_id is not None,
-            ]
-        )
-        return templates.TemplateResponse(
-            request,
-            "clients.html",
-            page_ctx(
-                user,
-                active_nav="clients",
-                clients=clients,
-                clients_total=clients_total,
-                managers=await service.list_managers() if can_filter_managers(user) else [],
-                filter_regions=filter_options.regions,
-                filter_cities=filter_options.cities,
-                filter_stands=filter_options.stands,
-                selected_manager_id=filters.manager_id,
-                selected_region_id=filters.region_id,
-                selected_city=filters.city,
-                selected_stand_id=filters.stand_id,
-                has_filters=has_filters,
-                page=page,
-                total_pages=total_pages,
             ),
         )
 

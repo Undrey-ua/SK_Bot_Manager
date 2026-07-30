@@ -15,8 +15,36 @@ class ClientService:
         self,
         manager_id: int,
         region_id: int,
+        *,
+        exclude_potential: bool = False,
+        potential_only: bool = False,
     ) -> list[Client]:
-        return await self._repo.list_by_manager_and_region(manager_id, region_id)
+        return await self._repo.list_by_manager_and_region(
+            manager_id,
+            region_id,
+            exclude_potential=exclude_potential,
+            potential_only=potential_only,
+        )
+
+    async def create_potential(
+        self,
+        manager_id: int,
+        region_id: int,
+        name: str,
+        address: str,
+        *,
+        photo_url: str | None = None,
+    ) -> Client:
+        return await self._repo.create(
+            manager_id=manager_id,
+            region_id=region_id,
+            name=name,
+            address=address,
+            comment=None,
+            stand_ids=[],
+            photo_url=photo_url,
+            is_potential=True,
+        )
 
     async def get_by_id(self, client_id: int) -> Client | None:
         return await self._repo.get_by_id(client_id)

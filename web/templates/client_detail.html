@@ -2,7 +2,11 @@
 {% block title %}{{ client.name }} — SK Bot Manager{% endblock %}
 {% block content %}
 <nav class="breadcrumb">
+  {% if client.is_potential %}
+  <a href="/clients/potential">Потенційні</a>
+  {% else %}
   <a href="/clients">Клієнти</a>
+  {% endif %}
   <span class="breadcrumb-sep">/</span>
   <span>{{ client.name }}</span>
 </nav>
@@ -17,7 +21,12 @@
     <div class="client-avatar">{{ client.name[0] | upper }}</div>
     {% endif %}
     <div class="client-hero-text">
-      <h1 class="page-title" style="margin:0">{{ client.name }}</h1>
+      <h1 class="page-title" style="margin:0">
+        {{ client.name }}
+        {% if client.is_potential %}
+        <span class="badge badge-potential">Потенційний клієнт</span>
+        {% endif %}
+      </h1>
       {% if client.legal_name %}
       <p class="client-legal-name muted">{{ client.legal_name }}</p>
       {% endif %}
@@ -47,6 +56,16 @@
   </div>
   <div class="page-actions client-hero-actions">
     {% if not is_leader %}
+    {% if client.is_potential %}
+    <form method="post" action="/clients/{{ client.id }}/promote" class="client-promote-form">
+      <button type="submit" class="btn btn-primary">Додати в список клієнтів</button>
+    </form>
+    {% elif not client_has_equipment %}
+    <form method="post" action="/clients/{{ client.id }}/demote" class="client-demote-form"
+          onsubmit="return confirm('Перенести «{{ client.name | e }}» до списку потенційних клієнтів?');">
+      <button type="submit" class="btn btn-secondary">Потенційний клієнт</button>
+    </form>
+    {% endif %}
     <a class="btn btn-secondary" href="/clients/{{ client.id }}/edit">Редагувати</a>
     <form method="post" action="/clients/{{ client.id }}/delete" class="client-delete-form"
           onsubmit="return confirm('Видалити торгову точку «{{ client.name | e }}»?\n\nТакож будуть видалені повʼязані продажі, візити та резерви. Дію не можна скасувати.');">

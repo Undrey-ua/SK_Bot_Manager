@@ -175,6 +175,16 @@ def client_stands(client: Client) -> str:
     return ", ".join(names) or "—"
 
 
+def client_has_equipment(client: Client) -> bool:
+    for link in client.stand_links:
+        if link.stand and link.stand.is_active:
+            return True
+    for link in client.swatch_links:
+        if link.brand and link.brand.is_active:
+            return True
+    return False
+
+
 def client_stands_map_json(clients: list[Client]) -> str:
     """JSON для фільтра стендів у модалці переміщення/списання."""
     data: dict[str, list[dict[str, int | str]]] = {}

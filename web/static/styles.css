@@ -3046,6 +3046,36 @@ tr.row-writeoff:hover td {
   border-radius: 4px;
 }
 
+.badge-potential {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #b45309;
+  background: rgba(245, 158, 11, 0.15);
+  border-radius: 4px;
+  vertical-align: middle;
+}
+
+.form-banner {
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.form-banner--warn {
+  color: #92400e;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+}
+
+.client-promote-form,
+.client-demote-form {
+  display: inline;
+}
+
 /* Modal */
 body.modal-open {
   overflow: hidden;

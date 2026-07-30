@@ -1,14 +1,15 @@
 {% extends "base.html" %}
-{% block title %}Клієнти — SK Bot Manager{% endblock %}
+{% block title %}{% if is_potential_section %}Потенційні клієнти{% else %}Клієнти{% endif %} — SK Bot Manager{% endblock %}
 {% block content %}
 <header class="page-header">
-  <h1 class="page-title">Клієнти</h1>
+  <h1 class="page-title">{% if is_potential_section %}Потенційні клієнти{% else %}Клієнти{% endif %}</h1>
   <p class="page-subtitle">
-    База торгових точок
+    {% if is_potential_section %}Торгові точки без стендів і свотчів{% else %}База торгових точок{% endif %}
     {% if has_filters %}
     — знайдено {{ clients_total }}
     {% else %}
-    — {{ clients_total }} торгових точок
+    — {{ clients_total }}
+    {% if is_potential_section %} потенційних{% else %} торгових точок{% endif %}
     {% endif %}
     {% if total_pages > 1 %} · сторінка {{ page }}/{{ total_pages }}{% endif %}
   </p>
@@ -16,11 +17,15 @@
 
 {% if not is_leader %}
 <div class="page-actions">
+  {% if is_potential_section %}
+  <a href="/clients/potential/new" class="btn btn-primary">+ Потенційний</a>
+  {% else %}
   <a href="/clients/new" class="btn btn-primary">+ Новий клієнт</a>
+  {% endif %}
 </div>
 {% endif %}
 
-<form class="filters filters--compact clients-filters" method="get" action="/clients">
+<form class="filters filters--compact clients-filters" method="get" action="{{ list_base_path }}">
   {% if can_filter_managers %}
   <label class="filters__field--manager">
     Менеджер
@@ -62,7 +67,7 @@
     </select>
   </label>
   {% if has_filters %}
-  <a href="/clients" class="btn btn-secondary btn-sm clients-filters__reset">Скинути</a>
+  <a href="{{ list_base_path }}" class="btn btn-secondary btn-sm clients-filters__reset">Скинути</a>
   {% endif %}
 </form>
 
@@ -94,7 +99,11 @@
         {% else %}
         <tr class="empty-row">
           <td colspan="{% if can_filter_managers %}7{% else %}6{% endif %}">
-            {% if has_filters %}Клієнтів за обраними фільтрами не знайдено{% else %}Клієнтів ще немає{% endif %}
+            {% if has_filters %}
+            {% if is_potential_section %}Потенційних клієнтів за обраними фільтрами не знайдено{% else %}Клієнтів за обраними фільтрами не знайдено{% endif %}
+            {% else %}
+            {% if is_potential_section %}Потенційних клієнтів ще немає{% else %}Клієнтів ще немає{% endif %}
+            {% endif %}
           </td>
         </tr>
         {% endfor %}

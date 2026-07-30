@@ -18,8 +18,11 @@ def stand_names(client: Client) -> list[str]:
 def format_client_card(client: Client) -> str:
     stands = ", ".join(stand_names(client)) or "—"
     region_name = client.region.name if client.region else "—"
+    title = f"<b>{client.name}</b>"
+    if client.is_potential:
+        title = f"⭐ {title}\n<i>Потенційний клієнт</i>"
     return (
-        f"<b>{client.name}</b>\n\n"
+        f"{title}\n\n"
         f"Область: {region_name}\n"
         f"Адреса: {client.address}\n"
         f"Місто: {client_display_city(client)}\n"

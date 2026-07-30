@@ -101,7 +101,9 @@ async def pick_region(
         await callback.answer("Область не знайдена", show_alert=True)
         return
 
-    clients = await client_service.list_by_manager_and_region(db_user.id, region_id)
+    clients = await client_service.list_by_manager_and_region(
+        db_user.id, region_id, exclude_potential=True
+    )
     if not clients:
         regions = await region_service.list_by_manager(db_user.id)
         await callback.message.edit_text(
@@ -150,6 +152,7 @@ async def pick_client(
             clients_back = await client_service.list_by_manager_and_region(
                 db_user.id,
                 int(region_id),
+                exclude_potential=True,
             )
             kb = sale_clients_keyboard(clients_back)
         else:
@@ -416,6 +419,7 @@ async def back_client(
     clients = await client_service.list_by_manager_and_region(
         db_user.id,
         int(region_id),
+        exclude_potential=True,
     )
     await state.set_state(SaleStates.select_client)
     await _edit_step(

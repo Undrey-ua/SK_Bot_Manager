@@ -43,6 +43,12 @@ def visit_regions_keyboard(regions: list[ManagerRegion]) -> InlineKeyboardMarkup
 
 def visit_clients_keyboard(clients: list[Client]) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(
+            text="⭐ Потенційний клієнт",
+            callback_data="visit:potential:list",
+        )
+    )
     for client in clients:
         builder.row(
             InlineKeyboardButton(
@@ -52,6 +58,39 @@ def visit_clients_keyboard(clients: list[Client]) -> InlineKeyboardMarkup:
         )
     builder.row(InlineKeyboardButton(text="◀️ Області", callback_data="visit:back:regions"))
     builder.row(InlineKeyboardButton(text="◀️ Меню", callback_data="menu:main"))
+    return builder.as_markup()
+
+
+def visit_potential_clients_keyboard(clients: list[Client]) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(
+            text="➕ Новий",
+            callback_data="visit:potential:new",
+        )
+    )
+    for client in clients:
+        builder.row(
+            InlineKeyboardButton(
+                text=client.name[:60],
+                callback_data=f"visit:client:{client.id}",
+            )
+        )
+    builder.row(InlineKeyboardButton(text="◀️ Назад", callback_data="visit:back:client"))
+    return builder.as_markup()
+
+
+def potential_photo_keyboard() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(
+            text="➡️ Пропустити фото",
+            callback_data="visit:potential:skip_photo",
+        )
+    )
+    builder.row(
+        InlineKeyboardButton(text="◀️ Назад", callback_data="visit:back:potential_list"),
+    )
     return builder.as_markup()
 
 

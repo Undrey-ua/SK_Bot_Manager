@@ -50,8 +50,11 @@ class ClientRepository(BaseRepository):
         self,
         manager_id: int,
         region_id: int,
+        *,
+        exclude_potential: bool = False,
+        potential_only: bool = False,
     ) -> list[Client]:
-        result = await self._session.execute(
+        stmt = (
             select(Client)
             .where(
                 Client.manager_id == manager_id,
@@ -60,6 +63,11 @@ class ClientRepository(BaseRepository):
             .options(*self._detail_options())
             .order_by(Client.name)
         )
+        if potential_only:
+            stmt = stmt.where(Client.is_potential.is_(True))
+        elif exclude_potential:
+            stmt = stmt.where(Client.is_potential.is_(False))
+        result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
     def _apply_filters(
@@ -70,6 +78,7 @@ class ClientRepository(BaseRepository):
         region_id: int | None = None,
         city: str | None = None,
         stand_id: int | None = None,
+        is_potential: bool | None = None,
     ):
         if manager_id is not None:
             stmt = stmt.where(Client.manager_id == manager_id)
@@ -84,6 +93,8 @@ class ClientRepository(BaseRepository):
                     ClientStand.stand_id == stand_id,
                 )
             )
+        if is_potential is not None:
+            stmt = stmt.where(Client.is_potential.is_(is_potential))
         return stmt
 
     async def count_filtered(
@@ -93,6 +104,7 @@ class ClientRepository(BaseRepository):
         region_id: int | None = None,
         city: str | None = None,
         stand_id: int | None = None,
+        is_potential: bool | None = None,
     ) -> int:
         stmt = self._apply_filters(
             select(func.count()).select_from(Client),
@@ -100,6 +112,7 @@ class ClientRepository(BaseRepository):
             region_id=region_id,
             city=city,
             stand_id=stand_id,
+            is_potential=is_potential,
         )
         result = await self._session.execute(stmt)
         return int(result.scalar_one())
@@ -111,15 +124,19 @@ class ClientRepository(BaseRepository):
         region_id: int | None = None,
         city: str | None = None,
         stand_id: int | None = None,
+        is_potential: bool | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> list[Client]:
         stmt = self._apply_filters(
-            select(Client).options(*self._admin_list_options()).order_by(Client.name),
+            select(Client)
+            .options(*self._admin_list_options())
+            .order_by(Client.is_potential.desc(), Client.name),
             manager_id=manager_id,
             region_id=region_id,
             city=city,
             stand_id=stand_id,
+            is_potential=is_potential,
         )
         result = await self._session.execute(stmt.limit(limit).offset(offset))
         return list(result.scalars().all())
@@ -128,6 +145,7 @@ class ClientRepository(BaseRepository):
         self,
         *,
         manager_id: int | None = None,
+        is_potential: bool | None = None,
     ) -> list[Client]:
         stmt = (
             select(Client)
@@ -139,6 +157,8 @@ class ClientRepository(BaseRepository):
         )
         if manager_id is not None:
             stmt = stmt.where(Client.manager_id == manager_id)
+        if is_potential is not None:
+            stmt = stmt.where(Client.is_potential.is_(is_potential))
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
@@ -172,6 +192,7 @@ class ClientRepository(BaseRepository):
         contacts: str | None = None,
         photo_url: str | None = None,
         swatch_brand_ids: list[int] | None = None,
+        is_potential: bool = False,
     ) -> Client:
         client = Client(
             manager_id=manager_id,
@@ -183,6 +204,7 @@ class ClientRepository(BaseRepository):
             comment=comment,
             contacts=contacts,
             photo_url=photo_url,
+            is_potential=is_potential,
         )
         self._session.add(client)
         await self._session.flush()
@@ -213,6 +235,7 @@ class ClientRepository(BaseRepository):
         photo_url: str | None = None,
         update_photo: bool = False,
         swatch_brand_ids: list[int] | None = None,
+        is_potential: bool | None = None,
     ) -> Client | None:
         client = await self.get_by_id(client_id)
         if client is None:
@@ -227,6 +250,8 @@ class ClientRepository(BaseRepository):
         client.contacts = contacts
         if update_photo:
             client.photo_url = photo_url
+        if is_potential is not None:
+            client.is_potential = is_potential
 
         client.stand_links.clear()
         await self._session.flush()
@@ -245,6 +270,14 @@ class ClientRepository(BaseRepository):
             )
         await self._session.flush()
         return await self.get_by_id(client.id)
+
+    async def set_is_potential(self, client_id: int, *, is_potential: bool) -> Client | None:
+        client = await self.get_by_id(client_id)
+        if client is None:
+            return None
+        client.is_potential = is_potential
+        await self._session.flush()
+        return await self.get_by_id(client_id)
 
     async def delete(self, client_id: int) -> bool:
         exists_id = await self._session.scalar(
