@@ -382,6 +382,15 @@ def register_panel_routes(
                 query_int(request, "b_quarter", default=default_b_quarter)
                 or default_b_quarter
             )
+            default_a_half = 1 if today.month <= 6 else 2
+            if default_a_half == 1:
+                default_b_half = 2
+                default_b_year_for_half = today.year - 1
+            else:
+                default_b_half = 1
+                default_b_year_for_half = today.year
+            a_half = query_int(request, "a_half", default=default_a_half) or default_a_half
+            b_half = query_int(request, "b_half", default=default_b_half) or default_b_half
 
             if compare_kind == "year":
                 default_b_year = today.year - 1
@@ -392,6 +401,14 @@ def register_panel_routes(
             elif compare_kind == "quarter":
                 report_range = quarter_range(a_year, a_quarter)
                 base_range = quarter_range(b_year, b_quarter)
+            elif compare_kind == "halfyear":
+                a_year = query_int(request, "a_year", default=today.year) or today.year
+                b_year = (
+                    query_int(request, "b_year", default=default_b_year_for_half)
+                    or default_b_year_for_half
+                )
+                report_range = halfyear_range(a_year, a_half)
+                base_range = halfyear_range(b_year, b_half)
             else:
                 report_range = month_range(a_year, a_month)
                 base_range = month_range(b_year, b_month)
@@ -412,9 +429,11 @@ def register_panel_routes(
                 a_year=a_year,
                 a_month=a_month,
                 a_quarter=a_quarter,
+                a_half=a_half,
                 b_year=b_year,
                 b_month=b_month,
                 b_quarter=b_quarter,
+                b_half=b_half,
                 report_label=report_range.label,
                 base_label=base_range.label,
                 compare_managers=await service.compare_managers_table(
