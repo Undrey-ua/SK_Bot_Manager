@@ -36,6 +36,12 @@ from web.analytics_periods import (
     quarter_range,
     year_range,
 )
+from web.compare_charts import (
+    build_compare_bar_items,
+    compare_kpi_bar_items,
+    compare_totals_row,
+    total_bar_heights,
+)
 from web.auth import (
     assert_reserve_manage_access,
     assert_sale_manage_access,
@@ -424,6 +430,25 @@ def register_panel_routes(
                 region_id=region_id,
             )
 
+            compare_managers = await service.compare_managers_table(
+                report_range, base_range, sales_filters
+            )
+            compare_kpis = await service.compare_kpis(
+                report_range, base_range, sales_filters
+            )
+            compare_brands = await service.compare_brands(
+                report_range, base_range, sales_filters
+            )
+            compare_clients = await service.compare_clients(
+                report_range, base_range, sales_filters
+            )
+            compare_total = compare_totals_row(compare_managers)
+            compare_total_base_pct, compare_total_report_pct = (
+                total_bar_heights(compare_total.previous, compare_total.current)
+                if compare_total
+                else (0.0, 0.0)
+            )
+
             ctx.update(
                 compare_kind=compare_kind,
                 a_year=a_year,
@@ -436,18 +461,16 @@ def register_panel_routes(
                 b_half=b_half,
                 report_label=report_range.label,
                 base_label=base_range.label,
-                compare_managers=await service.compare_managers_table(
-                    report_range, base_range, sales_filters
-                ),
-                compare_kpis=await service.compare_kpis(
-                    report_range, base_range, sales_filters
-                ),
-                compare_brands=await service.compare_brands(
-                    report_range, base_range, sales_filters
-                ),
-                compare_clients=await service.compare_clients(
-                    report_range, base_range, sales_filters
-                ),
+                compare_managers=compare_managers,
+                compare_kpis=compare_kpis,
+                compare_brands=compare_brands,
+                compare_clients=compare_clients,
+                compare_total=compare_total,
+                compare_total_base_pct=compare_total_base_pct,
+                compare_total_report_pct=compare_total_report_pct,
+                compare_brand_bars=build_compare_bar_items(compare_brands),
+                compare_manager_bars=build_compare_bar_items(compare_managers),
+                compare_kpi_bars=compare_kpi_bar_items(compare_kpis),
                 filter_regions=filter_opts.regions,
                 filter_cities=filter_opts.cities,
                 filter_stands=filter_opts.stands,

@@ -184,6 +184,141 @@
   Порівняння продажів: <strong>{{ report_label }}</strong> vs <strong>{{ base_label }}</strong>{% if sales_has_filters %} · застосовано фільтри{% endif %}
 </p>
 
+{% if compare_total %}
+<div class="compare-stats">
+  <div class="stat-card stat-card--compare-base">
+    <div class="label">Базовий період · {{ base_label }}</div>
+    <div class="value">{{ format_qty(compare_total.previous) }}</div>
+    <div class="stat-card__unit">кв. м</div>
+  </div>
+  <div class="stat-card stat-card--compare-report">
+    <div class="label">Період звіту · {{ report_label }}</div>
+    <div class="value">{{ format_qty(compare_total.current) }}</div>
+    <div class="stat-card__unit">кв. м</div>
+  </div>
+  <div class="stat-card stat-card--compare-delta{% if compare_total.delta > 0 %} stat-card--success{% elif compare_total.delta < 0 %} stat-card--warn{% endif %}">
+    <div class="label">Зміна</div>
+    <div class="value">{{ format_signed_qty(compare_total.delta) }}</div>
+    <div class="stat-card__unit">{% if compare_total.pct is not none %}{{ format_signed_pct(compare_total.pct) }}{% else %}—{% endif %}</div>
+  </div>
+</div>
+{% endif %}
+
+<div class="compare-charts-grid">
+  {% if compare_total %}
+  <section class="card compare-chart-card">
+    <h2>Загальні продажі</h2>
+    <div class="compare-total-chart">
+      <div class="compare-total-chart__col">
+        <div class="compare-total-chart__bar-wrap">
+          <div class="compare-total-chart__bar compare-total-chart__bar--base" style="height: {{ compare_total_base_pct }}%;"></div>
+        </div>
+        <div class="compare-total-chart__value">{{ format_qty(compare_total.previous) }}</div>
+        <div class="compare-total-chart__label">{{ base_label }}</div>
+      </div>
+      <div class="compare-total-chart__col">
+        <div class="compare-total-chart__bar-wrap">
+          <div class="compare-total-chart__bar compare-total-chart__bar--report" style="height: {{ compare_total_report_pct }}%;"></div>
+        </div>
+        <div class="compare-total-chart__value">{{ format_qty(compare_total.current) }}</div>
+        <div class="compare-total-chart__label">{{ report_label }}</div>
+      </div>
+    </div>
+    <div class="compare-chart-legend">
+      <span class="compare-chart-legend__item"><i class="compare-chart-legend__dot compare-chart-legend__dot--base"></i> Базовий</span>
+      <span class="compare-chart-legend__item"><i class="compare-chart-legend__dot compare-chart-legend__dot--report"></i> Звіт</span>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if compare_kpi_bars %}
+  <section class="card compare-chart-card">
+    <h2>Показники активності</h2>
+    <div class="compare-bars">
+      {% for item in compare_kpi_bars %}
+      <div class="compare-bar-row">
+        <div class="compare-bar-row__title">{{ item.label }}</div>
+        <div class="compare-bar-row__tracks">
+          <div class="compare-bar-line">
+            <span class="compare-bar-line__tag compare-bar-line__tag--base">B</span>
+            <div class="compare-bar-line__track"><div class="compare-bar-line__fill compare-bar-line__fill--base" style="width: {{ item.base_pct }}%;"></div></div>
+            <span class="compare-bar-line__val">{{ item.base|int }}</span>
+          </div>
+          <div class="compare-bar-line">
+            <span class="compare-bar-line__tag compare-bar-line__tag--report">A</span>
+            <div class="compare-bar-line__track"><div class="compare-bar-line__fill compare-bar-line__fill--report" style="width: {{ item.report_pct }}%;"></div></div>
+            <span class="compare-bar-line__val">{{ item.report|int }}</span>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="compare-chart-legend">
+      <span class="compare-chart-legend__item"><i class="compare-chart-legend__dot compare-chart-legend__dot--base"></i> {{ base_label }}</span>
+      <span class="compare-chart-legend__item"><i class="compare-chart-legend__dot compare-chart-legend__dot--report"></i> {{ report_label }}</span>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if compare_brand_bars %}
+  <section class="card compare-chart-card compare-chart-card--wide">
+    <h2>Продажі по торговим маркам</h2>
+    <div class="compare-bars">
+      {% for item in compare_brand_bars %}
+      <div class="compare-bar-row">
+        <div class="compare-bar-row__title" title="{{ item.label }}">{{ item.label }}</div>
+        <div class="compare-bar-row__tracks">
+          <div class="compare-bar-line">
+            <span class="compare-bar-line__tag compare-bar-line__tag--base">B</span>
+            <div class="compare-bar-line__track"><div class="compare-bar-line__fill compare-bar-line__fill--base" style="width: {{ item.base_pct }}%;"></div></div>
+            <span class="compare-bar-line__val">{{ format_qty(item.base) }}</span>
+          </div>
+          <div class="compare-bar-line">
+            <span class="compare-bar-line__tag compare-bar-line__tag--report">A</span>
+            <div class="compare-bar-line__track"><div class="compare-bar-line__fill compare-bar-line__fill--report" style="width: {{ item.report_pct }}%;"></div></div>
+            <span class="compare-bar-line__val">{{ format_qty(item.report) }}</span>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="compare-chart-legend">
+      <span class="compare-chart-legend__item"><i class="compare-chart-legend__dot compare-chart-legend__dot--base"></i> {{ base_label }}</span>
+      <span class="compare-chart-legend__item"><i class="compare-chart-legend__dot compare-chart-legend__dot--report"></i> {{ report_label }}</span>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if can_filter_managers and compare_manager_bars %}
+  <section class="card compare-chart-card compare-chart-card--wide">
+    <h2>Продажі по менеджерах</h2>
+    <div class="compare-bars">
+      {% for item in compare_manager_bars %}
+      <div class="compare-bar-row">
+        <div class="compare-bar-row__title" title="{{ item.label }}">{{ item.label }}</div>
+        <div class="compare-bar-row__tracks">
+          <div class="compare-bar-line">
+            <span class="compare-bar-line__tag compare-bar-line__tag--base">B</span>
+            <div class="compare-bar-line__track"><div class="compare-bar-line__fill compare-bar-line__fill--base" style="width: {{ item.base_pct }}%;"></div></div>
+            <span class="compare-bar-line__val">{{ format_qty(item.base) }}</span>
+          </div>
+          <div class="compare-bar-line">
+            <span class="compare-bar-line__tag compare-bar-line__tag--report">A</span>
+            <div class="compare-bar-line__track"><div class="compare-bar-line__fill compare-bar-line__fill--report" style="width: {{ item.report_pct }}%;"></div></div>
+            <span class="compare-bar-line__val">{{ format_qty(item.report) }}</span>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="compare-chart-legend">
+      <span class="compare-chart-legend__item"><i class="compare-chart-legend__dot compare-chart-legend__dot--base"></i> {{ base_label }}</span>
+      <span class="compare-chart-legend__item"><i class="compare-chart-legend__dot compare-chart-legend__dot--report"></i> {{ report_label }}</span>
+    </div>
+  </section>
+  {% endif %}
+</div>
+
 {% if can_filter_managers %}
 <section class="card">
   <h2>Порівняння продажів по менеджерах: {{ report_label }} vs {{ base_label }}</h2>
