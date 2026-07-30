@@ -30,6 +30,13 @@ def quarter_range(year: int, quarter: int) -> DateRange:
     return DateRange(start, end, f"Q{quarter} {year}")
 
 
+def halfyear_range(year: int, half: int) -> DateRange:
+    """half=1: січень–червень, half=2: липень–грудень."""
+    if half == 1:
+        return DateRange(date(year, 1, 1), date(year, 7, 1), f"I півр. {year}")
+    return DateRange(date(year, 7, 1), date(year + 1, 1, 1), f"II півр. {year}")
+
+
 def year_range(year: int) -> DateRange:
     return DateRange(date(year, 1, 1), date(year + 1, 1, 1), str(year))
 

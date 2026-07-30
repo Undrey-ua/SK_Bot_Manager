@@ -30,6 +30,7 @@ from database.repositories.reserve import ReserveRepository
 from database.repositories.sale import SaleRepository
 from database.repositories.user import UserRepository
 from web.analytics_periods import (
+    halfyear_range,
     month_range,
     prev_month_range,
     quarter_range,
@@ -131,7 +132,10 @@ def _resolve_sales_period(
     year: int,
     month: int,
     quarter: int,
+    half: int = 1,
 ):
+    if period_kind == "halfyear":
+        return halfyear_range(year, half)
     if period_kind == "quarter":
         return quarter_range(year, quarter)
     if period_kind == "year":
@@ -145,6 +149,7 @@ def _sales_analytics_cache_key(
     year: int,
     month: int,
     quarter: int,
+    half: int,
     sales_filters: SalesFilters,
 ) -> str:
     return ":".join(
@@ -154,6 +159,7 @@ def _sales_analytics_cache_key(
             str(year),
             str(month),
             str(quarter),
+            str(half),
             str(sales_filters.manager_id or ""),
             str(sales_filters.region_id or ""),
             sales_filters.city or "",
@@ -173,6 +179,7 @@ async def _load_sales_analytics_bundle(
     year: int,
     month: int,
     quarter: int,
+    half: int,
     include_plans: bool,
 ):
     cache_key = _sales_analytics_cache_key(
@@ -180,6 +187,7 @@ async def _load_sales_analytics_bundle(
         year=year,
         month=month,
         quarter=quarter,
+        half=half,
         sales_filters=sales_filters,
     )
 
@@ -239,6 +247,7 @@ def register_panel_routes(
         year: int | None = None,
         month: int | None = None,
         quarter: int | None = None,
+        half: int | None = None,
     ) -> HTMLResponse:
         user = await load_web_user(request, session)
         require_nav(user, "analytics")
@@ -248,6 +257,7 @@ def register_panel_routes(
         year = year or today.year
         month = month or today.month
         quarter = quarter or ((month - 1) // 3 + 1)
+        half = half or (1 if month <= 6 else 2)
 
         managers = await service.list_managers()
         ctx = page_ctx(
@@ -283,7 +293,7 @@ def register_panel_routes(
                 manager_id=manager_id,
                 region_id=region_id,
             )
-            period = _resolve_sales_period(period_kind, year, month, quarter)
+            period = _resolve_sales_period(period_kind, year, month, quarter, half)
             bundle = await _load_sales_analytics_bundle(
                 service,
                 plan_service,
@@ -293,6 +303,7 @@ def register_panel_routes(
                 year=year,
                 month=month,
                 quarter=quarter,
+                half=half,
                 include_plans=period_kind == "month" and can_filter_managers(user),
             )
             partial_q = _analytics_partial_query(request)
@@ -302,10 +313,12 @@ def register_panel_routes(
                 year=year,
                 month=month,
                 quarter=quarter,
+                half=half,
                 period_label=period.label,
                 period_kind_label={
                     "month": "місяць",
                     "quarter": "квартал",
+                    "halfyear": "півріччя",
                     "year": "рік",
                 }.get(period_kind, period_kind),
                 sales_by_manager=bundle["sales_by_manager"],
@@ -504,6 +517,7 @@ def register_panel_routes(
         year: int | None = None,
         month: int | None = None,
         quarter: int | None = None,
+        half: int | None = None,
     ) -> HTMLResponse:
         user = await load_web_user(request, session)
         require_nav(user, "analytics")
@@ -512,6 +526,7 @@ def register_panel_routes(
         year = year or today.year
         month = month or today.month
         quarter = quarter or ((month - 1) // 3 + 1)
+        half = half or (1 if month <= 6 else 2)
         sales_filters = SalesFilters(
             manager_id=manager_id,
             region_id=query_int(request, "region_id"),
@@ -519,7 +534,7 @@ def register_panel_routes(
             stand_id=query_int(request, "stand_id"),
             brand_id=query_int(request, "brand_id"),
         )
-        period = _resolve_sales_period(period_kind, year, month, quarter)
+        period = _resolve_sales_period(period_kind, year, month, quarter, half)
         sales_matrix_cols, sales_matrix_rows = await service.sales_matrix_from_stands(
             period, sales_filters
         )
@@ -548,6 +563,7 @@ def register_panel_routes(
         year = query_int(request, "year", default=today.year) or today.year
         month = query_int(request, "month", default=today.month) or today.month
         quarter = query_int(request, "quarter") or ((month - 1) // 3 + 1)
+        half = query_int(request, "half") or (1 if month <= 6 else 2)
         period_kind = query_str(request, "period_kind", default="month") or "month"
         sales_filters = SalesFilters(
             manager_id=manager_id,
@@ -556,7 +572,7 @@ def register_panel_routes(
             stand_id=query_int(request, "stand_id"),
             brand_id=query_int(request, "brand_id"),
         )
-        period = _resolve_sales_period(period_kind, year, month, quarter)
+        period = _resolve_sales_period(period_kind, year, month, quarter, half)
         sales_matrix_cols, sales_matrix_rows = await service.sales_matrix_from_stands(
             period, sales_filters
         )

@@ -10,6 +10,7 @@ def analytics_sales_return_url(query: dict[str, str]) -> str:
         "year",
         "month",
         "quarter",
+        "half",
         "manager_id",
         "region_id",
         "city",

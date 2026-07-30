@@ -14,6 +14,7 @@
     <select name="period_kind" onchange="this.form.submit()">
       <option value="month" {% if period_kind == 'month' %}selected{% endif %}>Місяць</option>
       <option value="quarter" {% if period_kind == 'quarter' %}selected{% endif %}>Квартал</option>
+      <option value="halfyear" {% if period_kind == 'halfyear' %}selected{% endif %}>Півріччя</option>
       <option value="year" {% if period_kind == 'year' %}selected{% endif %}>Рік</option>
     </select>
   </label>
@@ -42,6 +43,15 @@
       {% for q in range(1, 5) %}
       <option value="{{ q }}" {% if quarter == q %}selected{% endif %}>Q{{ q }}</option>
       {% endfor %}
+    </select>
+  </label>
+  {% endif %}
+  {% if period_kind == 'halfyear' %}
+  <label>
+    Півріччя
+    <select name="half" onchange="this.form.submit()">
+      <option value="1" {% if half == 1 %}selected{% endif %}>I (січень–червень)</option>
+      <option value="2" {% if half == 2 %}selected{% endif %}>II (липень–грудень)</option>
     </select>
   </label>
   {% endif %}
@@ -93,7 +103,7 @@
     </select>
   </label>
   {% if sales_has_filters %}
-  <a href="/analytics?section=sales&amp;period_kind={{ period_kind }}&amp;year={{ year }}{% if period_kind == 'month' %}&amp;month={{ month }}{% endif %}{% if period_kind == 'quarter' %}&amp;quarter={{ quarter }}{% endif %}" class="btn btn-secondary btn-sm clients-filters__reset">Скинути</a>
+  <a href="/analytics?section=sales&amp;period_kind={{ period_kind }}&amp;year={{ year }}{% if period_kind == 'month' %}&amp;month={{ month }}{% endif %}{% if period_kind == 'quarter' %}&amp;quarter={{ quarter }}{% endif %}{% if period_kind == 'halfyear' %}&amp;half={{ half }}{% endif %}" class="btn btn-secondary btn-sm clients-filters__reset">Скинути</a>
   {% endif %}
   {% else %}
   {% if can_filter_managers %}
