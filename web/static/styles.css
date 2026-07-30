@@ -469,6 +469,11 @@ tbody td strong {
   font-size: 0.95rem;
 }
 
+.client-list-legal {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
 .matrix-client-legal {
   font-size: 0.78rem;
   margin-top: 0.15rem;

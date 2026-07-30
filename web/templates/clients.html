@@ -77,6 +77,7 @@
       <thead>
         <tr>
           <th>Назва</th>
+          <th>Юридична назва</th>
           {% if can_filter_managers %}<th>Менеджер</th>{% endif %}
           <th>Область</th>
           <th>Місто</th>
@@ -89,6 +90,7 @@
         {% for client in clients %}
         <tr>
           <td><a href="/clients/{{ client.id }}"><strong>{{ client.name }}</strong></a></td>
+          <td>{% if client.legal_name %}<span class="client-list-legal">{{ client.legal_name }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
           {% if can_filter_managers %}<td>{{ client.manager.name if client.manager else '—' }}</td>{% endif %}
           <td>{{ client.region.name if client.region else '—' }}</td>
           <td>{{ client_city(client) }}</td>
@@ -98,7 +100,7 @@
         </tr>
         {% else %}
         <tr class="empty-row">
-          <td colspan="{% if can_filter_managers %}7{% else %}6{% endif %}">
+          <td colspan="{% if can_filter_managers %}8{% else %}7{% endif %}">
             {% if has_filters %}
             {% if is_potential_section %}Потенційних клієнтів за обраними фільтрами не знайдено{% else %}Клієнтів за обраними фільтрами не знайдено{% endif %}
             {% else %}
