@@ -6,149 +6,186 @@
   <p class="page-subtitle">Продажі та стенди</p>
 </header>
 
-<form class="filters{% if section in ('stands', 'sales') %} filters--compact{% endif %}" method="get">
+<form class="filters filters--panelled{% if section in ('stands', 'sales') %} filters--compact{% endif %}" method="get">
   <input type="hidden" name="section" value="{{ section }}">
   {% if section == 'sales' %}
-  <label>
-    Період
-    <select name="period_kind" onchange="this.form.submit()">
-      <option value="month" {% if period_kind == 'month' %}selected{% endif %}>Місяць</option>
-      <option value="quarter" {% if period_kind == 'quarter' %}selected{% endif %}>Квартал</option>
-      <option value="halfyear" {% if period_kind == 'halfyear' %}selected{% endif %}>Півріччя</option>
-      <option value="year" {% if period_kind == 'year' %}selected{% endif %}>Рік</option>
-    </select>
-  </label>
-  <label>
-    Рік
-    <select name="year" onchange="this.form.submit()">
-      {% for y in range(2020, 2031) %}
-      <option value="{{ y }}" {% if year == y %}selected{% endif %}>{{ y }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  {% if period_kind == 'month' %}
-  <label>
-    Місяць
-    <select name="month" onchange="this.form.submit()">
-      {% for num, name in uk_months %}
-      <option value="{{ num }}" {% if month == num %}selected{% endif %}>{{ name }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  {% endif %}
-  {% if period_kind == 'quarter' %}
-  <label>
-    Квартал
-    <select name="quarter" onchange="this.form.submit()">
-      {% for q in range(1, 5) %}
-      <option value="{{ q }}" {% if quarter == q %}selected{% endif %}>Q{{ q }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  {% endif %}
-  {% if period_kind == 'halfyear' %}
-  <label>
-    Півріччя
-    <select name="half" onchange="this.form.submit()">
-      <option value="1" {% if half == 1 %}selected{% endif %}>I (січень–червень)</option>
-      <option value="2" {% if half == 2 %}selected{% endif %}>II (липень–грудень)</option>
-    </select>
-  </label>
-  {% endif %}
-  {% if can_filter_managers %}
-  <label class="filters__field--manager">
-    Менеджер
-    <select name="manager_id" onchange="this.form.submit()">
-      <option value="">Усі</option>
-      {% for m in managers %}
-      <option value="{{ m.id }}" {% if selected_manager_id == m.id %}selected{% endif %}>{{ m.name }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  {% endif %}
-  <label class="filters__field--region">
-    Область
-    <select name="region_id" onchange="this.form.submit()">
-      <option value="">Усі області</option>
-      {% for region_id, region_name in filter_regions %}
-      <option value="{{ region_id }}" {% if selected_region_id == region_id %}selected{% endif %}>{{ region_name }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <label class="filters__field--city">
-    Місто
-    <select name="city" onchange="this.form.submit()">
-      <option value="">Усі міста</option>
-      {% for city_name in filter_cities %}
-      <option value="{{ city_name }}" {% if selected_city == city_name %}selected{% endif %}>{{ city_name }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <label class="filters__field--stand">
-    Стенд
-    <select name="stand_id" onchange="this.form.submit()">
-      <option value="">Усі стенди</option>
-      {% for sid, sname in filter_stands %}
-      <option value="{{ sid }}" {% if selected_stand_id == sid %}selected{% endif %}>{{ sname }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <label class="filters__field--brand">
-    Торгова марка
-    <select name="brand_id" onchange="this.form.submit()">
-      <option value="">Усі марки</option>
-      {% for bid, bname in filter_brands %}
-      <option value="{{ bid }}" {% if selected_brand_id == bid %}selected{% endif %}>{{ bname }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  {% if sales_has_filters %}
-  <a href="/analytics?section=sales&amp;period_kind={{ period_kind }}&amp;year={{ year }}{% if period_kind == 'month' %}&amp;month={{ month }}{% endif %}{% if period_kind == 'quarter' %}&amp;quarter={{ quarter }}{% endif %}{% if period_kind == 'halfyear' %}&amp;half={{ half }}{% endif %}" class="btn btn-secondary btn-sm clients-filters__reset">Скинути</a>
-  {% endif %}
+  <div class="filters-period-row">
+    <div class="filters-section filters-section--period-type">
+      <div class="filters-section__head">
+        <span class="filters-section__title">Тип періоду</span>
+      </div>
+      <div class="filters-section__fields">
+        <label>
+          Період
+          <select name="period_kind" onchange="this.form.submit()">
+            <option value="month" {% if period_kind == 'month' %}selected{% endif %}>Місяць</option>
+            <option value="quarter" {% if period_kind == 'quarter' %}selected{% endif %}>Квартал</option>
+            <option value="halfyear" {% if period_kind == 'halfyear' %}selected{% endif %}>Півріччя</option>
+            <option value="year" {% if period_kind == 'year' %}selected{% endif %}>Рік</option>
+          </select>
+        </label>
+      </div>
+    </div>
+    <div class="filters-section filters-section--period-values">
+      <div class="filters-section__head">
+        <span class="filters-section__title">Період</span>
+      </div>
+      <div class="filters-section__fields">
+        <label>
+          Рік
+          <select name="year">
+            {% for y in range(2020, 2031) %}
+            <option value="{{ y }}" {% if year == y %}selected{% endif %}>{{ y }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        {% if period_kind == 'month' %}
+        <label>
+          Місяць
+          <select name="month">
+            {% for num, name in uk_months %}
+            <option value="{{ num }}" {% if month == num %}selected{% endif %}>{{ name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        {% endif %}
+        {% if period_kind == 'quarter' %}
+        <label>
+          Квартал
+          <select name="quarter">
+            {% for q in range(1, 5) %}
+            <option value="{{ q }}" {% if quarter == q %}selected{% endif %}>Q{{ q }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        {% endif %}
+        {% if period_kind == 'halfyear' %}
+        <label>
+          Півріччя
+          <select name="half">
+            <option value="1" {% if half == 1 %}selected{% endif %}>I (січень–червень)</option>
+            <option value="2" {% if half == 2 %}selected{% endif %}>II (липень–грудень)</option>
+          </select>
+        </label>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="filters-section filters-section--apply">
+    <div class="filters-section__head">
+      <span class="filters-section__title">Параметри та фільтри</span>
+      <span class="filters-section__badge">По кнопці «Оновити»</span>
+    </div>
+    <div class="filters-section__fields">
+      {% if can_filter_managers %}
+      <label class="filters__field--manager">
+        Менеджер
+        <select name="manager_id">
+          <option value="">Усі</option>
+          {% for m in managers %}
+          <option value="{{ m.id }}" {% if selected_manager_id == m.id %}selected{% endif %}>{{ m.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      {% endif %}
+      <label class="filters__field--region">
+        Область
+        <select name="region_id">
+          <option value="">Усі області</option>
+          {% for region_id, region_name in filter_regions %}
+          <option value="{{ region_id }}" {% if selected_region_id == region_id %}selected{% endif %}>{{ region_name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="filters__field--city">
+        Місто
+        <select name="city">
+          <option value="">Усі міста</option>
+          {% for city_name in filter_cities %}
+          <option value="{{ city_name }}" {% if selected_city == city_name %}selected{% endif %}>{{ city_name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="filters__field--stand">
+        Стенд
+        <select name="stand_id">
+          <option value="">Усі стенди</option>
+          {% for sid, sname in filter_stands %}
+          <option value="{{ sid }}" {% if selected_stand_id == sid %}selected{% endif %}>{{ sname }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="filters__field--brand">
+        Торгова марка
+        <select name="brand_id">
+          <option value="">Усі марки</option>
+          {% for bid, bname in filter_brands %}
+          <option value="{{ bid }}" {% if selected_brand_id == bid %}selected{% endif %}>{{ bname }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+    <div class="filters-section__actions">
+      {% if sales_has_filters %}
+      <a href="/analytics?section=sales&amp;period_kind={{ period_kind }}&amp;year={{ year }}{% if period_kind == 'month' %}&amp;month={{ month }}{% endif %}{% if period_kind == 'quarter' %}&amp;quarter={{ quarter }}{% endif %}{% if period_kind == 'halfyear' %}&amp;half={{ half }}{% endif %}" class="btn btn-secondary btn-sm clients-filters__reset">Скинути</a>
+      {% endif %}
+      <button type="submit" class="btn btn-primary btn-sm">Оновити</button>
+    </div>
+  </div>
   {% else %}
-  {% if can_filter_managers %}
-  <label class="filters__field--manager">
-    Менеджер
-    <select name="manager_id" onchange="this.form.submit()">
-      <option value="">Усі</option>
-      {% for m in managers %}
-      <option value="{{ m.id }}" {% if selected_manager_id == m.id %}selected{% endif %}>{{ m.name }}</option>
-      {% endfor %}
-    </select>
-  </label>
+  <div class="filters-section filters-section--apply">
+    <div class="filters-section__head">
+      <span class="filters-section__title">Фільтри</span>
+      <span class="filters-section__badge">По кнопці «Оновити»</span>
+    </div>
+    <div class="filters-section__fields">
+      {% if can_filter_managers %}
+      <label class="filters__field--manager">
+        Менеджер
+        <select name="manager_id">
+          <option value="">Усі</option>
+          {% for m in managers %}
+          <option value="{{ m.id }}" {% if selected_manager_id == m.id %}selected{% endif %}>{{ m.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      {% endif %}
+      <label class="filters__field--region">
+        Область
+        <select name="region_id">
+          <option value="">Усі області</option>
+          {% for region_id, region_name in filter_regions %}
+          <option value="{{ region_id }}" {% if selected_region_id == region_id %}selected{% endif %}>{{ region_name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="filters__field--city">
+        Місто
+        <select name="city">
+          <option value="">Усі міста</option>
+          {% for city_name in filter_cities %}
+          <option value="{{ city_name }}" {% if selected_city == city_name %}selected{% endif %}>{{ city_name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="filters__field--stand">
+        Стенд
+        <select name="stand_id">
+          <option value="">Усі стенди</option>
+          {% for stand_id, stand_name in filter_stands %}
+          <option value="{{ stand_id }}" {% if selected_stand_id == stand_id %}selected{% endif %}>{{ stand_name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+    <div class="filters-section__actions">
+      {% if stands_has_filters %}
+      <a href="/analytics?section=stands" class="btn btn-secondary btn-sm clients-filters__reset">Скинути</a>
+      {% endif %}
+      <button type="submit" class="btn btn-primary btn-sm">Оновити</button>
+    </div>
+  </div>
   {% endif %}
-  <label class="filters__field--region">
-    Область
-    <select name="region_id" onchange="this.form.submit()">
-      <option value="">Усі області</option>
-      {% for region_id, region_name in filter_regions %}
-      <option value="{{ region_id }}" {% if selected_region_id == region_id %}selected{% endif %}>{{ region_name }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <label class="filters__field--city">
-    Місто
-    <select name="city" onchange="this.form.submit()">
-      <option value="">Усі міста</option>
-      {% for city_name in filter_cities %}
-      <option value="{{ city_name }}" {% if selected_city == city_name %}selected{% endif %}>{{ city_name }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <label class="filters__field--stand">
-    Стенд
-    <select name="stand_id" onchange="this.form.submit()">
-      <option value="">Усі стенди</option>
-      {% for stand_id, stand_name in filter_stands %}
-      <option value="{{ stand_id }}" {% if selected_stand_id == stand_id %}selected{% endif %}>{{ stand_name }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  {% if stands_has_filters %}
-  <a href="/analytics?section=stands" class="btn btn-secondary btn-sm clients-filters__reset">Скинути</a>
-  {% endif %}
-  {% endif %}
-  <button type="submit">Оновити</button>
 </form>
 
 {% if section == 'sales' %}
