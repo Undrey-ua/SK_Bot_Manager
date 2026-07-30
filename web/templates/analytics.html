@@ -180,6 +180,19 @@
 </section>
 {% endif %}
 
+<section class="card" id="sales-matrix-section">
+  <h2>Продажі (матриця) — {{ period_label }}</h2>
+  <div class="lazy-load-actions">
+    <button type="button" class="btn lazy-load-btn" id="load-sales-matrix"
+            data-url="{{ sales_matrix_partial_url }}"
+            data-label="Показати матрицю">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Показати матрицю
+    </button>
+  </div>
+  <div id="sales-matrix-container" class="lazy-partial-container"></div>
+</section>
+
 <section class="card">
   <h2>По стендам (торговим маркам) — {{ period_label }}</h2>
   <div class="table-wrap">
@@ -272,19 +285,6 @@
       </tbody>
     </table>
   </div>
-</section>
-
-<section class="card" id="sales-matrix-section">
-  <h2>Продажі (матриця) — {{ period_label }}</h2>
-  <div class="lazy-load-actions">
-    <button type="button" class="btn lazy-load-btn" id="load-sales-matrix"
-            data-url="{{ sales_matrix_partial_url }}"
-            data-label="Показати матрицю">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-      Показати матрицю
-    </button>
-  </div>
-  <div id="sales-matrix-container" class="lazy-partial-container"></div>
 </section>
 
 <section class="card">
