@@ -14,6 +14,11 @@
     <span class="matrix-summary__stat matrix-summary__stat--failed"><strong>{{ matrix_failed }}</strong> ні</span>
     <span class="matrix-summary__stat matrix-summary__stat--pct"><strong>{{ matrix_pct }}%</strong></span>
   </span>
+  {% if sales_matrix_pdf_url is defined %}
+  <div class="matrix-summary__actions">
+    <a href="{{ sales_matrix_pdf_url }}" class="btn btn-secondary btn-sm" target="_blank" rel="noopener">Завантажити PDF</a>
+  </div>
+  {% endif %}
 </div>
 <div class="table-wrap matrix-wrap">
   <table class="table--darkhead matrix-table">

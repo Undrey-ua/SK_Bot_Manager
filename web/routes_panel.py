@@ -81,6 +81,7 @@ from web.services.tasks_board import (
     TASK_STATUS_OVERDUE,
     build_tasks_board,
 )
+from web.sales_matrix_pdf import build_sales_matrix_pdf
 from web.stands_pdf import build_stands_clients_pdf
 from web.ttl_cache import get_or_load, invalidate_sales_analytics_cache
 from web.utils import (
@@ -326,6 +327,7 @@ def register_panel_routes(
                 selected_brand_id=brand_id,
                 sales_has_filters=sales_filters_active(sales_filters),
                 sales_matrix_partial_url=f"/analytics/partials/sales-matrix?{partial_q}",
+                sales_matrix_pdf_url=f"/analytics/sales-matrix.pdf?{partial_q}",
                 inactive_stands_partial_url=f"/analytics/partials/inactive-stands?{partial_q}",
                 sales_return_url=analytics_sales_return_url(
                     dict(request.query_params)
@@ -528,6 +530,51 @@ def register_panel_routes(
                 "period_label": period.label,
                 "sales_matrix_cols": sales_matrix_cols,
                 "sales_matrix_rows": sales_matrix_rows,
+                "sales_matrix_pdf_url": f"/analytics/sales-matrix.pdf?{request.url.query}",
+            },
+        )
+
+    @app.get("/analytics/sales-matrix.pdf")
+    async def analytics_sales_matrix_pdf(
+        request: Request,
+        session: AsyncSession = Depends(get_session),
+        service: AnalyticsService = Depends(analytics_service),
+        _auth: Response | None = Depends(require_auth),
+    ) -> Response:
+        user = await load_web_user(request, session)
+        require_nav(user, "analytics")
+        manager_id = scoped_manager_filter(user, query_int(request, "manager_id"))
+        today = date_cls.today()
+        year = query_int(request, "year", default=today.year) or today.year
+        month = query_int(request, "month", default=today.month) or today.month
+        quarter = query_int(request, "quarter") or ((month - 1) // 3 + 1)
+        period_kind = query_str(request, "period_kind", default="month") or "month"
+        sales_filters = SalesFilters(
+            manager_id=manager_id,
+            region_id=query_int(request, "region_id"),
+            city=query_str(request, "city"),
+            stand_id=query_int(request, "stand_id"),
+            brand_id=query_int(request, "brand_id"),
+        )
+        period = _resolve_sales_period(period_kind, year, month, quarter)
+        sales_matrix_cols, sales_matrix_rows = await service.sales_matrix_from_stands(
+            period, sales_filters
+        )
+        title = f"Продажі (матриця) — {period.label}"
+        try:
+            pdf_bytes = build_sales_matrix_pdf(
+                title=title,
+                columns=sales_matrix_cols,
+                rows=sales_matrix_rows,
+                generated_at=datetime.now(ZoneInfo("Europe/Kyiv")),
+            )
+        except FileNotFoundError as e:
+            raise HTTPException(status_code=500, detail=str(e)) from e
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": 'attachment; filename="sales-matrix.pdf"'
             },
         )
 

@@ -529,6 +529,11 @@ tbody td strong {
   color: var(--text);
 }
 
+.matrix-summary__actions {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
 .matrix-summary__total strong {
   font-size: 1.05rem;
   color: #312e81;
@@ -2457,7 +2462,10 @@ form.filters:has(.filters__field--region) {
 
 .lazy-load-actions {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: center;
+  gap: 0.5rem 0.65rem;
   margin: 0.75rem 0 1rem;
 }
 
