@@ -17,7 +17,7 @@
       <div class="filters-section__fields">
         <label>
           Період
-          <select name="compare_kind" onchange="this.form.submit()">
+          <select name="compare_kind">
             <option value="month" {% if compare_kind == 'month' %}selected{% endif %}>Місяць</option>
             <option value="quarter" {% if compare_kind == 'quarter' %}selected{% endif %}>Квартал</option>
             <option value="halfyear" {% if compare_kind == 'halfyear' %}selected{% endif %}>Півріччя</option>
@@ -301,4 +301,7 @@
     </table>
   </div>
 </section>
+{% endblock %}
+{% block scripts %}
+<script src="/static/analytics_filters.js" defer></script>
 {% endblock %}

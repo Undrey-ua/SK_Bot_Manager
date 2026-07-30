@@ -922,6 +922,7 @@ form.filters.filters--panelled:has(.filters__field--region) {
   align-items: stretch;
   gap: 0.65rem;
   width: 100%;
+  position: relative;
 }
 
 .filters-section--period-type {
@@ -1044,6 +1045,41 @@ form.filters.filters--panelled:has(.filters__field--region) {
 .filters--panelled .filters-section__actions .clients-filters__reset {
   align-self: center;
   margin-bottom: 0;
+}
+
+@keyframes filters-period-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.filters-period-row.is-loading {
+  pointer-events: none;
+}
+
+.filters-period-row.is-loading::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(238, 242, 255, 0.82);
+  backdrop-filter: blur(1px);
+  border-radius: 10px;
+  z-index: 2;
+}
+
+.filters-period-row.is-loading::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2rem;
+  height: 2rem;
+  margin: -1rem 0 0 -1rem;
+  border: 3px solid rgba(79, 70, 229, 0.2);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: filters-period-spin 0.65s linear infinite;
+  z-index: 3;
 }
 
 .col-datetime {

@@ -17,7 +17,7 @@
       <div class="filters-section__fields">
         <label>
           Період
-          <select name="period_kind" onchange="this.form.submit()">
+          <select name="period_kind">
             <option value="month" {% if period_kind == 'month' %}selected{% endif %}>Місяць</option>
             <option value="quarter" {% if period_kind == 'quarter' %}selected{% endif %}>Квартал</option>
             <option value="halfyear" {% if period_kind == 'halfyear' %}selected{% endif %}>Півріччя</option>
@@ -563,6 +563,7 @@
 <script src="/static/stands_drilldown.js"></script>
 {% endif %}
 {% if section == 'sales' %}
+<script src="/static/analytics_filters.js" defer></script>
 <script src="/static/analytics_lazy.js"></script>
 {% endif %}
 {% if section == 'sales' and can_create_sale %}
