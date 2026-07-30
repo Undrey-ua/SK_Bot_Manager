@@ -238,6 +238,7 @@
     if (!form) return;
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
+      if (!window.lockFormSubmit || !window.lockFormSubmit(form)) return;
       if (errEl) errEl.hidden = true;
       try {
         const res = await fetch(url, { method: "POST", body: new FormData(form) });
@@ -245,6 +246,7 @@
         if (!res.ok || !data.ok) throw new Error(data.error || "Помилка");
         window.location.reload();
       } catch (err) {
+        if (window.unlockFormSubmit) window.unlockFormSubmit(form);
         if (errEl) {
           errEl.textContent = err.message || "Помилка";
           errEl.hidden = false;

@@ -44,10 +44,11 @@
           <label for="telegram_id">Telegram ID <span class="muted">(менеджер)</span></label>
           <input type="text" id="telegram_id" name="telegram_id" inputmode="numeric" placeholder="Напр. 123456789">
           <p class="login-hint muted">Керівник: пароль керівника, поле Telegram залишити порожнім. Менеджер: спільний пароль команди + свій Telegram ID з бота.</p>
-          <button type="submit">Увійти</button>
+          <button type="submit" data-submit-loading="Вхід…">Увійти</button>
         </form>
       </div>
     </div>
   </div>
+  <script src="/static/submit_guard.js" defer></script>
 </body>
 </html>

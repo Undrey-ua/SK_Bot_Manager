@@ -237,6 +237,7 @@
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
+    if (!window.lockFormSubmit || !window.lockFormSubmit(form)) return;
     if (errEl) {
       errEl.hidden = true;
       errEl.textContent = "";
@@ -280,6 +281,7 @@
       }
       window.location.reload();
     } catch (err) {
+      if (window.unlockFormSubmit) window.unlockFormSubmit(form);
       if (errEl) {
         errEl.textContent = err.message || "Помилка";
         errEl.hidden = false;
