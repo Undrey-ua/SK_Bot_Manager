@@ -899,6 +899,75 @@ form.filters:has(.filters__field--region) {
   width: 100%;
 }
 
+.visits-filters.filters.filters--compact {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  gap: 0.55rem 0.7rem;
+}
+
+.visits-filters label {
+  min-width: 0;
+}
+
+.visits-filters .filters__field--manager {
+  flex: 1 1 11rem;
+  max-width: 14rem;
+}
+
+.visits-filters .filters__field--manager select {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}
+
+.visits-filters .filters__field--visit-type {
+  flex: 0 0 7.25rem;
+}
+
+.visits-filters .filters__field--year {
+  flex: 0 0 6rem;
+}
+
+.visits-filters .filters__field--week {
+  flex: 0 0 8.25rem;
+}
+
+.visits-filters .filters__field--visit-type select,
+.visits-filters .filters__field--year select,
+.visits-filters .filters__field--week select {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}
+
+.visits-filters__actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.visits-filters .filters__apply {
+  flex-wrap: nowrap;
+}
+
+.visits-filters .filters__pdf {
+  margin-left: 0;
+  margin-bottom: 0;
+  padding: 0.55rem 1rem;
+  font-size: 0.875rem;
+  min-height: 2.4rem;
+}
+
+.visits-filters .filters__apply .btn,
+.visits-filters .clients-filters__reset {
+  min-height: 2.4rem;
+  margin-bottom: 0;
+}
+
 .filters__apply {
   display: flex;
   flex-wrap: wrap;
@@ -911,12 +980,6 @@ form.filters:has(.filters__field--region) {
   align-self: flex-end;
   padding: 0.62rem 1.25rem;
   font-size: 0.9rem;
-}
-
-.visits-filters .filters__field--visit-type select,
-.visits-filters .filters__field--year select {
-  min-width: 8rem;
-  max-width: 11rem;
 }
 
 /* ——— Panelled filter sections (analytics) ——— */
@@ -3244,12 +3307,31 @@ form.filters.filters--panelled:has(.filters__field--region) {
   .filters button[type="submit"],
   .clients-filters__reset,
   .filters__apply,
-  .filters__pdf {
+  .filters__pdf,
+  .visits-filters__actions {
     grid-column: 1 / -1;
   }
 
   .filters--compact {
     display: grid;
+  }
+
+  .visits-filters.filters.filters--compact {
+    display: grid;
+    flex-wrap: wrap;
+  }
+
+  .visits-filters__actions {
+    margin-left: 0;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .visits-filters .filters__field--manager,
+  .visits-filters .filters__field--visit-type,
+  .visits-filters .filters__field--year,
+  .visits-filters .filters__field--week {
+    max-width: none;
   }
 
   .filters__pdf {

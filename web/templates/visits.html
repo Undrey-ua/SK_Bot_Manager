@@ -59,7 +59,7 @@
       {% endfor %}
     </select>
   </label>
-  <label>
+  <label class="filters__field--week">
     Тиждень
     <select name="week">
       <option value="">Усі</option>
@@ -71,13 +71,15 @@
   {% if selected_period == 'today' %}
   <input type="hidden" name="period" value="today">
   {% endif %}
-  <div class="filters__apply">
-    <button type="submit" class="btn btn-primary btn-sm">Оновити</button>
-    {% if selected_period or selected_week or selected_year or selected_visit_type or (can_filter_managers and selected_manager_id) %}
-    <a href="/" class="btn btn-secondary btn-sm clients-filters__reset">Скинути</a>
-    {% endif %}
+  <div class="visits-filters__actions">
+    <div class="filters__apply">
+      <button type="submit" class="btn btn-primary btn-sm">Оновити</button>
+      {% if selected_period or selected_week or selected_year or selected_visit_type or (can_filter_managers and selected_manager_id) %}
+      <a href="/" class="btn btn-secondary btn-sm clients-filters__reset">Скинути</a>
+      {% endif %}
+    </div>
+    <a class="btn btn-secondary filters__pdf" href="{{ visits_pdf_url }}" target="_blank" rel="noopener">Завантажити PDF</a>
   </div>
-  <a class="btn btn-secondary filters__pdf" href="{{ visits_pdf_url }}" target="_blank" rel="noopener">Завантажити PDF</a>
 </form>
 
 <div class="card">

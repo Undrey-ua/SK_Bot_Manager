@@ -46,9 +46,13 @@ def today_range(now: datetime | None = None) -> tuple[datetime, datetime]:
 
 
 def week_option_label(year: int, week: int) -> str:
+    return f"Тиждень {week}"
+
+
+def week_period_label(year: int, week: int) -> str:
     start_d = date.fromisocalendar(year, week, 1)
     end_d = start_d + timedelta(days=6)
-    return f"Тиждень {week} ({start_d.strftime('%d.%m')}–{end_d.strftime('%d.%m')})"
+    return f"Тиждень {week} ({start_d.strftime('%d.%m')}–{end_d.strftime('%d.%m')}) {year}"
 
 
 def last_week_of(year: int, *, current_year: int, current_week: int) -> int:
@@ -136,7 +140,7 @@ def parse_visit_period(
             current_year=current_year,
             current_week=current_week,
             selected_year=week_year,
-            title=f"Візити — {week_option_label(week_year, selected_week)} {week_year}",
+            title=f"Візити — {week_period_label(week_year, selected_week)}",
             filename=f"visits-{week_year}-week-{selected_week}.pdf",
         )
 
