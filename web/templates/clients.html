@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{% if is_pvc_section %}{% if is_potential_section %}Потенційні клієнти ПВХ{% else %}Клієнти ПВХ{% endif %}{% elif is_potential_section %}Потенційні клієнти{% else %}Клієнти{% endif %} — SK Bot Manager{% endblock %}
 {% block content %}
-<header class="page-header page-header--row">
+<header class="page-header{% if not is_leader %} page-header--row{% endif %}">
   <div>
     <h1 class="page-title">{% if is_pvc_section %}{% if is_potential_section %}Потенційні клієнти ПВХ{% else %}Клієнти ПВХ{% endif %}{% elif is_potential_section %}Потенційні клієнти{% else %}Клієнти{% endif %}</h1>
     <p class="page-subtitle">
@@ -17,29 +17,28 @@
       {% if total_pages > 1 %} · сторінка {{ page }}/{{ total_pages }}{% endif %}
     </p>
   </div>
+  {% if not is_leader %}
   <div class="page-actions">
-    <a class="btn btn-secondary" href="{{ clients_pdf_url }}" target="_blank" rel="noopener">Завантажити PDF</a>
-    {% if not is_leader %}
-      {% if is_pvc_section %}
-        {% if is_potential_section %}
+    {% if is_pvc_section %}
+      {% if is_potential_section %}
     <a href="/clients/pvc/potential/new" class="btn btn-primary">+ Потенційний ПВХ</a>
-        {% else %}
-    <a href="/clients/pvc/new" class="btn btn-primary">+ Клієнт ПВХ</a>
-        {% endif %}
-      {% elif is_potential_section %}
-    <a href="/clients/potential/new" class="btn btn-primary">+ Потенційний</a>
       {% else %}
-    <a href="/clients/new" class="btn btn-primary">+ Новий клієнт</a>
+    <a href="/clients/pvc/new" class="btn btn-primary">+ Клієнт ПВХ</a>
       {% endif %}
+    {% elif is_potential_section %}
+    <a href="/clients/potential/new" class="btn btn-primary">+ Потенційний</a>
+    {% else %}
+    <a href="/clients/new" class="btn btn-primary">+ Новий клієнт</a>
     {% endif %}
   </div>
+  {% endif %}
 </header>
 
 <form class="filters filters--compact clients-filters" method="get" action="{{ list_base_path }}">
   {% if can_filter_managers %}
   <label class="filters__field--manager">
     Менеджер
-    <select name="manager_id" onchange="this.form.submit()">
+    <select name="manager_id">
       <option value="">Усі</option>
       {% for m in managers %}
       <option value="{{ m.id }}" {% if selected_manager_id == m.id %}selected{% endif %}>
@@ -51,7 +50,7 @@
   {% endif %}
   <label class="filters__field--region">
     Область
-    <select name="region_id" onchange="this.form.submit()">
+    <select name="region_id">
       <option value="">Усі області</option>
       {% for region_id, region_name in filter_regions %}
       <option value="{{ region_id }}" {% if selected_region_id == region_id %}selected{% endif %}>{{ region_name }}</option>
@@ -60,7 +59,7 @@
   </label>
   <label class="filters__field--city">
     Місто
-    <select name="city" onchange="this.form.submit()">
+    <select name="city">
       <option value="">Усі міста</option>
       {% for city_name in filter_cities %}
       <option value="{{ city_name }}" {% if selected_city == city_name %}selected{% endif %}>{{ city_name }}</option>
@@ -70,7 +69,7 @@
   {% if not is_pvc_section %}
   <label class="filters__field--stand">
     Стенд
-    <select name="stand_id" onchange="this.form.submit()">
+    <select name="stand_id">
       <option value="">Усі стенди</option>
       {% for stand_id, stand_name in filter_stands %}
       <option value="{{ stand_id }}" {% if selected_stand_id == stand_id %}selected{% endif %}>{{ stand_name }}</option>
@@ -78,9 +77,13 @@
     </select>
   </label>
   {% endif %}
-  {% if has_filters %}
-  <a href="{{ list_base_path }}" class="btn btn-secondary btn-sm clients-filters__reset">Скинути</a>
-  {% endif %}
+  <div class="filters__apply">
+    <button type="submit" class="btn btn-primary btn-sm">Оновити</button>
+    {% if has_filters %}
+    <a href="{{ list_base_path }}" class="btn btn-secondary btn-sm clients-filters__reset">Скинути</a>
+    {% endif %}
+  </div>
+  <a class="btn btn-secondary btn-sm filters__pdf" href="{{ clients_pdf_url }}" target="_blank" rel="noopener">Завантажити PDF</a>
 </form>
 
 <div class="card">

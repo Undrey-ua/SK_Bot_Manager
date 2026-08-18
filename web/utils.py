@@ -142,6 +142,14 @@ def format_dt(dt: datetime | None) -> str:
     return local.strftime("%d.%m.%Y %H:%M")
 
 
+def format_visit_date(dt: datetime | None) -> str:
+    if dt is None:
+        return "—"
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+    return dt.astimezone(KYIV).strftime("%d.%m.%Y")
+
+
 def format_qty(value: Decimal | float | int | None, *, decimals: int = 3) -> str:
     if value is None:
         return "—"

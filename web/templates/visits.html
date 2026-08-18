@@ -1,14 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Візити — SK Bot Manager{% endblock %}
 {% block content %}
-<header class="page-header page-header--row">
-  <div>
-    <h1 class="page-title">{% if can_filter_managers %}Візити менеджерів{% else %}Мої візити{% endif %}</h1>
-    <p class="page-subtitle">{% if can_filter_managers %}Останні звіти з полів — фільтруйте за менеджером і тижнем{% else %}Останні звіти з полів{% endif %}</p>
-  </div>
-  <div class="page-actions">
-    <a class="btn btn-secondary" href="{{ visits_pdf_url }}" target="_blank" rel="noopener">Завантажити PDF</a>
-  </div>
+<header class="page-header">
+  <h1 class="page-title">{% if can_filter_managers %}Візити менеджерів{% else %}Мої візити{% endif %}</h1>
+  <p class="page-subtitle">{% if can_filter_managers %}Останні звіти з полів — фільтруйте за менеджером і тижнем{% else %}Останні звіти з полів{% endif %}</p>
 </header>
 
 <nav class="stats" aria-label="Фільтр за періодом">
@@ -33,11 +28,11 @@
   </a>
 </nav>
 
-<form class="filters" method="get" action="/">
+<form class="filters filters--compact visits-filters" method="get" action="/">
   {% if can_filter_managers %}
-  <label>
+  <label class="filters__field--manager">
     Менеджер
-    <select name="manager_id" onchange="this.form.submit()">
+    <select name="manager_id">
       <option value="">Усі</option>
       {% for m in managers %}
       <option value="{{ m.id }}" {% if selected_manager_id == m.id %}selected{% endif %}>
@@ -49,7 +44,7 @@
   {% endif %}
   <label>
     Тиждень
-    <select name="week" onchange="this.form.submit()">
+    <select name="week">
       <option value="">Усі</option>
       {% for week_num, week_label in week_choices %}
       <option value="{{ week_num }}" {% if selected_week == week_num %}selected{% endif %}>{{ week_label }}</option>
@@ -59,6 +54,13 @@
   {% if selected_period == 'today' %}
   <input type="hidden" name="period" value="today">
   {% endif %}
+  <div class="filters__apply">
+    <button type="submit" class="btn btn-primary btn-sm">Оновити</button>
+    {% if selected_period or selected_week or (can_filter_managers and selected_manager_id) %}
+    <a href="/" class="btn btn-secondary btn-sm clients-filters__reset">Скинути</a>
+    {% endif %}
+  </div>
+  <a class="btn btn-secondary btn-sm filters__pdf" href="{{ visits_pdf_url }}" target="_blank" rel="noopener">Завантажити PDF</a>
 </form>
 
 <div class="card">
@@ -79,7 +81,7 @@
       <tbody>
         {% for visit in visits %}
         <tr>
-          <td>{{ format_dt(visit.created_at) }}</td>
+          <td>{{ format_visit_date(visit.created_at) }}</td>
           {% if can_filter_managers %}<td>{{ visit.manager.name if visit.manager else '—' }}</td>{% endif %}
           <td>{{ visit.client.name if visit.client else '—' }}</td>
           <td>{{ visit.client.region.name if visit.client and visit.client.region else '—' }}</td>
@@ -96,9 +98,9 @@
             </div>
           </td>
           <td>{{ visit.photos|length }}</td>
-          <td>
-            <a class="btn-ghost" href="/visits/{{ visit.id }}">Деталі →</a>
-            <a class="btn-ghost" href="/visits/{{ visit.id }}/pdf" target="_blank" rel="noopener">PDF</a>
+          <td class="table-actions">
+            <a class="btn btn-secondary btn-sm" href="/visits/{{ visit.id }}">Деталі →</a>
+            <a class="btn btn-secondary btn-sm" href="/visits/{{ visit.id }}/pdf" target="_blank" rel="noopener">PDF</a>
           </td>
         </tr>
         {% else %}

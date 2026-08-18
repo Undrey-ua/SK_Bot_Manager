@@ -4,11 +4,11 @@
 <nav class="breadcrumb">
   <a href="/">Візити</a>
   <span class="breadcrumb-sep">/</span>
-  <span>{{ format_dt(visit.created_at) }}</span>
+  <span>{{ format_visit_date(visit.created_at) }}</span>
 </nav>
 
 <header class="page-header">
-  <h1 class="page-title">Візит від {{ format_dt(visit.created_at) }}</h1>
+  <h1 class="page-title">Візит від {{ format_visit_date(visit.created_at) }}</h1>
   {% if visit.client %}
   <p class="page-subtitle">
     <a href="/clients/{{ visit.client.id }}">{{ visit.client.name }}</a>

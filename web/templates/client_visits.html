@@ -31,7 +31,7 @@
       <tbody>
         {% for visit in visits %}
         <tr>
-          <td>{{ format_dt(visit.created_at) }}</td>
+          <td>{{ format_visit_date(visit.created_at) }}</td>
           {% if can_filter_managers %}<td>{{ visit.manager.name if visit.manager else '—' }}</td>{% endif %}
           <td>
             <span class="badge {% if visit.visit_type == 'stand' %}badge-stand{% endif %}">
@@ -47,7 +47,10 @@
           </td>
           <td class="comment-cell">{{ visit.comment or '—' }}</td>
           <td>{{ visit.photos|length }}</td>
-          <td><a class="btn-ghost" href="/visits/{{ visit.id }}">Деталі →</a></td>
+          <td class="table-actions">
+            <a class="btn btn-secondary btn-sm" href="/visits/{{ visit.id }}">Деталі →</a>
+            <a class="btn btn-secondary btn-sm" href="/visits/{{ visit.id }}/pdf" target="_blank" rel="noopener">PDF</a>
+          </td>
         </tr>
         {% else %}
         <tr class="empty-row">

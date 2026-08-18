@@ -48,7 +48,11 @@ from web.client_sales_periods import (
 )
 from web.clients_pdf import build_clients_pdf, clients_pdf_filename
 from web.visit_periods import parse_visit_period, visits_page_query, week_options
-from web.visits_pdf import build_visit_detail_pdf, build_visits_pdf
+from web.visits_pdf import (
+    build_visit_detail_pdf,
+    build_visits_pdf,
+    load_visit_photo_bytes,
+)
 from web.utils import (
     UK_MONTHS,
     WEEKDAY_LABELS,
@@ -56,6 +60,7 @@ from web.utils import (
     client_stands,
     format_date,
     format_dt,
+    format_visit_date,
     format_qty,
     format_signed_pct,
     format_signed_qty,
@@ -82,6 +87,7 @@ templates.env.globals.update(
     task_label=task_label,
     visit_type_label=visit_type_label,
     format_dt=format_dt,
+    format_visit_date=format_visit_date,
     client_stands=client_stands,
     client_city=client_city,
     client_display_city=client_display_city,
@@ -289,7 +295,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 selected_manager_id=manager_id,
                 selected_period=period_filter.period,
                 selected_week=period_filter.week,
-                week_choices=week_options(period_filter.iso_year),
+                week_choices=week_options(
+                    period_filter.iso_year, up_to_week=period_filter.current_week
+                ),
                 visits_pdf_url=f"/visits.pdf{pdf_qs}",
                 page=page,
                 total_pages=total_pages,
@@ -360,10 +368,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         visit = await service.get_visit(visit_id)
         if visit is None:
             raise HTTPException(status_code=404, detail="Візит не знайдено")
+        photo_bytes = await load_visit_photo_bytes(visit)
         try:
             pdf_bytes = build_visit_detail_pdf(
                 visit=visit,
                 show_manager=can_filter_managers(user),
+                photo_bytes=photo_bytes,
             )
         except FileNotFoundError as e:
             raise HTTPException(status_code=500, detail=str(e)) from e

@@ -42,10 +42,13 @@ def week_option_label(year: int, week: int) -> str:
     return f"Тиждень {week} ({start_d.strftime('%d.%m')}–{end_d.strftime('%d.%m')})"
 
 
-def week_options(year: int) -> list[tuple[int, str]]:
+def week_options(year: int, *, up_to_week: int | None = None) -> list[tuple[int, str]]:
+    last = iso_weeks_in_year(year)
+    if up_to_week is not None:
+        last = min(last, up_to_week)
     return [
         (week, week_option_label(year, week))
-        for week in range(1, iso_weeks_in_year(year) + 1)
+        for week in range(1, last + 1)
     ]
 
 
@@ -64,8 +67,9 @@ class VisitPeriodFilter:
 def parse_visit_period(*, period: str | None, week: int | None) -> VisitPeriodFilter:
     now = now_kyiv()
     iso_year, current_week = current_iso_week(now)
-    max_week = iso_weeks_in_year(iso_year)
-    selected_week = week if week is not None and 1 <= week <= max_week else None
+    selected_week = (
+        week if week is not None and 1 <= week <= current_week else None
+    )
 
     if selected_week is not None:
         start, end = iso_week_range(iso_year, selected_week)

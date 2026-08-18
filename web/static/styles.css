@@ -894,6 +894,24 @@ form.filters:has(.filters__field--region) {
   margin-bottom: 0.1rem;
 }
 
+.visits-filters,
+.clients-filters {
+  width: 100%;
+}
+
+.filters__apply {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.filters__pdf {
+  margin-left: auto;
+  align-self: flex-end;
+  margin-bottom: 0.1rem;
+}
+
 /* ——— Panelled filter sections (analytics) ——— */
 .filters--panelled {
   display: flex;
@@ -3217,12 +3235,19 @@ form.filters.filters--panelled:has(.filters__field--region) {
   .filters__field--stand,
   .filters__field--brand,
   .filters button[type="submit"],
-  .clients-filters__reset {
+  .clients-filters__reset,
+  .filters__apply,
+  .filters__pdf {
     grid-column: 1 / -1;
   }
 
   .filters--compact {
     display: grid;
+  }
+
+  .filters__pdf {
+    margin-left: 0;
+    justify-content: center;
   }
 
   .filters--panelled {
