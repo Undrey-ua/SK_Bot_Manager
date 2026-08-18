@@ -863,7 +863,6 @@ tbody td strong {
 .filters--compact .filters__field--manager select {
   min-width: 10rem;
   max-width: 16rem;
-  width: 16rem;
 }
 
 .filters.filters--compact,
@@ -899,23 +898,38 @@ form.filters:has(.filters__field--region) {
   width: 100%;
 }
 
-.visits-filters.filters.filters--compact {
+.filters--toolbar.filters.filters--compact {
   display: flex;
   flex-wrap: nowrap;
   align-items: flex-end;
   gap: 0.55rem 0.7rem;
 }
 
-.visits-filters label {
+.filters--toolbar label {
   min-width: 0;
 }
 
-.visits-filters .filters__field--manager {
+.filters--toolbar .filters__field--manager {
   flex: 1 1 11rem;
   max-width: 14rem;
 }
 
-.visits-filters .filters__field--manager select {
+.filters--toolbar .filters__field--manager select {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}
+
+.filters--toolbar .filters__field--region,
+.filters--toolbar .filters__field--city,
+.filters--toolbar .filters__field--stand {
+  flex: 1 1 8rem;
+  max-width: 12rem;
+}
+
+.filters--toolbar .filters__field--region select,
+.filters--toolbar .filters__field--city select,
+.filters--toolbar .filters__field--stand select {
   width: 100%;
   min-width: 0;
   max-width: none;
@@ -949,27 +963,31 @@ form.filters:has(.filters__field--region) {
   flex: 0 0 auto;
 }
 
-.visits-filters .filters__apply {
+.filters--toolbar .filters__apply {
   flex-wrap: nowrap;
+  flex: 0 0 auto;
 }
 
-.visits-filters .filters__pdf {
+.filters--toolbar .filters__pdf {
   margin-left: auto;
   margin-bottom: 0;
   padding: 0.55rem 1rem;
   font-size: 0.875rem;
   min-height: 2.4rem;
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
-.visits-filters .filters__apply .btn,
-.visits-filters .clients-filters__reset {
+.filters--toolbar .filters__apply .btn,
+.filters--toolbar .clients-filters__reset {
   min-height: 2.4rem;
   margin-bottom: 0;
+  white-space: nowrap;
 }
 
 .filters__apply {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: flex-end;
   gap: 0.5rem;
 }
@@ -979,6 +997,7 @@ form.filters:has(.filters__field--region) {
   align-self: flex-end;
   padding: 0.62rem 1.25rem;
   font-size: 0.9rem;
+  white-space: nowrap;
 }
 
 /* ——— Panelled filter sections (analytics) ——— */
@@ -3315,6 +3334,7 @@ form.filters.filters--panelled:has(.filters__field--region) {
     display: grid;
   }
 
+  .filters--toolbar.filters.filters--compact,
   .visits-filters.filters.filters--compact {
     display: grid;
     flex-wrap: wrap;
@@ -3326,11 +3346,18 @@ form.filters.filters--panelled:has(.filters__field--region) {
     flex-wrap: wrap;
   }
 
-  .visits-filters .filters__field--manager,
+  .filters--toolbar .filters__field--manager,
+  .filters--toolbar .filters__field--region,
+  .filters--toolbar .filters__field--city,
+  .filters--toolbar .filters__field--stand,
   .visits-filters .filters__field--visit-type,
   .visits-filters .filters__field--year,
   .visits-filters .filters__field--week {
     max-width: none;
+  }
+
+  .filters--toolbar .filters__pdf {
+    margin-left: 0;
   }
 
   .filters__pdf {

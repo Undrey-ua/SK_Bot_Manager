@@ -34,7 +34,7 @@
   {% endif %}
 </header>
 
-<form class="filters filters--compact clients-filters" method="get" action="{{ list_base_path }}">
+<form class="filters filters--compact filters--toolbar clients-filters" method="get" action="{{ list_base_path }}">
   {% if can_filter_managers %}
   <label class="filters__field--manager">
     Менеджер
@@ -83,7 +83,7 @@
     <a href="{{ list_base_path }}" class="btn btn-secondary btn-sm clients-filters__reset">Скинути</a>
     {% endif %}
   </div>
-  <a class="btn btn-secondary btn-sm filters__pdf" href="{{ clients_pdf_url }}" target="_blank" rel="noopener">Завантажити PDF</a>
+  <a class="btn btn-secondary filters__pdf" href="{{ clients_pdf_url }}" target="_blank" rel="noopener">Завантажити PDF</a>
 </form>
 
 <div class="card">
