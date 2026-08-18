@@ -50,6 +50,7 @@ from web.clients_pdf import build_clients_pdf, clients_pdf_filename
 from web.visit_periods import (
     parse_visit_period,
     parse_visit_type_filter,
+    visit_year_options,
     visits_filename_with_type,
     visits_page_query,
     visits_title_with_type,
@@ -278,6 +279,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         period_filter = parse_visit_period(
             period=query_str(request, "period"),
             week=query_int(request, "week"),
+            year=query_int(request, "year"),
         )
         visits, total, page, total_pages = await service.list_visits(
             manager_id=manager_id,
@@ -289,8 +291,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         pdf_qs = visits_page_query(
             manager_id=manager_id,
             visit_type=visit_type,
+            year=period_filter.selected_year,
             period=period_filter.period,
             week=period_filter.week,
+        )
+        week_cap = (
+            period_filter.current_week
+            if period_filter.iso_year == period_filter.current_year
+            else None
         )
 
         return templates.TemplateResponse(
@@ -306,11 +314,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 ),
                 selected_manager_id=manager_id,
                 selected_visit_type=visit_type,
+                selected_year=period_filter.selected_year,
                 selected_period=period_filter.period,
                 selected_week=period_filter.week,
-                week_choices=week_options(
-                    period_filter.iso_year, up_to_week=period_filter.current_week
-                ),
+                current_iso_year=period_filter.current_year,
+                year_choices=visit_year_options(period_filter.current_year),
+                week_choices=week_options(period_filter.iso_year, up_to_week=week_cap),
                 visits_pdf_url=f"/visits.pdf{pdf_qs}",
                 page=page,
                 total_pages=total_pages,
@@ -332,6 +341,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         period_filter = parse_visit_period(
             period=query_str(request, "period"),
             week=query_int(request, "week"),
+            year=query_int(request, "year"),
         )
         visits = await service.list_visits_export(
             manager_id=manager_id,

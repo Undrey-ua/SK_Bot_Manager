@@ -8,8 +8,8 @@
 
 <nav class="stats" aria-label="Фільтр за періодом">
   <a href="/{{ visits_page_query(manager_id=selected_manager_id, visit_type=selected_visit_type) }}"
-     class="stat-card stat-card--filter{% if not selected_period and not selected_week %} stat-card--selected{% endif %}"
-     aria-current="{% if not selected_period and not selected_week %}true{% else %}false{% endif %}">
+     class="stat-card stat-card--filter{% if not selected_period and not selected_week and not selected_year %} stat-card--selected{% endif %}"
+     aria-current="{% if not selected_period and not selected_week and not selected_year %}true{% else %}false{% endif %}">
     <div class="label">Всього</div>
     <div class="value">{{ stats.total }}</div>
   </a>
@@ -19,9 +19,9 @@
     <div class="label">Сьогодні</div>
     <div class="value">{{ stats.today }}</div>
   </a>
-  <a href="/{{ visits_page_query(manager_id=selected_manager_id, visit_type=selected_visit_type, week=stats.week_number) }}"
-     class="stat-card stat-card--filter stat-card--week{% if selected_week == stats.week_number %} stat-card--selected{% endif %}"
-     aria-current="{% if selected_week == stats.week_number %}true{% else %}false{% endif %}">
+  <a href="/{{ visits_page_query(manager_id=selected_manager_id, visit_type=selected_visit_type, year=current_iso_year, week=stats.week_number) }}"
+     class="stat-card stat-card--filter stat-card--week{% if selected_week == stats.week_number and selected_year == current_iso_year %} stat-card--selected{% endif %}"
+     aria-current="{% if selected_week == stats.week_number and selected_year == current_iso_year %}true{% else %}false{% endif %}">
     <div class="label">Цього тижня</div>
     <div class="value">{{ stats.week }}</div>
     <div class="stat-card__unit">тиждень {{ stats.week_number }}</div>
@@ -50,6 +50,15 @@
       <option value="stand" {% if selected_visit_type == 'stand' %}selected{% endif %}>Стенд</option>
     </select>
   </label>
+  <label class="filters__field--year">
+    Рік
+    <select name="year">
+      <option value="">Усі</option>
+      {% for y in year_choices %}
+      <option value="{{ y }}" {% if selected_year == y %}selected{% endif %}>{{ y }}</option>
+      {% endfor %}
+    </select>
+  </label>
   <label>
     Тиждень
     <select name="week">
@@ -64,7 +73,7 @@
   {% endif %}
   <div class="filters__apply">
     <button type="submit" class="btn btn-primary btn-sm">Оновити</button>
-    {% if selected_period or selected_week or selected_visit_type or (can_filter_managers and selected_manager_id) %}
+    {% if selected_period or selected_week or selected_year or selected_visit_type or (can_filter_managers and selected_manager_id) %}
     <a href="/" class="btn btn-secondary btn-sm clients-filters__reset">Скинути</a>
     {% endif %}
   </div>
@@ -114,7 +123,7 @@
         {% else %}
         <tr class="empty-row">
           <td colspan="{% if can_filter_managers %}8{% else %}7{% endif %}">
-            {% if selected_period or selected_week or selected_visit_type %}Візитів за обраними фільтрами немає{% else %}Візитів ще немає{% endif %}
+            {% if selected_period or selected_week or selected_year or selected_visit_type %}Візитів за обраними фільтрами немає{% else %}Візитів ще немає{% endif %}
           </td>
         </tr>
         {% endfor %}
@@ -126,11 +135,11 @@
 {% if total_pages > 1 %}
 <nav class="pagination">
   {% if page > 1 %}
-  <a href="/{{ visits_page_query(manager_id=selected_manager_id, visit_type=selected_visit_type, period=selected_period, week=selected_week, page=page - 1) }}">←</a>
+  <a href="/{{ visits_page_query(manager_id=selected_manager_id, visit_type=selected_visit_type, year=selected_year, period=selected_period, week=selected_week, page=page - 1) }}">←</a>
   {% endif %}
   <span class="current">{{ page }} / {{ total_pages }}</span>
   {% if page < total_pages %}
-  <a href="/{{ visits_page_query(manager_id=selected_manager_id, visit_type=selected_visit_type, period=selected_period, week=selected_week, page=page + 1) }}">→</a>
+  <a href="/{{ visits_page_query(manager_id=selected_manager_id, visit_type=selected_visit_type, year=selected_year, period=selected_period, week=selected_week, page=page + 1) }}">→</a>
   {% endif %}
 </nav>
 {% endif %}

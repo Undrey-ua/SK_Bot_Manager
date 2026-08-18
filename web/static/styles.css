@@ -913,7 +913,8 @@ form.filters:has(.filters__field--region) {
   font-size: 0.9rem;
 }
 
-.visits-filters .filters__field--visit-type select {
+.visits-filters .filters__field--visit-type select,
+.visits-filters .filters__field--year select {
   min-width: 8rem;
   max-width: 11rem;
 }
