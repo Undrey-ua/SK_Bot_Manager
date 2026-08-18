@@ -19,6 +19,7 @@ class WebUser:
     role: str
     telegram_id: int
     supervisor_id: int | None = None
+    work_scope: str = "stand"
 
     @property
     def is_admin(self) -> bool:
@@ -126,6 +127,7 @@ async def get_web_user(
         role=db_user.role,
         telegram_id=db_user.telegram_id,
         supervisor_id=db_user.supervisor_id,
+        work_scope=getattr(db_user, "work_scope", None) or "stand",
     )
 
 

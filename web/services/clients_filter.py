@@ -25,6 +25,7 @@ class ClientFilters:
     city: str | None = None
     stand_id: int | None = None
     is_potential: bool | None = None
+    is_pvc: bool | None = False
 
 
 @dataclass(frozen=True)
@@ -41,6 +42,7 @@ def sales_filters_to_client(filters: SalesFilters | None) -> ClientFilters | Non
         city=filters.city,
         stand_id=filters.stand_id,
         is_potential=filters.is_potential,
+        is_pvc=filters.is_pvc,
     )
 
 
@@ -78,6 +80,8 @@ def client_matches_filters(client: Client, filters: ClientFilters) -> bool:
         if filters.stand_id not in _client_stand_ids(client):
             return False
     if filters.is_potential is not None and client.is_potential != filters.is_potential:
+        return False
+    if filters.is_pvc is not None and client.is_pvc != filters.is_pvc:
         return False
     return True
 

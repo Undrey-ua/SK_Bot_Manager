@@ -1,6 +1,14 @@
 from __future__ import annotations
 
 from config.team import is_regional_manager
+from config.work_scope import (
+    WORK_SCOPE_CHOICES,
+    WORK_SCOPE_DEFAULT,
+    needs_work_scope,
+    normalize_work_scope,
+    work_scope_label,
+    work_scope_of,
+)
 from database.models import User, UserRole
 from database.repositories.user import UserRepository
 

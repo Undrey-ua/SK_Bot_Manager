@@ -90,13 +90,18 @@ class UserRepository(BaseRepository):
         telegram_id: int,
         role: str,
         supervisor_id: int | None,
+        work_scope: str | None = None,
     ) -> User:
+        from config.work_scope import WORK_SCOPE_DEFAULT, normalize_work_scope
+
         user.name = name.strip()
         user.telegram_id = telegram_id
         user.role = role
         user.supervisor_id = (
             supervisor_id if role == UserRole.SALES_MANAGER.value else None
         )
+        if work_scope is not None:
+            user.work_scope = normalize_work_scope(work_scope)
         await self._session.flush()
         return user
 
@@ -110,12 +115,16 @@ class UserRepository(BaseRepository):
         role: str = UserRole.MANAGER.value,
         *,
         supervisor_id: int | None = None,
+        work_scope: str | None = None,
     ) -> User:
+        from config.work_scope import WORK_SCOPE_DEFAULT, normalize_work_scope
+
         user = User(
             telegram_id=telegram_id,
             name=name.strip(),
             role=role,
             supervisor_id=supervisor_id,
+            work_scope=normalize_work_scope(work_scope) if work_scope else WORK_SCOPE_DEFAULT,
         )
         self._session.add(user)
         await self._session.flush()

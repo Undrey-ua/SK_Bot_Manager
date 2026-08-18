@@ -29,21 +29,38 @@ class ClientRepository(BaseRepository):
             selectinload(Client.swatch_links).selectinload(ClientSwatch.brand),
         )
 
-    async def list_all(self) -> list[Client]:
-        result = await self._session.execute(
+    async def list_all(self, *, is_pvc: bool | None = False) -> list[Client]:
+        stmt = (
             select(Client)
             .options(*self._admin_list_options())
             .order_by(Client.name)
         )
+        stmt = self._apply_pvc(stmt, is_pvc)
+        result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
-    async def list_by_manager(self, manager_id: int) -> list[Client]:
-        result = await self._session.execute(
+    @staticmethod
+    def _apply_pvc(stmt, is_pvc: bool | None):
+        if is_pvc is True:
+            return stmt.where(Client.is_pvc.is_(True))
+        if is_pvc is False:
+            return stmt.where(Client.is_pvc.is_(False))
+        return stmt
+
+    async def list_by_manager(
+        self,
+        manager_id: int,
+        *,
+        is_pvc: bool | None = False,
+    ) -> list[Client]:
+        stmt = (
             select(Client)
             .where(Client.manager_id == manager_id)
             .options(*self._detail_options())
             .order_by(Client.name)
         )
+        stmt = self._apply_pvc(stmt, is_pvc)
+        result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
     async def list_by_manager_and_region(
@@ -53,6 +70,8 @@ class ClientRepository(BaseRepository):
         *,
         exclude_potential: bool = False,
         potential_only: bool = False,
+        is_pvc: bool | None = False,
+        city: str | None = None,
     ) -> list[Client]:
         stmt = (
             select(Client)
@@ -63,12 +82,37 @@ class ClientRepository(BaseRepository):
             .options(*self._detail_options())
             .order_by(Client.name)
         )
+        stmt = self._apply_pvc(stmt, is_pvc)
+        if city:
+            stmt = stmt.where(func.lower(Client.city) == city.strip().casefold())
         if potential_only:
             stmt = stmt.where(Client.is_potential.is_(True))
         elif exclude_potential:
             stmt = stmt.where(Client.is_potential.is_(False))
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
+
+    async def list_cities_for_region(
+        self,
+        manager_id: int,
+        region_id: int,
+        *,
+        is_pvc: bool | None = None,
+    ) -> list[str]:
+        stmt = (
+            select(Client.city)
+            .where(
+                Client.manager_id == manager_id,
+                Client.region_id == region_id,
+                Client.city.is_not(None),
+                Client.city != "",
+            )
+            .distinct()
+            .order_by(Client.city)
+        )
+        stmt = self._apply_pvc(stmt, is_pvc)
+        result = await self._session.execute(stmt)
+        return [row[0] for row in result.all() if row[0]]
 
     def _apply_filters(
         self,
@@ -79,6 +123,7 @@ class ClientRepository(BaseRepository):
         city: str | None = None,
         stand_id: int | None = None,
         is_potential: bool | None = None,
+        is_pvc: bool | None = False,
     ):
         if manager_id is not None:
             stmt = stmt.where(Client.manager_id == manager_id)
@@ -95,6 +140,7 @@ class ClientRepository(BaseRepository):
             )
         if is_potential is not None:
             stmt = stmt.where(Client.is_potential.is_(is_potential))
+        stmt = self._apply_pvc(stmt, is_pvc)
         return stmt
 
     async def count_filtered(
@@ -105,6 +151,7 @@ class ClientRepository(BaseRepository):
         city: str | None = None,
         stand_id: int | None = None,
         is_potential: bool | None = None,
+        is_pvc: bool | None = False,
     ) -> int:
         stmt = self._apply_filters(
             select(func.count()).select_from(Client),
@@ -113,6 +160,7 @@ class ClientRepository(BaseRepository):
             city=city,
             stand_id=stand_id,
             is_potential=is_potential,
+            is_pvc=is_pvc,
         )
         result = await self._session.execute(stmt)
         return int(result.scalar_one())
@@ -125,6 +173,7 @@ class ClientRepository(BaseRepository):
         city: str | None = None,
         stand_id: int | None = None,
         is_potential: bool | None = None,
+        is_pvc: bool | None = False,
         limit: int = 50,
         offset: int = 0,
     ) -> list[Client]:
@@ -137,6 +186,7 @@ class ClientRepository(BaseRepository):
             city=city,
             stand_id=stand_id,
             is_potential=is_potential,
+            is_pvc=is_pvc,
         )
         result = await self._session.execute(stmt.limit(limit).offset(offset))
         return list(result.scalars().all())
@@ -146,6 +196,7 @@ class ClientRepository(BaseRepository):
         *,
         manager_id: int | None = None,
         is_potential: bool | None = None,
+        is_pvc: bool | None = False,
     ) -> list[Client]:
         stmt = (
             select(Client)
@@ -159,6 +210,7 @@ class ClientRepository(BaseRepository):
             stmt = stmt.where(Client.manager_id == manager_id)
         if is_potential is not None:
             stmt = stmt.where(Client.is_potential.is_(is_potential))
+        stmt = self._apply_pvc(stmt, is_pvc)
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
@@ -193,6 +245,7 @@ class ClientRepository(BaseRepository):
         photo_url: str | None = None,
         swatch_brand_ids: list[int] | None = None,
         is_potential: bool = False,
+        is_pvc: bool = False,
     ) -> Client:
         client = Client(
             manager_id=manager_id,
@@ -205,6 +258,7 @@ class ClientRepository(BaseRepository):
             contacts=contacts,
             photo_url=photo_url,
             is_potential=is_potential,
+            is_pvc=is_pvc,
         )
         self._session.add(client)
         await self._session.flush()

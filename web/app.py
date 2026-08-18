@@ -28,9 +28,10 @@ from web.auth import (
 )
 from web.deps import query_int, query_str
 from web.page_context import load_web_user, page_ctx, scoped_manager_filter
-from web.roles import can_filter_managers, data_owner_manager_id
+from web.roles import can_filter_managers, data_owner_manager_id, show_pvc_clients_nav, show_stand_clients_nav
 from web.services.clients_filter import ClientFilters, build_client_filter_options
 from web.services.dashboard import DashboardService
+from config.work_scope import work_scope_label
 from config.team import is_regional_manager
 from web.services.user_admin import user_role_label, user_roles_display
 from web.client_geo import (
@@ -98,6 +99,7 @@ templates.env.globals.update(
     user_role_label=user_role_label,
     user_roles_display=user_roles_display,
     is_regional_manager=is_regional_manager,
+    work_scope_label=work_scope_label,
     stand_transfer_operation_label=lambda op: STAND_TRANSFER_OPERATION_LABELS.get(
         op, op
     ),
@@ -290,6 +292,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         user,
         *,
         is_potential_section: bool,
+        is_pvc_section: bool,
         page: int,
     ) -> HTMLResponse:
         stands = await service.list_active_stands()
@@ -298,8 +301,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             manager_id=scoped_manager_filter(user, query_int(request, "manager_id")),
             region_id=query_int(request, "region_id"),
             city=query_str(request, "city"),
-            stand_id=query_int(request, "stand_id"),
+            stand_id=None if is_pvc_section else query_int(request, "stand_id"),
             is_potential=is_potential,
+            is_pvc=is_pvc_section,
         )
         owner = data_owner_manager_id(user)
         filter_pool_manager = filters.manager_id
@@ -308,6 +312,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         filter_clients_pool = await service.list_clients_for_filters(
             manager_id=filter_pool_manager,
             is_potential=is_potential,
+            is_pvc=is_pvc_section,
         )
         clients, clients_total, page, total_pages = await service.list_clients_page(
             filters,
@@ -315,7 +320,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         filter_options = build_client_filter_options(
             filter_clients_pool,
-            stands,
+            [] if is_pvc_section else stands,
             manager_id=filters.manager_id,
             region_id=filters.region_id,
         )
@@ -327,7 +332,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 filters.stand_id is not None,
             ]
         )
-        list_base_path = "/clients/potential" if is_potential_section else "/clients"
+        if is_pvc_section:
+            list_base_path = (
+                "/clients/pvc/potential" if is_potential_section else "/clients/pvc"
+            )
+        else:
+            list_base_path = "/clients/potential" if is_potential_section else "/clients"
         return templates.TemplateResponse(
             request,
             "clients.html",
@@ -336,6 +346,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 active_nav="clients",
                 clients_subsection="potential" if is_potential_section else "active",
                 is_potential_section=is_potential_section,
+                is_pvc_section=is_pvc_section,
                 clients=clients,
                 clients_total=clients_total,
                 managers=await service.list_managers() if can_filter_managers(user) else [],
@@ -363,8 +374,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     ) -> HTMLResponse:
         user = await load_web_user(request, session)
         require_nav(user, "clients")
+        if not show_stand_clients_nav(user):
+            raise HTTPException(status_code=403, detail="Forbidden")
         return await _render_clients_list(
-            request, service, user, is_potential_section=False, page=page
+            request,
+            service,
+            user,
+            is_potential_section=False,
+            is_pvc_section=False,
+            page=page,
         )
 
     @app.get("/clients/potential", response_class=HTMLResponse)
@@ -377,8 +395,57 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     ) -> HTMLResponse:
         user = await load_web_user(request, session)
         require_nav(user, "clients")
+        if not show_stand_clients_nav(user):
+            raise HTTPException(status_code=403, detail="Forbidden")
         return await _render_clients_list(
-            request, service, user, is_potential_section=True, page=page
+            request,
+            service,
+            user,
+            is_potential_section=True,
+            is_pvc_section=False,
+            page=page,
+        )
+
+    @app.get("/clients/pvc", response_class=HTMLResponse)
+    async def pvc_clients_page(
+        request: Request,
+        session: AsyncSession = Depends(get_session),
+        service: DashboardService = Depends(dashboard_service),
+        _auth: Response | None = Depends(require_auth),
+        page: int = 1,
+    ) -> HTMLResponse:
+        user = await load_web_user(request, session)
+        require_nav(user, "clients")
+        if not show_pvc_clients_nav(user):
+            raise HTTPException(status_code=403, detail="Forbidden")
+        return await _render_clients_list(
+            request,
+            service,
+            user,
+            is_potential_section=False,
+            is_pvc_section=True,
+            page=page,
+        )
+
+    @app.get("/clients/pvc/potential", response_class=HTMLResponse)
+    async def pvc_potential_clients_page(
+        request: Request,
+        session: AsyncSession = Depends(get_session),
+        service: DashboardService = Depends(dashboard_service),
+        _auth: Response | None = Depends(require_auth),
+        page: int = 1,
+    ) -> HTMLResponse:
+        user = await load_web_user(request, session)
+        require_nav(user, "clients")
+        if not show_pvc_clients_nav(user):
+            raise HTTPException(status_code=403, detail="Forbidden")
+        return await _render_clients_list(
+            request,
+            service,
+            user,
+            is_potential_section=True,
+            is_pvc_section=True,
+            page=page,
         )
 
     @app.get("/clients/{client_id}", response_class=HTMLResponse)
@@ -434,6 +501,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 user,
                 active_nav="clients",
                 clients_subsection="potential" if client.is_potential else "active",
+                is_pvc_section=client.is_pvc,
                 client=client,
                 visit_count=await service.client_visit_count(client_id),
                 visit_gallery=await service.client_visit_gallery(client_id),

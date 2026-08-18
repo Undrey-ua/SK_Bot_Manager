@@ -27,6 +27,32 @@ WEB_NAV_ADMIN_EXTRA = frozenset({"users"})
 WEB_NAV_SALES_MANAGER = frozenset({"analytics", "reserves"})
 
 
+def work_scope_value(user: WebUser) -> str:
+    from config.work_scope import normalize_work_scope
+
+    return normalize_work_scope(getattr(user, "work_scope", None))
+
+
+def show_stand_clients_nav(user: WebUser) -> bool:
+    if is_sales_manager(user):
+        return False
+    if user.role in ORG_VIEW_ROLES:
+        return True
+    from config.work_scope import WorkScope
+
+    return work_scope_value(user) in {WorkScope.STAND.value, WorkScope.BOTH.value}
+
+
+def show_pvc_clients_nav(user: WebUser) -> bool:
+    if is_sales_manager(user):
+        return False
+    if user.role in ORG_VIEW_ROLES:
+        return True
+    from config.work_scope import WorkScope
+
+    return work_scope_value(user) in {WorkScope.PVC.value, WorkScope.BOTH.value}
+
+
 def can_filter_managers(user: WebUser) -> bool:
     return user.role in ORG_VIEW_ROLES
 

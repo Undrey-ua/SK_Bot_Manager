@@ -9,6 +9,8 @@ class VisitStates(StatesGroup):
     potential_address = State()
     potential_photo = State()
     select_visit_type = State()
+    select_city = State()
+    enter_city = State()
     select_tasks = State()
     enter_comment = State()
     upload_photos = State()

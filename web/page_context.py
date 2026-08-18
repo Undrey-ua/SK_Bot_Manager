@@ -18,6 +18,8 @@ from web.roles import (
     nav_allowed,
     panel_subtitle,
     scope_manager_id,
+    show_pvc_clients_nav,
+    show_stand_clients_nav,
 )
 
 
@@ -36,6 +38,10 @@ def page_ctx(user: WebUser, **kwargs: object) -> dict[str, object]:
         "can_pick_reserve_manager": can_pick_reserve_manager(user),
         "can_create_sale": can_create_sale(user),
         "show_tasks_nav": nav_allowed(user, "tasks"),
+        "show_stand_clients_nav": show_stand_clients_nav(user),
+        "show_pvc_clients_nav": show_pvc_clients_nav(user),
+        "is_pvc_section": False,
+        "is_pvc_form": False,
         "can_allocate_stand_stock": can_allocate_stand_stock(user),
         "can_operate_stand_warehouse": can_operate_stand_warehouse(user),
         "can_view_stand_warehouse": can_view_stand_warehouse(user),

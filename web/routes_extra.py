@@ -32,6 +32,7 @@ from web.roles import (
     can_filter_managers,
     can_operate_stand_warehouse,
     data_owner_manager_id,
+    show_pvc_clients_nav,
 )
 from web.services.clients_filter import build_client_filter_options
 from web.services.dashboard import DashboardService
@@ -550,6 +551,192 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
         await session.commit()
         return RedirectResponse(f"/clients/{client.id}", status_code=303)
 
+    async def _pvc_client_form_page(
+        request: Request,
+        session: AsyncSession,
+        dashboard: DashboardService,
+        user,
+        *,
+        is_potential_form: bool,
+    ):
+        if user.is_leader or not show_pvc_clients_nav(user):
+            raise HTTPException(status_code=403, detail="Forbidden")
+        managers = []
+        form_manager_id = user.id
+        if user.is_admin:
+            managers = await dashboard.list_managers()
+            picked = query_int(request, "manager_id")
+            if picked is not None:
+                form_manager_id = picked
+            elif managers:
+                form_manager_id = managers[0].id
+        regions = await RegionRepository(session).list_by_manager(form_manager_id)
+        action = (
+            "/clients/pvc/potential/new" if is_potential_form else "/clients/pvc/new"
+        )
+        return templates.TemplateResponse(
+            request,
+            "client_form.html",
+            page_ctx(
+                user,
+                active_nav="clients",
+                clients_subsection="potential" if is_potential_form else "active",
+                is_pvc_section=True,
+                is_pvc_form=True,
+                client=None,
+                regions=regions,
+                stands=[],
+                brands=[],
+                selected_stand_ids=[],
+                selected_swatch_brand_ids=[],
+                form_action=action,
+                submit_label="Створити",
+                form_manager_id=form_manager_id,
+                form_managers=managers,
+                is_potential_form=is_potential_form,
+            ),
+        )
+
+    async def _pvc_client_save(
+        request: Request,
+        session: AsyncSession,
+        user,
+        *,
+        name: str,
+        legal_name: str,
+        region_id: int,
+        address: str,
+        city: str,
+        comment: str,
+        contacts: str,
+        form_manager_id: str,
+        cover_photo: UploadFile | None,
+        is_potential: bool,
+    ):
+        if user.is_leader or not show_pvc_clients_nav(user):
+            raise HTTPException(status_code=403, detail="Forbidden")
+        target_manager_id = user.id
+        if user.is_admin and form_manager_id.strip().isdigit():
+            target_manager_id = int(form_manager_id.strip())
+        region = await RegionRepository(session).get_by_id(region_id)
+        if region is None or region.manager_id != target_manager_id:
+            raise HTTPException(status_code=400, detail="Invalid region")
+        client = await ClientRepository(session).create(
+            manager_id=target_manager_id,
+            region_id=region_id,
+            name=name,
+            legal_name=legal_name.strip() or None,
+            address=address,
+            city=city.strip() or None,
+            comment=comment.strip() or None,
+            contacts=contacts.strip() or None,
+            stand_ids=[],
+            is_potential=is_potential,
+            is_pvc=True,
+        )
+        try:
+            photo_url = await upload_client_cover(
+                StorageService(get_settings()), client.id, cover_photo
+            )
+            if photo_url:
+                client.photo_url = photo_url
+        except StorageError:
+            pass
+        await session.commit()
+        return RedirectResponse(f"/clients/{client.id}", status_code=303)
+
+    @app.get("/clients/pvc/new", response_class=HTMLResponse)
+    async def pvc_client_new_page(
+        request: Request,
+        session: AsyncSession = Depends(get_session),
+        dashboard: DashboardService = Depends(dashboard_service),
+        _auth=Depends(require_auth),
+    ):
+        user = await load_web_user(request, session)
+        require_nav(user, "clients")
+        return await _pvc_client_form_page(
+            request, session, dashboard, user, is_potential_form=False
+        )
+
+    @app.post("/clients/pvc/new")
+    async def pvc_client_new_save(
+        request: Request,
+        session: AsyncSession = Depends(get_session),
+        _auth=Depends(require_auth),
+        name: str = Form(...),
+        legal_name: str = Form(""),
+        region_id: int = Form(...),
+        address: str = Form(...),
+        city: str = Form(""),
+        comment: str = Form(""),
+        contacts: str = Form(""),
+        form_manager_id: str = Form(""),
+        cover_photo: UploadFile | None = File(None),
+    ):
+        user = await load_web_user(request, session)
+        require_nav(user, "clients")
+        return await _pvc_client_save(
+            request,
+            session,
+            user,
+            name=name,
+            legal_name=legal_name,
+            region_id=region_id,
+            address=address,
+            city=city,
+            comment=comment,
+            contacts=contacts,
+            form_manager_id=form_manager_id,
+            cover_photo=cover_photo,
+            is_potential=False,
+        )
+
+    @app.get("/clients/pvc/potential/new", response_class=HTMLResponse)
+    async def pvc_potential_client_new_page(
+        request: Request,
+        session: AsyncSession = Depends(get_session),
+        dashboard: DashboardService = Depends(dashboard_service),
+        _auth=Depends(require_auth),
+    ):
+        user = await load_web_user(request, session)
+        require_nav(user, "clients")
+        return await _pvc_client_form_page(
+            request, session, dashboard, user, is_potential_form=True
+        )
+
+    @app.post("/clients/pvc/potential/new")
+    async def pvc_potential_client_new_save(
+        request: Request,
+        session: AsyncSession = Depends(get_session),
+        _auth=Depends(require_auth),
+        name: str = Form(...),
+        legal_name: str = Form(""),
+        region_id: int = Form(...),
+        address: str = Form(...),
+        city: str = Form(""),
+        comment: str = Form(""),
+        contacts: str = Form(""),
+        form_manager_id: str = Form(""),
+        cover_photo: UploadFile | None = File(None),
+    ):
+        user = await load_web_user(request, session)
+        require_nav(user, "clients")
+        return await _pvc_client_save(
+            request,
+            session,
+            user,
+            name=name,
+            legal_name=legal_name,
+            region_id=region_id,
+            address=address,
+            city=city,
+            comment=comment,
+            contacts=contacts,
+            form_manager_id=form_manager_id,
+            cover_photo=cover_photo,
+            is_potential=True,
+        )
+
     @app.get("/clients/new", response_class=HTMLResponse)
     async def client_new_page(
         request: Request,
@@ -686,6 +873,8 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
                 user,
                 active_nav="clients",
                 clients_subsection="potential" if client.is_potential else "active",
+                is_pvc_section=client.is_pvc,
+                is_pvc_form=client.is_pvc,
                 client=client,
                 regions=regions,
                 stands=stands,
@@ -727,7 +916,7 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
             raise HTTPException(status_code=404)
         stand_ids = stand_id
         swatch_brand_ids = swatch_brand_id
-        if not stand_ids and not swatch_brand_ids and not (client and client.is_potential):
+        if not stand_ids and not swatch_brand_ids and not (client and (client.is_potential or client.is_pvc)):
             raise HTTPException(
                 status_code=400,
                 detail="Оберіть хоча б один стенд або свотч",
@@ -754,8 +943,8 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
             except StorageError:
                 pass
 
-        is_potential = not (stand_ids or swatch_brand_ids)
-        if is_potential and not client.is_potential:
+        is_potential = client.is_potential if client.is_pvc else not (stand_ids or swatch_brand_ids)
+        if is_potential and not client.is_potential and not client.is_pvc:
             raise HTTPException(
                 status_code=400,
                 detail="Для діючого клієнта потрібен хоча б один стенд або свотч",
@@ -797,6 +986,10 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
             raise HTTPException(status_code=404)
         if not client.is_potential:
             return RedirectResponse(f"/clients/{client_id}", status_code=303)
+        if client.is_pvc:
+            await ClientRepository(session).set_is_potential(client_id, is_potential=False)
+            await session.commit()
+            return RedirectResponse(f"/clients/{client_id}?promoted=1", status_code=303)
         if not client_has_equipment(client):
             return RedirectResponse(
                 f"/clients/{client_id}/edit?need_equipment=1",
@@ -824,14 +1017,15 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
             raise HTTPException(status_code=404)
         if client.is_potential:
             return RedirectResponse(f"/clients/{client_id}", status_code=303)
-        if client_has_equipment(client):
+        if client_has_equipment(client) and not client.is_pvc:
             raise HTTPException(
                 status_code=400,
                 detail="Спочатку зніміть усі стенди та свотчі",
             )
         await ClientRepository(session).set_is_potential(client_id, is_potential=True)
         await session.commit()
-        return RedirectResponse("/clients/potential?demoted=1", status_code=303)
+        dest = "/clients/pvc/potential?demoted=1" if client.is_pvc else "/clients/potential?demoted=1"
+        return RedirectResponse(dest, status_code=303)
 
     @app.post("/clients/{client_id}/delete")
     async def client_delete(

@@ -27,6 +27,18 @@
         {% endfor %}
       </select>
     </label>
+    <div id="work-scope-block" {% if not show_work_scope %}hidden{% endif %}>
+      <fieldset class="stands-picker">
+        <legend>Сфера роботи</legend>
+        <p class="muted client-form-hint">Визначає бази клієнтів і кроки візиту в боті.</p>
+        {% for value, label in work_scope_choices %}
+        <label class="stands-picker__item">
+          <input type="radio" name="work_scope" value="{{ value }}" {% if form_work_scope == value %}checked{% endif %}>
+          {{ label }}
+        </label>
+        {% endfor %}
+      </fieldset>
+    </div>
     <div id="supervisor-block" {% if form_role != 'sales_manager' %}hidden{% endif %}>
       <label>Регіональний менеджер
         <select name="supervisor_id" id="user-supervisor">
@@ -66,12 +78,15 @@
 (function () {
   const roleSel = document.getElementById("user-role");
   const block = document.getElementById("supervisor-block");
+  const scopeBlock = document.getElementById("work-scope-block");
   const supSel = document.getElementById("user-supervisor");
   if (!roleSel || !block) return;
   function sync() {
     const isSales = roleSel.value === "sales_manager";
+    const isManager = roleSel.value === "manager";
     block.hidden = !isSales;
     if (supSel) supSel.required = isSales;
+    if (scopeBlock) scopeBlock.hidden = isSales ? true : !(isManager || {{ 'true' if show_work_scope else 'false' }});
   }
   roleSel.addEventListener("change", sync);
   sync();

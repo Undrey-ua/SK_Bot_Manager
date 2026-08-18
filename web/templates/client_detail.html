@@ -2,7 +2,13 @@
 {% block title %}{{ client.name }} — SK Bot Manager{% endblock %}
 {% block content %}
 <nav class="breadcrumb">
-  {% if client.is_potential %}
+  {% if client.is_pvc %}
+    {% if client.is_potential %}
+  <a href="/clients/pvc/potential">Потенційні ПВХ</a>
+    {% else %}
+  <a href="/clients/pvc">Клієнти ПВХ</a>
+    {% endif %}
+  {% elif client.is_potential %}
   <a href="/clients/potential">Потенційні</a>
   {% else %}
   <a href="/clients">Клієнти</a>
@@ -25,6 +31,9 @@
         {{ client.name }}
         {% if client.is_potential %}
         <span class="badge badge-potential">Потенційний клієнт</span>
+        {% endif %}
+        {% if client.is_pvc %}
+        <span class="badge">ПВХ</span>
         {% endif %}
       </h1>
       {% if client.legal_name %}
@@ -78,6 +87,7 @@
   </div>
 </header>
 
+{% if not client.is_pvc %}
 <section class="detail-section client-sales-section">
   <h2>Продажі</h2>
   <form class="filters filters--compact client-sales-filters" method="get">
@@ -183,6 +193,7 @@
     </table>
   </div>
 </section>
+{% endif %}
 
 <div class="detail-grid client-detail-grid">
   <section class="detail-section meta">

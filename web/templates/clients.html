@@ -1,10 +1,12 @@
 {% extends "base.html" %}
-{% block title %}{% if is_potential_section %}Потенційні клієнти{% else %}Клієнти{% endif %} — SK Bot Manager{% endblock %}
+{% block title %}{% if is_pvc_section %}{% if is_potential_section %}Потенційні клієнти ПВХ{% else %}Клієнти ПВХ{% endif %}{% elif is_potential_section %}Потенційні клієнти{% else %}Клієнти{% endif %} — SK Bot Manager{% endblock %}
 {% block content %}
 <header class="page-header">
-  <h1 class="page-title">{% if is_potential_section %}Потенційні клієнти{% else %}Клієнти{% endif %}</h1>
+  <h1 class="page-title">{% if is_pvc_section %}{% if is_potential_section %}Потенційні клієнти ПВХ{% else %}Клієнти ПВХ{% endif %}{% elif is_potential_section %}Потенційні клієнти{% else %}Клієнти{% endif %}</h1>
   <p class="page-subtitle">
-    {% if is_potential_section %}Торгові точки без стендів і свотчів{% else %}База торгових точок{% endif %}
+    {% if is_pvc_section %}
+      {% if is_potential_section %}Потенційні торгові точки ПВХ{% else %}Окрема база клієнтів ПВХ — лише візити{% endif %}
+    {% elif is_potential_section %}Торгові точки без стендів і свотчів{% else %}База торгових точок{% endif %}
     {% if has_filters %}
     — знайдено {{ clients_total }}
     {% else %}
@@ -17,7 +19,13 @@
 
 {% if not is_leader %}
 <div class="page-actions">
-  {% if is_potential_section %}
+  {% if is_pvc_section %}
+    {% if is_potential_section %}
+  <a href="/clients/pvc/potential/new" class="btn btn-primary">+ Потенційний ПВХ</a>
+    {% else %}
+  <a href="/clients/pvc/new" class="btn btn-primary">+ Клієнт ПВХ</a>
+    {% endif %}
+  {% elif is_potential_section %}
   <a href="/clients/potential/new" class="btn btn-primary">+ Потенційний</a>
   {% else %}
   <a href="/clients/new" class="btn btn-primary">+ Новий клієнт</a>
@@ -57,6 +65,7 @@
       {% endfor %}
     </select>
   </label>
+  {% if not is_pvc_section %}
   <label class="filters__field--stand">
     Стенд
     <select name="stand_id" onchange="this.form.submit()">
@@ -66,6 +75,7 @@
       {% endfor %}
     </select>
   </label>
+  {% endif %}
   {% if has_filters %}
   <a href="{{ list_base_path }}" class="btn btn-secondary btn-sm clients-filters__reset">Скинути</a>
   {% endif %}
@@ -82,7 +92,7 @@
           <th>Область</th>
           <th>Місто</th>
           <th>Адреса</th>
-          <th>Стенди</th>
+          {% if not is_pvc_section %}<th>Стенди</th>{% endif %}
           <th></th>
         </tr>
       </thead>
@@ -95,12 +105,12 @@
           <td>{{ client.region.name if client.region else '—' }}</td>
           <td>{{ client_city(client) }}</td>
           <td>{{ client.address }}</td>
-          <td>{{ client_stands(client) }}</td>
+          {% if not is_pvc_section %}<td>{{ client_stands(client) }}</td>{% endif %}
           <td><a class="btn-ghost" href="/clients/{{ client.id }}">Картка →</a></td>
         </tr>
         {% else %}
         <tr class="empty-row">
-          <td colspan="{% if can_filter_managers %}8{% else %}7{% endif %}">
+          <td colspan="{% if can_filter_managers %}{% if is_pvc_section %}7{% else %}8{% endif %}{% else %}{% if is_pvc_section %}6{% else %}7{% endif %}{% endif %}">
             {% if has_filters %}
             {% if is_potential_section %}Потенційних клієнтів за обраними фільтрами не знайдено{% else %}Клієнтів за обраними фільтрами не знайдено{% endif %}
             {% else %}

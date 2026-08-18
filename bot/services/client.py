@@ -8,8 +8,13 @@ class ClientService:
     def __init__(self, repo: ClientRepository) -> None:
         self._repo = repo
 
-    async def list_by_manager(self, manager_id: int) -> list[Client]:
-        return await self._repo.list_by_manager(manager_id)
+    async def list_by_manager(
+        self,
+        manager_id: int,
+        *,
+        is_pvc: bool | None = False,
+    ) -> list[Client]:
+        return await self._repo.list_by_manager(manager_id, is_pvc=is_pvc)
 
     async def list_by_manager_and_region(
         self,
@@ -18,12 +23,27 @@ class ClientService:
         *,
         exclude_potential: bool = False,
         potential_only: bool = False,
+        is_pvc: bool | None = False,
+        city: str | None = None,
     ) -> list[Client]:
         return await self._repo.list_by_manager_and_region(
             manager_id,
             region_id,
             exclude_potential=exclude_potential,
             potential_only=potential_only,
+            is_pvc=is_pvc,
+            city=city,
+        )
+
+    async def list_cities_for_region(
+        self,
+        manager_id: int,
+        region_id: int,
+        *,
+        is_pvc: bool | None = None,
+    ) -> list[str]:
+        return await self._repo.list_cities_for_region(
+            manager_id, region_id, is_pvc=is_pvc
         )
 
     async def create_potential(
@@ -34,16 +54,20 @@ class ClientService:
         address: str,
         *,
         photo_url: str | None = None,
+        city: str | None = None,
+        is_pvc: bool = False,
     ) -> Client:
         return await self._repo.create(
             manager_id=manager_id,
             region_id=region_id,
             name=name,
             address=address,
+            city=city,
             comment=None,
             stand_ids=[],
             photo_url=photo_url,
             is_potential=True,
+            is_pvc=is_pvc,
         )
 
     async def get_by_id(self, client_id: int) -> Client | None:

@@ -27,6 +27,7 @@
           <th>ПІБ</th>
           <th>Telegram ID</th>
           <th>Роль</th>
+          <th>Сфера</th>
           <th>Менеджер зі збуту</th>
         </tr>
       </thead>
@@ -36,6 +37,13 @@
           <td><strong>{{ u.name }}</strong></td>
           <td><code>{{ u.telegram_id }}</code></td>
           <td>{{ user_roles_display(u) }}</td>
+          <td>
+            {% if is_regional_manager(u) %}
+            {{ work_scope_label(u.work_scope) }}
+            {% else %}
+            <span class="muted">—</span>
+            {% endif %}
+          </td>
           <td>
             {% if u.role == 'sales_manager' and u.supervisor %}
             <span class="muted">Регіональний:</span> {{ u.supervisor.name }}
@@ -55,7 +63,7 @@
           </td>
         </tr>
         {% else %}
-        <tr class="empty-row"><td colspan="5">Немає користувачів</td></tr>
+        <tr class="empty-row"><td colspan="6">Немає користувачів</td></tr>
         {% endfor %}
       </tbody>
     </table>

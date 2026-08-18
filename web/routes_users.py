@@ -6,6 +6,12 @@ from fastapi import Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config.work_scope import (
+    WORK_SCOPE_CHOICES,
+    WORK_SCOPE_DEFAULT,
+    needs_work_scope,
+    normalize_work_scope,
+)
 from database.models import User, UserRole
 from database.repositories.user import UserRepository
 from web.auth import require_admin
@@ -26,13 +32,20 @@ def _parse_user_form(
     telegram_id: str,
     role: str,
     supervisor_id: str,
-) -> tuple[int, str, str, int | None]:
+    work_scope: str = "",
+) -> tuple[int, str, str, int | None, str]:
     try:
         tg = int(telegram_id.strip())
     except ValueError:
         tg = -1
     sup_id = int(supervisor_id.strip()) if supervisor_id.strip().isdigit() else None
-    return tg, name, role.strip(), sup_id
+    return tg, name, role.strip(), sup_id, normalize_work_scope(work_scope or None)
+
+
+def _resolved_work_scope(*, role: str, work_scope: str) -> str | None:
+    if needs_work_scope(None, role=role):
+        return work_scope
+    return WORK_SCOPE_DEFAULT
 
 
 def register_user_routes(app, *, templates, get_session, require_auth, dashboard_service):
@@ -46,6 +59,7 @@ def register_user_routes(app, *, templates, get_session, require_auth, dashboard
         form_telegram_id: str,
         form_role: str,
         form_supervisor_id: int | None,
+        form_work_scope: str,
         error: str | None,
         acting_user: User,
     ) -> dict:
@@ -74,6 +88,9 @@ def register_user_routes(app, *, templates, get_session, require_auth, dashboard
             form_telegram_id=form_telegram_id,
             form_role=form_role,
             form_supervisor_id=form_supervisor_id,
+            form_work_scope=form_work_scope,
+            work_scope_choices=WORK_SCOPE_CHOICES,
+            show_work_scope=needs_work_scope(edit_user, role=form_role),
             error=error,
             delete_blocked=delete_blocked,
         )
@@ -124,6 +141,7 @@ def register_user_routes(app, *, templates, get_session, require_auth, dashboard
                 form_telegram_id="",
                 form_role=UserRole.MANAGER.value,
                 form_supervisor_id=None,
+                form_work_scope=WORK_SCOPE_DEFAULT,
                 error=None,
                 acting_user=user,
             ),
@@ -139,16 +157,18 @@ def register_user_routes(app, *, templates, get_session, require_auth, dashboard
         telegram_id: str = Form(...),
         role: str = Form(...),
         supervisor_id: str = Form(""),
+        work_scope: str = Form(""),
     ):
         user = await load_web_user(request, session)
         require_admin(user)
         repo = UserRepository(session)
         regional = await dashboard.list_managers()
-        tg, name_s, role_s, sup_id = _parse_user_form(
+        tg, name_s, role_s, sup_id, scope = _parse_user_form(
             name=name,
             telegram_id=telegram_id,
             role=role,
             supervisor_id=supervisor_id,
+            work_scope=work_scope,
         )
         err = await validate_new_user(
             repo,
@@ -171,6 +191,7 @@ def register_user_routes(app, *, templates, get_session, require_auth, dashboard
                     form_telegram_id=telegram_id.strip(),
                     form_role=role_s,
                     form_supervisor_id=sup_id,
+                    form_work_scope=scope,
                     error=err,
                     acting_user=user,
                 ),
@@ -182,6 +203,7 @@ def register_user_routes(app, *, templates, get_session, require_auth, dashboard
             name=name_s,
             role=role_s,
             supervisor_id=sup_id if role_s == UserRole.SALES_MANAGER.value else None,
+            work_scope=_resolved_work_scope(role=role_s, work_scope=scope),
         )
         await session.commit()
         return RedirectResponse("/admin/users?created=1", status_code=303)
@@ -211,6 +233,7 @@ def register_user_routes(app, *, templates, get_session, require_auth, dashboard
                 form_telegram_id=str(target.telegram_id),
                 form_role=target.role,
                 form_supervisor_id=target.supervisor_id,
+                form_work_scope=normalize_work_scope(getattr(target, "work_scope", None)),
                 error=None,
                 acting_user=user,
             ),
@@ -227,6 +250,7 @@ def register_user_routes(app, *, templates, get_session, require_auth, dashboard
         telegram_id: str = Form(...),
         role: str = Form(...),
         supervisor_id: str = Form(""),
+        work_scope: str = Form(""),
     ):
         user = await load_web_user(request, session)
         require_admin(user)
@@ -235,11 +259,12 @@ def register_user_routes(app, *, templates, get_session, require_auth, dashboard
         if target is None:
             raise HTTPException(status_code=404, detail="Користувача не знайдено")
         regional = await dashboard.list_managers()
-        tg, name_s, role_s, sup_id = _parse_user_form(
+        tg, name_s, role_s, sup_id, scope = _parse_user_form(
             name=name,
             telegram_id=telegram_id,
             role=role,
             supervisor_id=supervisor_id,
+            work_scope=work_scope,
         )
         err = await validate_update_user(
             repo,
@@ -263,18 +288,21 @@ def register_user_routes(app, *, templates, get_session, require_auth, dashboard
                     form_telegram_id=telegram_id.strip(),
                     form_role=role_s,
                     form_supervisor_id=sup_id,
+                    form_work_scope=scope,
                     error=err,
                     acting_user=user,
                 ),
                 status_code=400,
             )
 
+        resolved_scope = scope if needs_work_scope(target, role=role_s) else None
         await repo.update(
             target,
             name=name_s,
             telegram_id=tg,
             role=role_s,
             supervisor_id=sup_id,
+            work_scope=resolved_scope,
         )
         await session.commit()
         return RedirectResponse("/admin/users?updated=1", status_code=303)
@@ -310,6 +338,9 @@ def register_user_routes(app, *, templates, get_session, require_auth, dashboard
                     form_telegram_id=str(target.telegram_id),
                     form_role=target.role,
                     form_supervisor_id=target.supervisor_id,
+                    form_work_scope=normalize_work_scope(
+                        getattr(target, "work_scope", None)
+                    ),
                     error=err,
                     acting_user=user,
                 ),
