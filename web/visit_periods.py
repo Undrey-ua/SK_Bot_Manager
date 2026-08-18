@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
+from database.models import VISIT_TYPE_LABELS, VisitType
+
 KYIV = ZoneInfo("Europe/Kyiv")
 
 
@@ -64,6 +66,27 @@ class VisitPeriodFilter:
     filename: str
 
 
+def parse_visit_type_filter(raw: str | None) -> str | None:
+    if raw in {VisitType.PVH.value, VisitType.STAND.value}:
+        return raw
+    return None
+
+
+def visits_title_with_type(title: str, visit_type: str | None) -> str:
+    if visit_type is None:
+        return title
+    label = VISIT_TYPE_LABELS[VisitType(visit_type)]
+    if title == "Візити":
+        return f"Візити — {label}"
+    return f"{title} · {label}"
+
+
+def visits_filename_with_type(filename: str, visit_type: str | None) -> str:
+    if visit_type is None:
+        return filename
+    return filename.removesuffix(".pdf") + f"-{visit_type}.pdf"
+
+
 def parse_visit_period(*, period: str | None, week: int | None) -> VisitPeriodFilter:
     now = now_kyiv()
     iso_year, current_week = current_iso_week(now)
@@ -112,6 +135,7 @@ def parse_visit_period(*, period: str | None, week: int | None) -> VisitPeriodFi
 def visits_page_query(
     *,
     manager_id: int | None = None,
+    visit_type: str | None = None,
     period: str | None = None,
     week: int | None = None,
     page: int | None = None,
@@ -119,6 +143,8 @@ def visits_page_query(
     parts: list[str] = []
     if manager_id is not None:
         parts.append(f"manager_id={manager_id}")
+    if visit_type in {VisitType.PVH.value, VisitType.STAND.value}:
+        parts.append(f"visit_type={visit_type}")
     if period == "today":
         parts.append("period=today")
     elif week is not None:

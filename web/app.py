@@ -47,7 +47,14 @@ from web.client_sales_periods import (
     resolve_client_sales_period,
 )
 from web.clients_pdf import build_clients_pdf, clients_pdf_filename
-from web.visit_periods import parse_visit_period, visits_page_query, week_options
+from web.visit_periods import (
+    parse_visit_period,
+    parse_visit_type_filter,
+    visits_filename_with_type,
+    visits_page_query,
+    visits_title_with_type,
+    week_options,
+)
 from web.visits_pdf import (
     build_visit_detail_pdf,
     build_visits_pdf,
@@ -267,18 +274,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return RedirectResponse("/analytics?section=sales", status_code=303)
         require_nav(user, "visits")
         manager_id = scoped_manager_filter(user, query_int(request, "manager_id"))
+        visit_type = parse_visit_type_filter(query_str(request, "visit_type"))
         period_filter = parse_visit_period(
             period=query_str(request, "period"),
             week=query_int(request, "week"),
         )
         visits, total, page, total_pages = await service.list_visits(
             manager_id=manager_id,
+            visit_type=visit_type,
             start_at=period_filter.start_at,
             end_at=period_filter.end_at,
             page=page,
         )
         pdf_qs = visits_page_query(
             manager_id=manager_id,
+            visit_type=visit_type,
             period=period_filter.period,
             week=period_filter.week,
         )
@@ -291,8 +301,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 active_nav="visits",
                 visits=visits,
                 managers=await service.list_managers() if can_filter_managers(user) else [],
-                stats=await service.visit_stats(manager_id=manager_id),
+                stats=await service.visit_stats(
+                    manager_id=manager_id, visit_type=visit_type
+                ),
                 selected_manager_id=manager_id,
+                selected_visit_type=visit_type,
                 selected_period=period_filter.period,
                 selected_week=period_filter.week,
                 week_choices=week_options(
@@ -315,24 +328,28 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         user = await load_web_user(request, session)
         require_nav(user, "visits")
         manager_id = scoped_manager_filter(user, query_int(request, "manager_id"))
+        visit_type = parse_visit_type_filter(query_str(request, "visit_type"))
         period_filter = parse_visit_period(
             period=query_str(request, "period"),
             week=query_int(request, "week"),
         )
         visits = await service.list_visits_export(
             manager_id=manager_id,
+            visit_type=visit_type,
             start_at=period_filter.start_at,
             end_at=period_filter.end_at,
         )
         try:
             pdf_bytes = build_visits_pdf(
-                title=period_filter.title,
+                title=visits_title_with_type(period_filter.title, visit_type),
                 visits=visits,
                 show_manager=can_filter_managers(user),
             )
         except FileNotFoundError as e:
             raise HTTPException(status_code=500, detail=str(e)) from e
-        return _pdf_attachment(pdf_bytes, period_filter.filename)
+        return _pdf_attachment(
+            pdf_bytes, visits_filename_with_type(period_filter.filename, visit_type)
+        )
 
     @app.get("/visits/{visit_id}", response_class=HTMLResponse)
     async def visit_detail(

@@ -69,11 +69,15 @@ class DashboardService:
         manager_id: int | None = None,
         start_at: datetime | None = None,
         end_at: datetime | None = None,
+        visit_type: str | None = None,
         page: int = 1,
         per_page: int = 30,
     ) -> tuple[list[Visit], int, int, int]:
         total = await self._visits.count(
-            manager_id=manager_id, start_at=start_at, end_at=end_at
+            manager_id=manager_id,
+            start_at=start_at,
+            end_at=end_at,
+            visit_type=visit_type,
         )
         total_pages = max(1, (total + per_page - 1) // per_page)
         page = max(1, min(page, total_pages))
@@ -82,6 +86,7 @@ class DashboardService:
             manager_id=manager_id,
             start_at=start_at,
             end_at=end_at,
+            visit_type=visit_type,
             limit=per_page,
             offset=offset,
         )
@@ -93,11 +98,13 @@ class DashboardService:
         manager_id: int | None = None,
         start_at: datetime | None = None,
         end_at: datetime | None = None,
+        visit_type: str | None = None,
     ) -> list[Visit]:
         return await self._visits.list_recent(
             manager_id=manager_id,
             start_at=start_at,
             end_at=end_at,
+            visit_type=visit_type,
             limit=None,
         )
 
@@ -226,7 +233,12 @@ class DashboardService:
             for name, qty in sorted(totals.items(), key=lambda x: x[1], reverse=True)
         ]
 
-    async def visit_stats(self, *, manager_id: int | None = None) -> VisitStats:
+    async def visit_stats(
+        self,
+        *,
+        manager_id: int | None = None,
+        visit_type: str | None = None,
+    ) -> VisitStats:
         now = now_kyiv()
         start_of_day, _ = today_range(now)
         iso_year, week_number = current_iso_week(now)
@@ -235,6 +247,7 @@ class DashboardService:
             start_of_day=start_of_day,
             start_of_week=start_of_week,
             manager_id=manager_id,
+            visit_type=visit_type,
         )
         return VisitStats(
             total=total, today=today, week=week, week_number=week_number

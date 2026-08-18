@@ -21,6 +21,7 @@ class VisitRepository(BaseRepository):
         client_id: int | None = None,
         start_at: datetime | None = None,
         end_at: datetime | None = None,
+        visit_type: str | None = None,
     ):
         stmt = select(Visit).options(
             selectinload(Visit.manager),
@@ -36,6 +37,8 @@ class VisitRepository(BaseRepository):
             stmt = stmt.where(Visit.created_at >= start_at)
         if end_at is not None:
             stmt = stmt.where(Visit.created_at < end_at)
+        if visit_type is not None:
+            stmt = stmt.where(Visit.visit_type == visit_type)
         return stmt.order_by(Visit.created_at.desc())
 
     async def list_recent(
@@ -45,6 +48,7 @@ class VisitRepository(BaseRepository):
         client_id: int | None = None,
         start_at: datetime | None = None,
         end_at: datetime | None = None,
+        visit_type: str | None = None,
         limit: int | None = 50,
         offset: int = 0,
     ) -> list[Visit]:
@@ -53,6 +57,7 @@ class VisitRepository(BaseRepository):
             client_id=client_id,
             start_at=start_at,
             end_at=end_at,
+            visit_type=visit_type,
         )
         if limit is not None:
             stmt = stmt.limit(limit).offset(offset)
@@ -75,6 +80,7 @@ class VisitRepository(BaseRepository):
         manager_id: int | None = None,
         start_at: datetime | None = None,
         end_at: datetime | None = None,
+        visit_type: str | None = None,
     ) -> int:
         stmt = select(func.count()).select_from(Visit)
         if manager_id is not None:
@@ -83,6 +89,8 @@ class VisitRepository(BaseRepository):
             stmt = stmt.where(Visit.created_at >= start_at)
         if end_at is not None:
             stmt = stmt.where(Visit.created_at < end_at)
+        if visit_type is not None:
+            stmt = stmt.where(Visit.visit_type == visit_type)
         result = await self._session.execute(stmt)
         return int(result.scalar_one())
 
@@ -92,6 +100,7 @@ class VisitRepository(BaseRepository):
         start_of_day,
         start_of_week,
         manager_id: int | None = None,
+        visit_type: str | None = None,
     ) -> tuple[int, int, int]:
         """total, today, week — один запит до БД."""
         stmt = select(
@@ -101,6 +110,8 @@ class VisitRepository(BaseRepository):
         ).select_from(Visit)
         if manager_id is not None:
             stmt = stmt.where(Visit.manager_id == manager_id)
+        if visit_type is not None:
+            stmt = stmt.where(Visit.visit_type == visit_type)
         result = await self._session.execute(stmt)
         total, today, week = result.one()
         return int(total), int(today), int(week)

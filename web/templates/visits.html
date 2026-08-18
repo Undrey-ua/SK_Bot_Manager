@@ -3,23 +3,23 @@
 {% block content %}
 <header class="page-header">
   <h1 class="page-title">{% if can_filter_managers %}Візити менеджерів{% else %}Мої візити{% endif %}</h1>
-  <p class="page-subtitle">{% if can_filter_managers %}Останні звіти з полів — фільтруйте за менеджером і тижнем{% else %}Останні звіти з полів{% endif %}</p>
+  <p class="page-subtitle">{% if can_filter_managers %}Останні звіти з полів — фільтруйте за менеджером, типом і тижнем{% else %}Останні звіти з полів{% endif %}</p>
 </header>
 
 <nav class="stats" aria-label="Фільтр за періодом">
-  <a href="/{{ visits_page_query(manager_id=selected_manager_id) }}"
+  <a href="/{{ visits_page_query(manager_id=selected_manager_id, visit_type=selected_visit_type) }}"
      class="stat-card stat-card--filter{% if not selected_period and not selected_week %} stat-card--selected{% endif %}"
      aria-current="{% if not selected_period and not selected_week %}true{% else %}false{% endif %}">
     <div class="label">Всього</div>
     <div class="value">{{ stats.total }}</div>
   </a>
-  <a href="/{{ visits_page_query(manager_id=selected_manager_id, period='today') }}"
+  <a href="/{{ visits_page_query(manager_id=selected_manager_id, visit_type=selected_visit_type, period='today') }}"
      class="stat-card stat-card--filter stat-card--today{% if selected_period == 'today' %} stat-card--selected{% endif %}"
      aria-current="{% if selected_period == 'today' %}true{% else %}false{% endif %}">
     <div class="label">Сьогодні</div>
     <div class="value">{{ stats.today }}</div>
   </a>
-  <a href="/{{ visits_page_query(manager_id=selected_manager_id, week=stats.week_number) }}"
+  <a href="/{{ visits_page_query(manager_id=selected_manager_id, visit_type=selected_visit_type, week=stats.week_number) }}"
      class="stat-card stat-card--filter stat-card--week{% if selected_week == stats.week_number %} stat-card--selected{% endif %}"
      aria-current="{% if selected_week == stats.week_number %}true{% else %}false{% endif %}">
     <div class="label">Цього тижня</div>
@@ -42,6 +42,14 @@
     </select>
   </label>
   {% endif %}
+  <label class="filters__field--visit-type">
+    Тип візиту
+    <select name="visit_type">
+      <option value="" {% if not selected_visit_type %}selected{% endif %}>Усі</option>
+      <option value="pvh" {% if selected_visit_type == 'pvh' %}selected{% endif %}>ПВХ</option>
+      <option value="stand" {% if selected_visit_type == 'stand' %}selected{% endif %}>Стенд</option>
+    </select>
+  </label>
   <label>
     Тиждень
     <select name="week">
@@ -56,11 +64,11 @@
   {% endif %}
   <div class="filters__apply">
     <button type="submit" class="btn btn-primary btn-sm">Оновити</button>
-    {% if selected_period or selected_week or (can_filter_managers and selected_manager_id) %}
+    {% if selected_period or selected_week or selected_visit_type or (can_filter_managers and selected_manager_id) %}
     <a href="/" class="btn btn-secondary btn-sm clients-filters__reset">Скинути</a>
     {% endif %}
   </div>
-  <a class="btn btn-secondary btn-sm filters__pdf" href="{{ visits_pdf_url }}" target="_blank" rel="noopener">Завантажити PDF</a>
+  <a class="btn btn-secondary filters__pdf" href="{{ visits_pdf_url }}" target="_blank" rel="noopener">Завантажити PDF</a>
 </form>
 
 <div class="card">
@@ -106,7 +114,7 @@
         {% else %}
         <tr class="empty-row">
           <td colspan="{% if can_filter_managers %}8{% else %}7{% endif %}">
-            {% if selected_period or selected_week %}Візитів за обраний період немає{% else %}Візитів ще немає{% endif %}
+            {% if selected_period or selected_week or selected_visit_type %}Візитів за обраними фільтрами немає{% else %}Візитів ще немає{% endif %}
           </td>
         </tr>
         {% endfor %}
@@ -118,11 +126,11 @@
 {% if total_pages > 1 %}
 <nav class="pagination">
   {% if page > 1 %}
-  <a href="/{{ visits_page_query(manager_id=selected_manager_id, period=selected_period, week=selected_week, page=page - 1) }}">←</a>
+  <a href="/{{ visits_page_query(manager_id=selected_manager_id, visit_type=selected_visit_type, period=selected_period, week=selected_week, page=page - 1) }}">←</a>
   {% endif %}
   <span class="current">{{ page }} / {{ total_pages }}</span>
   {% if page < total_pages %}
-  <a href="/{{ visits_page_query(manager_id=selected_manager_id, period=selected_period, week=selected_week, page=page + 1) }}">→</a>
+  <a href="/{{ visits_page_query(manager_id=selected_manager_id, visit_type=selected_visit_type, period=selected_period, week=selected_week, page=page + 1) }}">→</a>
   {% endif %}
 </nav>
 {% endif %}

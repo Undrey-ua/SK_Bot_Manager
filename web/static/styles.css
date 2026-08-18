@@ -909,7 +909,13 @@ form.filters:has(.filters__field--region) {
 .filters__pdf {
   margin-left: auto;
   align-self: flex-end;
-  margin-bottom: 0.1rem;
+  padding: 0.62rem 1.25rem;
+  font-size: 0.9rem;
+}
+
+.visits-filters .filters__field--visit-type select {
+  min-width: 8rem;
+  max-width: 11rem;
 }
 
 /* ——— Panelled filter sections (analytics) ——— */
