@@ -946,7 +946,6 @@ form.filters:has(.filters__field--region) {
   flex-wrap: nowrap;
   align-items: flex-end;
   gap: 0.5rem;
-  margin-left: auto;
   flex: 0 0 auto;
 }
 
@@ -955,7 +954,7 @@ form.filters:has(.filters__field--region) {
 }
 
 .visits-filters .filters__pdf {
-  margin-left: 0;
+  margin-left: auto;
   margin-bottom: 0;
   padding: 0.55rem 1rem;
   font-size: 0.875rem;
