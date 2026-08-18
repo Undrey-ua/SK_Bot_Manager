@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from aiogram import Bot, F, Router
@@ -26,6 +27,28 @@ from visit_task_labels import visit_task_label
 
 logger = logging.getLogger(__name__)
 router = Router(name="visit")
+
+_potential_create_locks: dict[int, asyncio.Lock] = {}
+_potential_create_locks_guard = asyncio.Lock()
+
+
+async def _claim_potential_client_create(manager_id: int, state: FSMContext) -> bool:
+    """Лише один апдейт створює потенційного клієнта (альбом / кілька фото)."""
+    async with _potential_create_locks_guard:
+        lock = _potential_create_locks.get(manager_id)
+        if lock is None:
+            lock = asyncio.Lock()
+            _potential_create_locks[manager_id] = lock
+    async with lock:
+        data = await state.get_data()
+        if data.get("client_id") or data.get("potential_creating"):
+            return False
+        await state.update_data(potential_creating=True)
+        return True
+
+
+async def _release_potential_client_create(state: FSMContext) -> None:
+    await state.update_data(potential_creating=False)
 
 
 async def _active_task_choices(
@@ -199,7 +222,11 @@ async def start_potential_client(
     await callback.answer()
     if callback.message is None:
         return
-    await state.update_data(potential_photo_url=None)
+    await state.update_data(
+        potential_photo_url=None,
+        potential_creating=False,
+        is_potential=True,
+    )
     await state.set_state(VisitStates.potential_name)
     await callback.message.edit_text(
         "⭐ <b>Потенційний клієнт</b>\n\nВведіть назву магазину:",
@@ -232,24 +259,12 @@ async def potential_address(message: Message, state: FSMContext) -> None:
     )
 
 
-async def _finish_potential_and_select_type(
+async def _show_potential_visit_type(
     target: CallbackQuery | Message,
-    state: FSMContext,
-    db_user: User,
-    client_service: ClientService,
+    client_name: str,
 ) -> None:
-    data = await state.get_data()
-    client = await client_service.create_potential(
-        manager_id=db_user.id,
-        region_id=int(data["region_id"]),
-        name=data["potential_name"],
-        address=data["potential_address"],
-        photo_url=data.get("potential_photo_url"),
-    )
-    await state.update_data(client_id=client.id, client_name=client.name)
-    await state.set_state(VisitStates.select_visit_type)
     text = (
-        f"⭐ Потенційний клієнт: <b>{client.name}</b>\n\n"
+        f"⭐ Потенційний клієнт: <b>{client_name}</b>\n\n"
         "Оберіть тип візиту:"
     )
     markup = visit_type_keyboard()
@@ -258,6 +273,45 @@ async def _finish_potential_and_select_type(
             await target.message.edit_text(text, reply_markup=markup)
     else:
         await target.answer(text, reply_markup=markup)
+
+
+async def _finish_potential_and_select_type(
+    target: CallbackQuery | Message,
+    state: FSMContext,
+    db_user: User,
+    client_service: ClientService,
+) -> None:
+    data = await state.get_data()
+    if data.get("client_id"):
+        return
+
+    try:
+        client = await client_service.create_potential(
+            manager_id=db_user.id,
+            region_id=int(data["region_id"]),
+            name=data["potential_name"],
+            address=data["potential_address"],
+            photo_url=data.get("potential_photo_url"),
+        )
+    except Exception:
+        await _release_potential_client_create(state)
+        logger.exception("Failed to create potential client for manager %s", db_user.id)
+        error_text = "Не вдалося зберегти клієнта. Спробуйте ще раз."
+        if isinstance(target, CallbackQuery):
+            if target.message:
+                await target.message.answer(error_text)
+        else:
+            await target.answer(error_text)
+        return
+
+    await state.update_data(
+        client_id=client.id,
+        client_name=client.name,
+        is_potential=True,
+        potential_creating=True,
+    )
+    await state.set_state(VisitStates.select_visit_type)
+    await _show_potential_visit_type(target, client.name)
 
 
 @router.message(VisitStates.potential_photo, F.photo)
@@ -269,21 +323,32 @@ async def potential_photo(
     client_service: ClientService,
     storage_service: StorageService,
 ) -> None:
-    photo = message.photo[-1]
-    file = await bot.get_file(photo.file_id)
-    if file.file_path is None:
-        await message.answer("Не вдалося завантажити фото. Спробуйте ще раз.")
+    if not await _claim_potential_client_create(db_user.id, state):
         return
-    buffer = await bot.download_file(file.file_path)
-    if buffer is None:
+
+    try:
+        photo = message.photo[-1]
+        file = await bot.get_file(photo.file_id)
+        if file.file_path is None:
+            await message.answer("Не вдалося завантажити фото. Спробуйте ще раз.")
+            return
+        buffer = await bot.download_file(file.file_path)
+        if buffer is None:
+            await message.answer("Не вдалося завантажити фото. Спробуйте ще раз.")
+            return
+        extension = file.file_path.rsplit(".", 1)[-1] if "." in file.file_path else "jpg"
+        url = await storage_service.upload_photo(buffer.read(), extension=extension)
+        await state.update_data(potential_photo_url=url)
+        await _finish_potential_and_select_type(
+            message, state, db_user, client_service
+        )
+    except Exception:
+        logger.exception("Failed to upload potential client photo")
         await message.answer("Не вдалося завантажити фото. Спробуйте ще раз.")
-        return
-    extension = file.file_path.rsplit(".", 1)[-1] if "." in file.file_path else "jpg"
-    url = await storage_service.upload_photo(buffer.read(), extension=extension)
-    await state.update_data(potential_photo_url=url)
-    await _finish_potential_and_select_type(
-        message, state, db_user, client_service
-    )
+    finally:
+        data = await state.get_data()
+        if not data.get("client_id"):
+            await _release_potential_client_create(state)
 
 
 @router.callback_query(
@@ -299,9 +364,16 @@ async def potential_skip_photo(
     await callback.answer()
     if callback.message is None:
         return
-    await _finish_potential_and_select_type(
-        callback, state, db_user, client_service
-    )
+    if not await _claim_potential_client_create(db_user.id, state):
+        return
+    try:
+        await _finish_potential_and_select_type(
+            callback, state, db_user, client_service
+        )
+    finally:
+        data = await state.get_data()
+        if not data.get("client_id"):
+            await _release_potential_client_create(state)
 
 
 @router.callback_query(
@@ -328,7 +400,11 @@ async def select_client(
         await callback.answer("Клієнт не знайдений", show_alert=True)
         return
 
-    await state.update_data(client_id=client_id, client_name=client.name)
+    await state.update_data(
+        client_id=client_id,
+        client_name=client.name,
+        is_potential=client.is_potential,
+    )
     await state.set_state(VisitStates.select_visit_type)
     prefix = "⭐ Потенційний клієнт" if client.is_potential else "Клієнт"
     await callback.message.edit_text(
@@ -350,6 +426,18 @@ async def select_visit_type(
     if callback.message is None:
         return
 
+    visit_type = callback.data.split(":")[-1]
+    data = await state.get_data()
+    await state.update_data(visit_type=visit_type, selected_tasks=[])
+
+    if data.get("is_potential"):
+        await state.set_state(VisitStates.enter_comment)
+        await callback.message.edit_text(
+            f"Тип: <b>{VISIT_TYPE_LABELS[VisitType(visit_type)]}</b>\n\n"
+            "Введіть коментар до візиту (або «-» щоб пропустити):",
+        )
+        return
+
     task_choices = await _active_task_choices(visit_task_type_service)
     if not task_choices:
         await callback.answer(
@@ -358,8 +446,6 @@ async def select_visit_type(
         )
         return
 
-    visit_type = callback.data.split(":")[-1]
-    await state.update_data(visit_type=visit_type, selected_tasks=[])
     await state.set_state(VisitStates.select_tasks)
     await callback.message.edit_text(
         f"Тип: <b>{VISIT_TYPE_LABELS[VisitType(visit_type)]}</b>\n\n"
@@ -479,7 +565,7 @@ async def finish_visit(
     selected_tasks = await visit_task_type_service.filter_known_tasks(
         data.get("selected_tasks", [])
     )
-    if not selected_tasks:
+    if not selected_tasks and not data.get("is_potential"):
         await callback.answer("Оберіть хоча б одну задачу", show_alert=True)
         return
 
@@ -594,8 +680,13 @@ async def back_to_comment(callback: CallbackQuery, state: FSMContext) -> None:
     if callback.message is None:
         return
     data = await state.get_data()
-    selected: list[str] = data.get("selected_tasks", [])
     await state.set_state(VisitStates.enter_comment)
+    if data.get("is_potential"):
+        await callback.message.edit_text(
+            "Введіть коментар до візиту (або «-» щоб пропустити):",
+        )
+        return
+    selected: list[str] = data.get("selected_tasks", [])
     await callback.message.edit_text(
         f"Задачі: {_tasks_text(selected)}\n\n"
         "Введіть коментар до візиту (або «-» щоб пропустити):",
