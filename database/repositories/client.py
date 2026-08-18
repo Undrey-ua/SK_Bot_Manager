@@ -174,7 +174,7 @@ class ClientRepository(BaseRepository):
         stand_id: int | None = None,
         is_potential: bool | None = None,
         is_pvc: bool | None = False,
-        limit: int = 50,
+        limit: int | None = 50,
         offset: int = 0,
     ) -> list[Client]:
         stmt = self._apply_filters(
@@ -188,7 +188,9 @@ class ClientRepository(BaseRepository):
             is_potential=is_potential,
             is_pvc=is_pvc,
         )
-        result = await self._session.execute(stmt.limit(limit).offset(offset))
+        if limit is not None:
+            stmt = stmt.limit(limit).offset(offset)
+        result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
     async def list_for_filter_options(

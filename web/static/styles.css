@@ -3390,6 +3390,10 @@ form.filters.filters--panelled:has(.filters__field--region) {
   gap: 1rem;
 }
 
+.page-header--row > .page-actions {
+  margin-bottom: 0;
+}
+
 .page-actions,
 .stands-actions,
 .sales-actions {

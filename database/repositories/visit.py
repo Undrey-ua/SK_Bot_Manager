@@ -14,7 +14,14 @@ class VisitRepository(BaseRepository):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session)
 
-    def _list_query(self, *, manager_id: int | None = None, client_id: int | None = None):
+    def _list_query(
+        self,
+        *,
+        manager_id: int | None = None,
+        client_id: int | None = None,
+        start_at: datetime | None = None,
+        end_at: datetime | None = None,
+    ):
         stmt = select(Visit).options(
             selectinload(Visit.manager),
             selectinload(Visit.client).selectinload(Client.region),
@@ -25,6 +32,10 @@ class VisitRepository(BaseRepository):
             stmt = stmt.where(Visit.manager_id == manager_id)
         if client_id is not None:
             stmt = stmt.where(Visit.client_id == client_id)
+        if start_at is not None:
+            stmt = stmt.where(Visit.created_at >= start_at)
+        if end_at is not None:
+            stmt = stmt.where(Visit.created_at < end_at)
         return stmt.order_by(Visit.created_at.desc())
 
     async def list_recent(
@@ -32,14 +43,20 @@ class VisitRepository(BaseRepository):
         *,
         manager_id: int | None = None,
         client_id: int | None = None,
-        limit: int = 50,
+        start_at: datetime | None = None,
+        end_at: datetime | None = None,
+        limit: int | None = 50,
         offset: int = 0,
     ) -> list[Visit]:
-        result = await self._session.execute(
-            self._list_query(manager_id=manager_id, client_id=client_id)
-            .limit(limit)
-            .offset(offset)
+        stmt = self._list_query(
+            manager_id=manager_id,
+            client_id=client_id,
+            start_at=start_at,
+            end_at=end_at,
         )
+        if limit is not None:
+            stmt = stmt.limit(limit).offset(offset)
+        result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
     async def list_by_client(self, client_id: int) -> list[Visit]:
@@ -52,10 +69,20 @@ class VisitRepository(BaseRepository):
         )
         return int(result.scalar_one())
 
-    async def count(self, *, manager_id: int | None = None) -> int:
+    async def count(
+        self,
+        *,
+        manager_id: int | None = None,
+        start_at: datetime | None = None,
+        end_at: datetime | None = None,
+    ) -> int:
         stmt = select(func.count()).select_from(Visit)
         if manager_id is not None:
             stmt = stmt.where(Visit.manager_id == manager_id)
+        if start_at is not None:
+            stmt = stmt.where(Visit.created_at >= start_at)
+        if end_at is not None:
+            stmt = stmt.where(Visit.created_at < end_at)
         result = await self._session.execute(stmt)
         return int(result.scalar_one())
 

@@ -4,6 +4,7 @@ import hashlib
 import secrets
 from datetime import date as date_cls
 from pathlib import Path
+from urllib.parse import urlencode
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
@@ -45,6 +46,9 @@ from web.client_sales_periods import (
     CLIENT_SALES_PERIOD_LABELS,
     resolve_client_sales_period,
 )
+from web.clients_pdf import build_clients_pdf, clients_pdf_filename
+from web.visit_periods import parse_visit_period, visits_page_query, week_options
+from web.visits_pdf import build_visit_detail_pdf, build_visits_pdf
 from web.utils import (
     UK_MONTHS,
     WEEKDAY_LABELS,
@@ -91,6 +95,7 @@ templates.env.globals.update(
     format_date=format_date,
     user_initials=user_initials,
     tasks_page_query=tasks_page_query,
+    visits_page_query=visits_page_query,
     manager_task_kind_label=manager_task_kind_label,
     manager_task_kind_choices=MANAGER_TASK_KIND_CHOICES,
     can_manage_task=can_manage_task,
@@ -120,6 +125,27 @@ def _no_cache_html(response: HTMLResponse) -> HTMLResponse:
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
     response.headers["Pragma"] = "no-cache"
     return response
+
+
+def _pdf_attachment(content: bytes, filename: str) -> Response:
+    return Response(
+        content=content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def _clients_pdf_query(filters: ClientFilters, *, is_pvc: bool) -> str:
+    params: list[tuple[str, str]] = []
+    if filters.manager_id is not None:
+        params.append(("manager_id", str(filters.manager_id)))
+    if filters.region_id is not None:
+        params.append(("region_id", str(filters.region_id)))
+    if filters.city:
+        params.append(("city", filters.city))
+    if not is_pvc and filters.stand_id is not None:
+        params.append(("stand_id", str(filters.stand_id)))
+    return ("?" + urlencode(params)) if params else ""
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -235,9 +261,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return RedirectResponse("/analytics?section=sales", status_code=303)
         require_nav(user, "visits")
         manager_id = scoped_manager_filter(user, query_int(request, "manager_id"))
+        period_filter = parse_visit_period(
+            period=query_str(request, "period"),
+            week=query_int(request, "week"),
+        )
         visits, total, page, total_pages = await service.list_visits(
             manager_id=manager_id,
+            start_at=period_filter.start_at,
+            end_at=period_filter.end_at,
             page=page,
+        )
+        pdf_qs = visits_page_query(
+            manager_id=manager_id,
+            period=period_filter.period,
+            week=period_filter.week,
         )
 
         return templates.TemplateResponse(
@@ -250,11 +287,44 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 managers=await service.list_managers() if can_filter_managers(user) else [],
                 stats=await service.visit_stats(manager_id=manager_id),
                 selected_manager_id=manager_id,
+                selected_period=period_filter.period,
+                selected_week=period_filter.week,
+                week_choices=week_options(period_filter.iso_year),
+                visits_pdf_url=f"/visits.pdf{pdf_qs}",
                 page=page,
                 total_pages=total_pages,
                 total=total,
             ),
         )
+
+    @app.get("/visits.pdf")
+    async def visits_pdf(
+        request: Request,
+        session: AsyncSession = Depends(get_session),
+        service: DashboardService = Depends(dashboard_service),
+        _auth: Response | None = Depends(require_auth),
+    ) -> Response:
+        user = await load_web_user(request, session)
+        require_nav(user, "visits")
+        manager_id = scoped_manager_filter(user, query_int(request, "manager_id"))
+        period_filter = parse_visit_period(
+            period=query_str(request, "period"),
+            week=query_int(request, "week"),
+        )
+        visits = await service.list_visits_export(
+            manager_id=manager_id,
+            start_at=period_filter.start_at,
+            end_at=period_filter.end_at,
+        )
+        try:
+            pdf_bytes = build_visits_pdf(
+                title=period_filter.title,
+                visits=visits,
+                show_manager=can_filter_managers(user),
+            )
+        except FileNotFoundError as e:
+            raise HTTPException(status_code=500, detail=str(e)) from e
+        return _pdf_attachment(pdf_bytes, period_filter.filename)
 
     @app.get("/visits/{visit_id}", response_class=HTMLResponse)
     async def visit_detail(
@@ -275,6 +345,29 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "visit_detail.html",
             page_ctx(user, active_nav="visits", visit=visit),
         )
+
+    @app.get("/visits/{visit_id}/pdf")
+    async def visit_detail_pdf(
+        request: Request,
+        visit_id: int,
+        session: AsyncSession = Depends(get_session),
+        service: DashboardService = Depends(dashboard_service),
+        _auth: Response | None = Depends(require_auth),
+    ) -> Response:
+        user = await load_web_user(request, session)
+        require_nav(user, "visits")
+        await assert_visit_access(session, user, visit_id)
+        visit = await service.get_visit(visit_id)
+        if visit is None:
+            raise HTTPException(status_code=404, detail="Візит не знайдено")
+        try:
+            pdf_bytes = build_visit_detail_pdf(
+                visit=visit,
+                show_manager=can_filter_managers(user),
+            )
+        except FileNotFoundError as e:
+            raise HTTPException(status_code=500, detail=str(e)) from e
+        return _pdf_attachment(pdf_bytes, f"visit-{visit.id}.pdf")
 
     from web.routes_extra import register_extra_routes
 
@@ -359,6 +452,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 selected_stand_id=filters.stand_id,
                 has_filters=has_filters,
                 list_base_path=list_base_path,
+                clients_pdf_url=f"{list_base_path}.pdf{_clients_pdf_query(filters, is_pvc=is_pvc_section)}",
                 page=page,
                 total_pages=total_pages,
             ),
@@ -446,6 +540,106 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             is_potential_section=True,
             is_pvc_section=True,
             page=page,
+        )
+
+    async def _export_clients_pdf(
+        request: Request,
+        session: AsyncSession,
+        service: DashboardService,
+        *,
+        is_potential_section: bool,
+        is_pvc_section: bool,
+    ) -> Response:
+        user = await load_web_user(request, session)
+        require_nav(user, "clients")
+        if is_pvc_section:
+            if not show_pvc_clients_nav(user):
+                raise HTTPException(status_code=403, detail="Forbidden")
+        elif not show_stand_clients_nav(user):
+            raise HTTPException(status_code=403, detail="Forbidden")
+        filters = ClientFilters(
+            manager_id=scoped_manager_filter(user, query_int(request, "manager_id")),
+            region_id=query_int(request, "region_id"),
+            city=query_str(request, "city"),
+            stand_id=None if is_pvc_section else query_int(request, "stand_id"),
+            is_potential=is_potential_section,
+            is_pvc=is_pvc_section,
+        )
+        clients = await service.list_clients_export(filters)
+        try:
+            pdf_bytes = build_clients_pdf(
+                clients=clients,
+                is_potential=is_potential_section,
+                is_pvc=is_pvc_section,
+                show_manager=can_filter_managers(user),
+            )
+        except FileNotFoundError as e:
+            raise HTTPException(status_code=500, detail=str(e)) from e
+        return _pdf_attachment(
+            pdf_bytes,
+            clients_pdf_filename(
+                is_potential=is_potential_section, is_pvc=is_pvc_section
+            ),
+        )
+
+    @app.get("/clients.pdf")
+    async def clients_pdf(
+        request: Request,
+        session: AsyncSession = Depends(get_session),
+        service: DashboardService = Depends(dashboard_service),
+        _auth: Response | None = Depends(require_auth),
+    ) -> Response:
+        return await _export_clients_pdf(
+            request,
+            session,
+            service,
+            is_potential_section=False,
+            is_pvc_section=False,
+        )
+
+    @app.get("/clients/potential.pdf")
+    async def potential_clients_pdf(
+        request: Request,
+        session: AsyncSession = Depends(get_session),
+        service: DashboardService = Depends(dashboard_service),
+        _auth: Response | None = Depends(require_auth),
+    ) -> Response:
+        return await _export_clients_pdf(
+            request,
+            session,
+            service,
+            is_potential_section=True,
+            is_pvc_section=False,
+        )
+
+    @app.get("/clients/pvc.pdf")
+    async def pvc_clients_pdf(
+        request: Request,
+        session: AsyncSession = Depends(get_session),
+        service: DashboardService = Depends(dashboard_service),
+        _auth: Response | None = Depends(require_auth),
+    ) -> Response:
+        return await _export_clients_pdf(
+            request,
+            session,
+            service,
+            is_potential_section=False,
+            is_pvc_section=True,
+        )
+
+    @app.get("/clients/pvc/potential.pdf")
+    async def pvc_potential_clients_pdf(
+        request: Request,
+        session: AsyncSession = Depends(get_session),
+        service: DashboardService = Depends(dashboard_service),
+        _auth: Response | None = Depends(require_auth),
+    ) -> Response:
+        return await _export_clients_pdf(
+            request,
+            session,
+            service,
+            is_potential_section=True,
+            is_pvc_section=True,
         )
 
     @app.get("/clients/{client_id}", response_class=HTMLResponse)

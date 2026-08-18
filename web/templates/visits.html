@@ -1,28 +1,40 @@
 {% extends "base.html" %}
 {% block title %}Візити — SK Bot Manager{% endblock %}
 {% block content %}
-<header class="page-header">
-  <h1 class="page-title">{% if can_filter_managers %}Візити менеджерів{% else %}Мої візити{% endif %}</h1>
-  <p class="page-subtitle">{% if can_filter_managers %}Останні звіти з полів — фільтруйте за менеджером{% else %}Останні звіти з полів{% endif %}</p>
+<header class="page-header page-header--row">
+  <div>
+    <h1 class="page-title">{% if can_filter_managers %}Візити менеджерів{% else %}Мої візити{% endif %}</h1>
+    <p class="page-subtitle">{% if can_filter_managers %}Останні звіти з полів — фільтруйте за менеджером і тижнем{% else %}Останні звіти з полів{% endif %}</p>
+  </div>
+  <div class="page-actions">
+    <a class="btn btn-secondary" href="{{ visits_pdf_url }}" target="_blank" rel="noopener">Завантажити PDF</a>
+  </div>
 </header>
 
-<div class="stats">
-  <div class="stat-card">
+<nav class="stats" aria-label="Фільтр за періодом">
+  <a href="/{{ visits_page_query(manager_id=selected_manager_id) }}"
+     class="stat-card stat-card--filter{% if not selected_period and not selected_week %} stat-card--selected{% endif %}"
+     aria-current="{% if not selected_period and not selected_week %}true{% else %}false{% endif %}">
     <div class="label">Всього</div>
     <div class="value">{{ stats.total }}</div>
-  </div>
-  <div class="stat-card stat-card--today">
+  </a>
+  <a href="/{{ visits_page_query(manager_id=selected_manager_id, period='today') }}"
+     class="stat-card stat-card--filter stat-card--today{% if selected_period == 'today' %} stat-card--selected{% endif %}"
+     aria-current="{% if selected_period == 'today' %}true{% else %}false{% endif %}">
     <div class="label">Сьогодні</div>
     <div class="value">{{ stats.today }}</div>
-  </div>
-  <div class="stat-card stat-card--week">
+  </a>
+  <a href="/{{ visits_page_query(manager_id=selected_manager_id, week=stats.week_number) }}"
+     class="stat-card stat-card--filter stat-card--week{% if selected_week == stats.week_number %} stat-card--selected{% endif %}"
+     aria-current="{% if selected_week == stats.week_number %}true{% else %}false{% endif %}">
     <div class="label">Цього тижня</div>
     <div class="value">{{ stats.week }}</div>
-  </div>
-</div>
+    <div class="stat-card__unit">тиждень {{ stats.week_number }}</div>
+  </a>
+</nav>
 
-{% if can_filter_managers %}
 <form class="filters" method="get" action="/">
+  {% if can_filter_managers %}
   <label>
     Менеджер
     <select name="manager_id" onchange="this.form.submit()">
@@ -34,8 +46,20 @@
       {% endfor %}
     </select>
   </label>
+  {% endif %}
+  <label>
+    Тиждень
+    <select name="week" onchange="this.form.submit()">
+      <option value="">Усі</option>
+      {% for week_num, week_label in week_choices %}
+      <option value="{{ week_num }}" {% if selected_week == week_num %}selected{% endif %}>{{ week_label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  {% if selected_period == 'today' %}
+  <input type="hidden" name="period" value="today">
+  {% endif %}
 </form>
-{% endif %}
 
 <div class="card">
   <div class="table-wrap">
@@ -72,11 +96,16 @@
             </div>
           </td>
           <td>{{ visit.photos|length }}</td>
-          <td><a class="btn-ghost" href="/visits/{{ visit.id }}">Деталі →</a></td>
+          <td>
+            <a class="btn-ghost" href="/visits/{{ visit.id }}">Деталі →</a>
+            <a class="btn-ghost" href="/visits/{{ visit.id }}/pdf" target="_blank" rel="noopener">PDF</a>
+          </td>
         </tr>
         {% else %}
         <tr class="empty-row">
-          <td colspan="{% if can_filter_managers %}8{% else %}7{% endif %}">Візитів ще немає</td>
+          <td colspan="{% if can_filter_managers %}8{% else %}7{% endif %}">
+            {% if selected_period or selected_week %}Візитів за обраний період немає{% else %}Візитів ще немає{% endif %}
+          </td>
         </tr>
         {% endfor %}
       </tbody>
@@ -87,11 +116,11 @@
 {% if total_pages > 1 %}
 <nav class="pagination">
   {% if page > 1 %}
-  <a href="?page={{ page - 1 }}{% if selected_manager_id %}&manager_id={{ selected_manager_id }}{% endif %}">←</a>
+  <a href="/{{ visits_page_query(manager_id=selected_manager_id, period=selected_period, week=selected_week, page=page - 1) }}">←</a>
   {% endif %}
   <span class="current">{{ page }} / {{ total_pages }}</span>
   {% if page < total_pages %}
-  <a href="?page={{ page + 1 }}{% if selected_manager_id %}&manager_id={{ selected_manager_id }}{% endif %}">→</a>
+  <a href="/{{ visits_page_query(manager_id=selected_manager_id, period=selected_period, week=selected_week, page=page + 1) }}">→</a>
   {% endif %}
 </nav>
 {% endif %}

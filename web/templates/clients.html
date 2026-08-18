@@ -1,37 +1,39 @@
 {% extends "base.html" %}
 {% block title %}{% if is_pvc_section %}{% if is_potential_section %}Потенційні клієнти ПВХ{% else %}Клієнти ПВХ{% endif %}{% elif is_potential_section %}Потенційні клієнти{% else %}Клієнти{% endif %} — SK Bot Manager{% endblock %}
 {% block content %}
-<header class="page-header">
-  <h1 class="page-title">{% if is_pvc_section %}{% if is_potential_section %}Потенційні клієнти ПВХ{% else %}Клієнти ПВХ{% endif %}{% elif is_potential_section %}Потенційні клієнти{% else %}Клієнти{% endif %}</h1>
-  <p class="page-subtitle">
-    {% if is_pvc_section %}
-      {% if is_potential_section %}Потенційні торгові точки ПВХ{% else %}Окрема база клієнтів ПВХ — лише візити{% endif %}
-    {% elif is_potential_section %}Торгові точки без стендів і свотчів{% else %}База торгових точок{% endif %}
-    {% if has_filters %}
-    — знайдено {{ clients_total }}
-    {% else %}
-    — {{ clients_total }}
-    {% if is_potential_section %} потенційних{% else %} торгових точок{% endif %}
+<header class="page-header page-header--row">
+  <div>
+    <h1 class="page-title">{% if is_pvc_section %}{% if is_potential_section %}Потенційні клієнти ПВХ{% else %}Клієнти ПВХ{% endif %}{% elif is_potential_section %}Потенційні клієнти{% else %}Клієнти{% endif %}</h1>
+    <p class="page-subtitle">
+      {% if is_pvc_section %}
+        {% if is_potential_section %}Потенційні торгові точки ПВХ{% else %}Окрема база клієнтів ПВХ — лише візити{% endif %}
+      {% elif is_potential_section %}Торгові точки без стендів і свотчів{% else %}База торгових точок{% endif %}
+      {% if has_filters %}
+      — знайдено {{ clients_total }}
+      {% else %}
+      — {{ clients_total }}
+      {% if is_potential_section %} потенційних{% else %} торгових точок{% endif %}
+      {% endif %}
+      {% if total_pages > 1 %} · сторінка {{ page }}/{{ total_pages }}{% endif %}
+    </p>
+  </div>
+  <div class="page-actions">
+    <a class="btn btn-secondary" href="{{ clients_pdf_url }}" target="_blank" rel="noopener">Завантажити PDF</a>
+    {% if not is_leader %}
+      {% if is_pvc_section %}
+        {% if is_potential_section %}
+    <a href="/clients/pvc/potential/new" class="btn btn-primary">+ Потенційний ПВХ</a>
+        {% else %}
+    <a href="/clients/pvc/new" class="btn btn-primary">+ Клієнт ПВХ</a>
+        {% endif %}
+      {% elif is_potential_section %}
+    <a href="/clients/potential/new" class="btn btn-primary">+ Потенційний</a>
+      {% else %}
+    <a href="/clients/new" class="btn btn-primary">+ Новий клієнт</a>
+      {% endif %}
     {% endif %}
-    {% if total_pages > 1 %} · сторінка {{ page }}/{{ total_pages }}{% endif %}
-  </p>
+  </div>
 </header>
-
-{% if not is_leader %}
-<div class="page-actions">
-  {% if is_pvc_section %}
-    {% if is_potential_section %}
-  <a href="/clients/pvc/potential/new" class="btn btn-primary">+ Потенційний ПВХ</a>
-    {% else %}
-  <a href="/clients/pvc/new" class="btn btn-primary">+ Клієнт ПВХ</a>
-    {% endif %}
-  {% elif is_potential_section %}
-  <a href="/clients/potential/new" class="btn btn-primary">+ Потенційний</a>
-  {% else %}
-  <a href="/clients/new" class="btn btn-primary">+ Новий клієнт</a>
-  {% endif %}
-</div>
-{% endif %}
 
 <form class="filters filters--compact clients-filters" method="get" action="{{ list_base_path }}">
   {% if can_filter_managers %}

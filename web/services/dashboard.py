@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +16,7 @@ from database.repositories.stand import StandRepository
 from database.repositories.user import UserRepository
 from database.repositories.visit import VisitRepository
 from web.analytics_periods import DateRange
+from web.visit_periods import current_iso_week, iso_week_range, now_kyiv, today_range
 
 
 @dataclass
@@ -23,6 +24,7 @@ class VisitStats:
     total: int
     today: int
     week: int
+    week_number: int
 
 
 @dataclass
@@ -65,19 +67,39 @@ class DashboardService:
         self,
         *,
         manager_id: int | None = None,
+        start_at: datetime | None = None,
+        end_at: datetime | None = None,
         page: int = 1,
         per_page: int = 30,
     ) -> tuple[list[Visit], int, int, int]:
-        total = await self._visits.count(manager_id=manager_id)
+        total = await self._visits.count(
+            manager_id=manager_id, start_at=start_at, end_at=end_at
+        )
         total_pages = max(1, (total + per_page - 1) // per_page)
         page = max(1, min(page, total_pages))
         offset = (page - 1) * per_page
         visits = await self._visits.list_recent(
             manager_id=manager_id,
+            start_at=start_at,
+            end_at=end_at,
             limit=per_page,
             offset=offset,
         )
         return visits, total, page, total_pages
+
+    async def list_visits_export(
+        self,
+        *,
+        manager_id: int | None = None,
+        start_at: datetime | None = None,
+        end_at: datetime | None = None,
+    ) -> list[Visit]:
+        return await self._visits.list_recent(
+            manager_id=manager_id,
+            start_at=start_at,
+            end_at=end_at,
+            limit=None,
+        )
 
     async def get_visit(self, visit_id: int) -> Visit | None:
         return await self._visits.get_by_id(visit_id)
@@ -128,6 +150,17 @@ class DashboardService:
             offset=offset,
         )
         return clients, total, page, total_pages
+
+    async def list_clients_export(self, filters) -> list[Client]:
+        return await self._clients.list_filtered(
+            manager_id=filters.manager_id,
+            region_id=filters.region_id,
+            city=filters.city or None,
+            stand_id=filters.stand_id,
+            is_potential=filters.is_potential,
+            is_pvc=getattr(filters, "is_pvc", False),
+            limit=None,
+        )
 
     async def list_active_stands(self) -> list[Stand]:
         return await self._stands.list_active()
@@ -194,15 +227,18 @@ class DashboardService:
         ]
 
     async def visit_stats(self, *, manager_id: int | None = None) -> VisitStats:
-        now = datetime.now(timezone.utc)
-        start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        start_of_week = start_of_day - timedelta(days=start_of_day.weekday())
+        now = now_kyiv()
+        start_of_day, _ = today_range(now)
+        iso_year, week_number = current_iso_week(now)
+        start_of_week, _ = iso_week_range(iso_year, week_number)
         total, today, week = await self._visits.stats_summary(
             start_of_day=start_of_day,
             start_of_week=start_of_week,
             manager_id=manager_id,
         )
-        return VisitStats(total=total, today=today, week=week)
+        return VisitStats(
+            total=total, today=today, week=week, week_number=week_number
+        )
 
     async def visits_per_manager(self) -> list[ManagerVisitCount]:
         managers = await self._users.list_all()
