@@ -11,6 +11,7 @@ from config.team import filter_regional_managers
 from database.models import Brand, Client, Sale, Stand, User, Visit
 from database.repositories.brand import BrandRepository
 from database.repositories.client import ClientRepository
+from database.repositories.region import RegionRepository
 from database.repositories.sale import SaleRepository
 from database.repositories.stand import StandRepository
 from database.repositories.user import UserRepository
@@ -55,6 +56,7 @@ class DashboardService:
         self._clients = ClientRepository(session)
         self._users = UserRepository(session)
         self._stands = StandRepository(session)
+        self._regions = RegionRepository(session)
         self._brands = BrandRepository(session)
         self._sales = SaleRepository(session)
 
@@ -168,6 +170,23 @@ class DashboardService:
             is_pvc=getattr(filters, "is_pvc", False),
             limit=None,
         )
+
+    async def resolve_client_filter_names(
+        self, filters
+    ) -> tuple[str | None, str | None, str | None, str | None]:
+        manager_name = None
+        region_name = None
+        stand_name = None
+        if filters.manager_id is not None:
+            manager = await self._users.get_by_id(filters.manager_id)
+            manager_name = manager.name if manager else None
+        if filters.region_id is not None:
+            region = await self._regions.get_by_id(filters.region_id)
+            region_name = region.name if region else None
+        if filters.stand_id is not None:
+            stand = await self._stands.get_by_id(filters.stand_id)
+            stand_name = stand.name if stand else None
+        return manager_name, region_name, filters.city or None, stand_name
 
     async def list_active_stands(self) -> list[Stand]:
         return await self._stands.list_active()

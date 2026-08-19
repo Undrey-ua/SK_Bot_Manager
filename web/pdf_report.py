@@ -18,11 +18,24 @@ from web.stands_pdf import (
 )
 
 
+def _ellipsize(pdf: FPDF, text: str, max_width: float) -> str:
+    if pdf.get_string_width(text) <= max_width:
+        return text
+    ellipsis = "…"
+    trimmed = text
+    while trimmed and pdf.get_string_width(trimmed + ellipsis) > max_width:
+        trimmed = trimmed[:-1]
+    return (trimmed + ellipsis) if trimmed else ellipsis
+
+
 class ReportPDF(FPDF):
-    def __init__(self, *, doc_title: str, strip_label: str) -> None:
+    def __init__(
+        self, *, doc_title: str, strip_label: str, header_note: str = ""
+    ) -> None:
         super().__init__(orientation="L", unit="mm", format="A4")
         self._doc_title = doc_title
         self._strip_label = strip_label
+        self._header_note = header_note
         font_path = _unicode_font_path()
         self.add_font("Unicode", "", font_path)
         self.add_font("Unicode", "B", font_path)
@@ -35,6 +48,15 @@ class ReportPDF(FPDF):
             self.set_font("Unicode", "B", 9)
             self.set_text_color(*COLOR_MUTED)
             self.cell(0, 6, self._doc_title, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            if self._header_note:
+                self.set_font("Unicode", "", 7)
+                self.cell(
+                    0,
+                    5,
+                    self._header_note,
+                    new_x=XPos.LMARGIN,
+                    new_y=YPos.NEXT,
+                )
             self.ln(1)
 
     def footer(self) -> None:
@@ -91,14 +113,21 @@ def draw_title_block(
         pdf.set_fill_color(*COLOR_SUMMARY_BG)
         pdf.set_draw_color(*COLOR_BORDER)
         pdf.rect(x, card_y, card_w, card_h, style="DF")
+        inner_w = card_w - 6
         pdf.set_xy(x + 3, card_y + 3)
         pdf.set_font("Unicode", "", 7)
         pdf.set_text_color(*COLOR_MUTED)
-        pdf.cell(card_w - 6, 4, label, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.set_x(x + 3)
+        pdf.cell(
+            inner_w,
+            4,
+            _ellipsize(pdf, label, inner_w),
+            new_x=XPos.LMARGIN,
+            new_y=YPos.NEXT,
+        )
+        pdf.set_xy(x + 3, card_y + 7)
         pdf.set_font("Unicode", "B", 9)
         pdf.set_text_color(15, 23, 42)
-        pdf.cell(card_w - 6, 6, value)
+        pdf.cell(inner_w, 6, _ellipsize(pdf, value, inner_w))
 
     pdf.set_y(card_y + card_h + 6)
 

@@ -603,12 +603,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             is_pvc=is_pvc_section,
         )
         clients = await service.list_clients_export(filters)
+        manager_name, region_name, city, stand_name = (
+            await service.resolve_client_filter_names(filters)
+        )
         try:
             pdf_bytes = build_clients_pdf(
                 clients=clients,
                 is_potential=is_potential_section,
                 is_pvc=is_pvc_section,
                 show_manager=can_filter_managers(user),
+                manager_name=manager_name,
+                region_name=region_name,
+                city=city,
+                stand_name=stand_name,
             )
         except FileNotFoundError as e:
             raise HTTPException(status_code=500, detail=str(e)) from e

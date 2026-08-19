@@ -33,23 +33,82 @@ def clients_pdf_filename(*, is_potential: bool, is_pvc: bool) -> str:
     return "clients.pdf"
 
 
+def clients_filter_summaries(
+    *,
+    count: int,
+    is_pvc: bool,
+    manager_name: str | None,
+    region_name: str | None,
+    city: str | None,
+    stand_name: str | None,
+) -> list[tuple[str, str]]:
+    items = [
+        ("Клієнтів", str(count)),
+        ("Менеджер", manager_name or "Усі"),
+        ("Область", region_name or "Усі області"),
+        ("Місто", city or "Усі міста"),
+    ]
+    if not is_pvc:
+        items.append(("Стенд", stand_name or "Усі стенди"))
+    return items
+
+
+def clients_filter_header_note(
+    *,
+    is_pvc: bool,
+    manager_name: str | None,
+    region_name: str | None,
+    city: str | None,
+    stand_name: str | None,
+) -> str:
+    parts = [
+        manager_name or "Усі менеджери",
+        region_name or "Усі області",
+        city or "Усі міста",
+    ]
+    if not is_pvc:
+        parts.append(stand_name or "Усі стенди")
+    return " · ".join(parts)
+
+
 def build_clients_pdf(
     *,
     clients: list[Client],
     is_potential: bool = False,
     is_pvc: bool = False,
     show_manager: bool = True,
+    manager_name: str | None = None,
+    region_name: str | None = None,
+    city: str | None = None,
+    stand_name: str | None = None,
     generated_at: datetime | None = None,
 ) -> bytes:
     title = clients_title(is_potential=is_potential, is_pvc=is_pvc)
     when = generated_at or datetime.now(KYIV)
-    pdf = ReportPDF(doc_title=title, strip_label="База клієнтів")
+    pdf = ReportPDF(
+        doc_title=title,
+        strip_label="База клієнтів",
+        header_note=clients_filter_header_note(
+            is_pvc=is_pvc,
+            manager_name=manager_name,
+            region_name=region_name,
+            city=city,
+            stand_name=stand_name,
+        ),
+    )
     pdf.add_page()
     draw_title_block(
         pdf,
         title=title,
         generated_at=when,
-        summaries=[("Клієнтів", str(len(clients)))],
+        summaries=clients_filter_summaries(
+            count=len(clients),
+            is_pvc=is_pvc,
+            manager_name=manager_name,
+            region_name=region_name,
+            city=city,
+            stand_name=stand_name,
+        ),
     )
 
     if not clients:
