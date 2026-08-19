@@ -13,6 +13,13 @@ from web.stands_pdf import COLOR_HEADER_BG, COLOR_HEADER_TEXT, COLOR_ROW_ALT, KY
 from web.utils import client_stands
 
 
+def client_contacts_text(client: Client) -> str:
+    raw = (client.contacts or "").strip()
+    if not raw:
+        return "—"
+    return "\n".join(line.strip() for line in raw.splitlines() if line.strip())
+
+
 def clients_title(*, is_potential: bool, is_pvc: bool) -> str:
     if is_pvc and is_potential:
         return "Потенційні клієнти ПВХ"
@@ -133,7 +140,7 @@ def build_clients_pdf(
     headers = ["№", "Назва", "Юридична назва"]
     if show_manager:
         headers.append("Менеджер")
-    headers.extend(["Область", "Місто", "Адреса"])
+    headers.extend(["Область", "Місто", "Адреса", "Контакти"])
     if not is_pvc:
         headers.append("Стенди")
 
@@ -142,14 +149,14 @@ def build_clients_pdf(
     rest = pdf.epw - num_w
     if is_pvc:
         if show_manager:
-            shares = (0.22, 0.22, 0.16, 0.14, 0.12, 0.14)
+            shares = (0.16, 0.16, 0.12, 0.11, 0.10, 0.14, 0.21)
         else:
-            shares = (0.26, 0.26, 0.16, 0.14, 0.18)
+            shares = (0.18, 0.18, 0.12, 0.10, 0.16, 0.26)
     else:
         if show_manager:
-            shares = (0.18, 0.18, 0.14, 0.12, 0.10, 0.14, 0.14)
+            shares = (0.14, 0.14, 0.11, 0.10, 0.09, 0.12, 0.16, 0.14)
         else:
-            shares = (0.22, 0.22, 0.14, 0.12, 0.16, 0.14)
+            shares = (0.16, 0.16, 0.12, 0.10, 0.14, 0.18, 0.14)
 
     col_widths = [num_w] + [rest * s for s in shares]
     leftover = pdf.epw - sum(col_widths)
@@ -183,6 +190,7 @@ def build_clients_pdf(
                     client.region.name if client.region else "—",
                     client_city(client),
                     client.address or "—",
+                    client_contacts_text(client),
                 ]
             )
             if not is_pvc:
