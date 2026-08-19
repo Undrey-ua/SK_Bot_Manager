@@ -17,6 +17,8 @@ _FONT_CANDIDATES = (
     Path(__file__).resolve().parent / "static" / "fonts" / "DejaVuSans.ttf",
     Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
     Path("/usr/share/fonts/TTF/DejaVuSans.ttf"),
+    Path("/usr/share/fonts/dejavu/DejaVuSans.ttf"),
+    Path("/usr/local/share/fonts/DejaVuSans.ttf"),
     Path("/System/Library/Fonts/Supplemental/Arial Unicode.ttf"),
 )
 
