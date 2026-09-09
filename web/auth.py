@@ -20,6 +20,8 @@ class WebUser:
     telegram_id: int
     supervisor_id: int | None = None
     work_scope: str = "stand"
+    nav_grants: tuple[str, ...] = ()
+    supervisor_work_scope: str | None = None
 
     @property
     def is_admin(self) -> bool:
@@ -121,6 +123,9 @@ async def get_web_user(
     if db_user is None:
         request.session.clear()
         raise LoginRequired("/login?error=session")
+    from web.roles import parse_nav_grants
+
+    supervisor = getattr(db_user, "supervisor", None)
     return WebUser(
         id=db_user.id,
         name=db_user.name,
@@ -128,6 +133,10 @@ async def get_web_user(
         telegram_id=db_user.telegram_id,
         supervisor_id=db_user.supervisor_id,
         work_scope=getattr(db_user, "work_scope", None) or "stand",
+        nav_grants=parse_nav_grants(getattr(db_user, "nav_grants", None)),
+        supervisor_work_scope=(
+            getattr(supervisor, "work_scope", None) if supervisor is not None else None
+        ),
     )
 
 

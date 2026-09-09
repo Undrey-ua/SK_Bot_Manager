@@ -17,6 +17,11 @@ from database.repositories.user import UserRepository
 from web.auth import require_admin
 from web.page_context import load_web_user, page_ctx
 from web.services.dashboard import DashboardService
+from web.roles import (
+    WEB_NAV_GRANT_CHOICES,
+    parse_nav_grants,
+    serialize_nav_grants,
+)
 from web.services.user_admin import (
     delete_user_blocked_reason,
     role_choices_for_form,
@@ -42,10 +47,11 @@ def _parse_user_form(
     return tg, name, role.strip(), sup_id, normalize_work_scope(work_scope or None)
 
 
-def _resolved_work_scope(*, role: str, work_scope: str) -> str | None:
-    if needs_work_scope(None, role=role):
-        return work_scope
-    return WORK_SCOPE_DEFAULT
+def _resolved_nav_grants(*, role: str, nav_grant: list[str] | str) -> str:
+    if role != UserRole.SALES_MANAGER.value:
+        return ""
+    keys = [nav_grant] if isinstance(nav_grant, str) else list(nav_grant)
+    return serialize_nav_grants(keys)
 
 
 def register_user_routes(app, *, templates, get_session, require_auth, dashboard_service):
@@ -60,6 +66,7 @@ def register_user_routes(app, *, templates, get_session, require_auth, dashboard
         form_role: str,
         form_supervisor_id: int | None,
         form_work_scope: str,
+        form_nav_grants: tuple[str, ...] | list[str],
         error: str | None,
         acting_user: User,
     ) -> dict:
@@ -89,8 +96,11 @@ def register_user_routes(app, *, templates, get_session, require_auth, dashboard
             form_role=form_role,
             form_supervisor_id=form_supervisor_id,
             form_work_scope=form_work_scope,
+            form_nav_grants=list(form_nav_grants),
+            nav_grant_choices=WEB_NAV_GRANT_CHOICES,
             work_scope_choices=WORK_SCOPE_CHOICES,
             show_work_scope=needs_work_scope(edit_user, role=form_role),
+            show_nav_grants=form_role == UserRole.SALES_MANAGER.value,
             error=error,
             delete_blocked=delete_blocked,
         )
@@ -142,6 +152,7 @@ def register_user_routes(app, *, templates, get_session, require_auth, dashboard
                 form_role=UserRole.MANAGER.value,
                 form_supervisor_id=None,
                 form_work_scope=WORK_SCOPE_DEFAULT,
+                form_nav_grants=(),
                 error=None,
                 acting_user=user,
             ),
@@ -158,6 +169,7 @@ def register_user_routes(app, *, templates, get_session, require_auth, dashboard
         role: str = Form(...),
         supervisor_id: str = Form(""),
         work_scope: str = Form(""),
+        nav_grant: list[str] = Form(default=[]),
     ):
         user = await load_web_user(request, session)
         require_admin(user)
@@ -170,6 +182,7 @@ def register_user_routes(app, *, templates, get_session, require_auth, dashboard
             supervisor_id=supervisor_id,
             work_scope=work_scope,
         )
+        grants = _resolved_nav_grants(role=role_s, nav_grant=nav_grant)
         err = await validate_new_user(
             repo,
             telegram_id=tg,
@@ -192,6 +205,7 @@ def register_user_routes(app, *, templates, get_session, require_auth, dashboard
                     form_role=role_s,
                     form_supervisor_id=sup_id,
                     form_work_scope=scope,
+                    form_nav_grants=parse_nav_grants(grants),
                     error=err,
                     acting_user=user,
                 ),
@@ -204,6 +218,7 @@ def register_user_routes(app, *, templates, get_session, require_auth, dashboard
             role=role_s,
             supervisor_id=sup_id if role_s == UserRole.SALES_MANAGER.value else None,
             work_scope=_resolved_work_scope(role=role_s, work_scope=scope),
+            nav_grants=grants,
         )
         await session.commit()
         return RedirectResponse("/admin/users?created=1", status_code=303)
@@ -234,6 +249,7 @@ def register_user_routes(app, *, templates, get_session, require_auth, dashboard
                 form_role=target.role,
                 form_supervisor_id=target.supervisor_id,
                 form_work_scope=normalize_work_scope(getattr(target, "work_scope", None)),
+                form_nav_grants=parse_nav_grants(getattr(target, "nav_grants", None)),
                 error=None,
                 acting_user=user,
             ),
@@ -251,6 +267,7 @@ def register_user_routes(app, *, templates, get_session, require_auth, dashboard
         role: str = Form(...),
         supervisor_id: str = Form(""),
         work_scope: str = Form(""),
+        nav_grant: list[str] = Form(default=[]),
     ):
         user = await load_web_user(request, session)
         require_admin(user)
@@ -266,6 +283,7 @@ def register_user_routes(app, *, templates, get_session, require_auth, dashboard
             supervisor_id=supervisor_id,
             work_scope=work_scope,
         )
+        grants = _resolved_nav_grants(role=role_s, nav_grant=nav_grant)
         err = await validate_update_user(
             repo,
             target,
@@ -289,6 +307,7 @@ def register_user_routes(app, *, templates, get_session, require_auth, dashboard
                     form_role=role_s,
                     form_supervisor_id=sup_id,
                     form_work_scope=scope,
+                    form_nav_grants=parse_nav_grants(grants),
                     error=err,
                     acting_user=user,
                 ),
@@ -303,6 +322,7 @@ def register_user_routes(app, *, templates, get_session, require_auth, dashboard
             role=role_s,
             supervisor_id=sup_id,
             work_scope=resolved_scope,
+            nav_grants=grants,
         )
         await session.commit()
         return RedirectResponse("/admin/users?updated=1", status_code=303)
@@ -341,6 +361,7 @@ def register_user_routes(app, *, templates, get_session, require_auth, dashboard
                     form_work_scope=normalize_work_scope(
                         getattr(target, "work_scope", None)
                     ),
+                    form_nav_grants=parse_nav_grants(getattr(target, "nav_grants", None)),
                     error=err,
                     acting_user=user,
                 ),

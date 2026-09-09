@@ -32,10 +32,17 @@ from web.roles import (
     can_filter_managers,
     can_operate_stand_warehouse,
     data_owner_manager_id,
+    default_owned_manager_id,
     show_pvc_clients_nav,
 )
 from web.services.clients_filter import build_client_filter_options
 from web.services.dashboard import DashboardService
+
+
+def _client_owner_id(user, form_manager_id: str = "") -> int:
+    if user.is_admin and str(form_manager_id).strip().isdigit():
+        return int(str(form_manager_id).strip())
+    return default_owned_manager_id(user)
 
 
 @dataclass(frozen=True)
@@ -468,7 +475,7 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
         if user.is_leader:
             raise HTTPException(status_code=403, detail="Forbidden")
         managers = []
-        form_manager_id = user.id
+        form_manager_id = default_owned_manager_id(user)
         if user.is_admin:
             managers = await dashboard.list_managers()
             mgrs = [m for m in managers if m.role == UserRole.MANAGER.value]
@@ -519,9 +526,7 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
         require_nav(user, "clients")
         if user.is_leader:
             raise HTTPException(status_code=403, detail="Forbidden")
-        target_manager_id = user.id
-        if user.is_admin and form_manager_id.strip().isdigit():
-            target_manager_id = int(form_manager_id.strip())
+        target_manager_id = _client_owner_id(user, form_manager_id)
 
         region = await RegionRepository(session).get_by_id(region_id)
         if region is None or region.manager_id != target_manager_id:
@@ -562,7 +567,7 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
         if user.is_leader or not show_pvc_clients_nav(user):
             raise HTTPException(status_code=403, detail="Forbidden")
         managers = []
-        form_manager_id = user.id
+        form_manager_id = default_owned_manager_id(user)
         if user.is_admin:
             managers = await dashboard.list_managers()
             picked = query_int(request, "manager_id")
@@ -615,9 +620,7 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
     ):
         if user.is_leader or not show_pvc_clients_nav(user):
             raise HTTPException(status_code=403, detail="Forbidden")
-        target_manager_id = user.id
-        if user.is_admin and form_manager_id.strip().isdigit():
-            target_manager_id = int(form_manager_id.strip())
+        target_manager_id = _client_owner_id(user, form_manager_id)
         region = await RegionRepository(session).get_by_id(region_id)
         if region is None or region.manager_id != target_manager_id:
             raise HTTPException(status_code=400, detail="Invalid region")
@@ -749,7 +752,7 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
         if user.is_leader:
             raise HTTPException(status_code=403, detail="Forbidden")
         managers = []
-        form_manager_id = user.id
+        form_manager_id = default_owned_manager_id(user)
         if user.is_admin:
             managers = await dashboard.list_managers()
             mgrs = [m for m in managers if m.role == UserRole.MANAGER.value]
@@ -810,9 +813,7 @@ def register_extra_routes(app, *, templates, get_session, require_auth, dashboar
                 status_code=400,
                 detail="Оберіть хоча б один стенд або свотч",
             )
-        target_manager_id = user.id
-        if user.is_admin and form_manager_id.strip().isdigit():
-            target_manager_id = int(form_manager_id.strip())
+        target_manager_id = _client_owner_id(user, form_manager_id)
 
         region = await RegionRepository(session).get_by_id(region_id)
         if region is None or region.manager_id != target_manager_id:

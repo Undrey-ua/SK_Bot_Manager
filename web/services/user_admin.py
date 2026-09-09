@@ -11,6 +11,10 @@ from config.work_scope import (
 )
 from database.models import User, UserRole
 from database.repositories.user import UserRepository
+from web.roles import (
+    WEB_NAV_GRANT_LABELS,
+    parse_nav_grants,
+)
 
 
 USER_ROLE_LABELS: dict[str, str] = {
@@ -74,6 +78,15 @@ def user_roles_display(user: User) -> str:
         regional = USER_ROLE_LABELS[UserRole.MANAGER.value]
         return f"{label}, {regional}"
     return label
+
+
+def user_nav_access_display(user: User) -> str:
+    if user.role != UserRole.SALES_MANAGER.value:
+        return "—"
+    labels = ["Продажі", "Резерви"]
+    for key in parse_nav_grants(getattr(user, "nav_grants", None)):
+        labels.append(WEB_NAV_GRANT_LABELS[key])
+    return ", ".join(labels)
 
 
 def _format_usage_block(usage: dict[str, int]) -> str:

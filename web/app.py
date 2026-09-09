@@ -29,12 +29,18 @@ from web.auth import (
 )
 from web.deps import query_int, query_str
 from web.page_context import load_web_user, page_ctx, scoped_manager_filter
-from web.roles import can_filter_managers, data_owner_manager_id, show_pvc_clients_nav, show_stand_clients_nav
+from web.roles import (
+    can_filter_managers,
+    data_owner_manager_id,
+    nav_allowed,
+    show_pvc_clients_nav,
+    show_stand_clients_nav,
+)
 from web.services.clients_filter import ClientFilters, build_client_filter_options
 from web.services.dashboard import DashboardService
 from config.work_scope import work_scope_label
 from config.team import is_regional_manager
-from web.services.user_admin import user_role_label, user_roles_display
+from web.services.user_admin import user_nav_access_display, user_role_label, user_roles_display
 from web.client_geo import (
     client_city,
     client_display_city,
@@ -117,6 +123,7 @@ templates.env.globals.update(
     can_sale_from_reserve=can_sale_from_reserve,
     user_role_label=user_role_label,
     user_roles_display=user_roles_display,
+    user_nav_access_display=user_nav_access_display,
     is_regional_manager=is_regional_manager,
     work_scope_label=work_scope_label,
     stand_transfer_operation_label=lambda op: STAND_TRANSFER_OPERATION_LABELS.get(
@@ -271,7 +278,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         page: int = 1,
     ) -> HTMLResponse:
         user = await load_web_user(request, session)
-        if user.is_sales_manager:
+        if user.is_sales_manager and not nav_allowed(user, "visits"):
             return RedirectResponse("/analytics?section=sales", status_code=303)
         require_nav(user, "visits")
         manager_id = scoped_manager_filter(user, query_int(request, "manager_id"))

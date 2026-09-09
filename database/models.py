@@ -94,6 +94,7 @@ class User(Base):
         index=True,
     )
     work_scope: Mapped[str] = mapped_column(String(20), default="stand", server_default="stand")
+    nav_grants: Mapped[str] = mapped_column(String(200), default="", server_default="")
 
     supervisor: Mapped[Optional["User"]] = relationship(
         remote_side="User.id",

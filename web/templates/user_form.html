@@ -49,6 +49,18 @@
         </select>
       </label>
     </div>
+    <div id="nav-grants-block" {% if not show_nav_grants %}hidden{% endif %}>
+      <fieldset class="stands-picker nav-grants-picker">
+        <legend>Доступ до розділів панелі</legend>
+        <p class="muted client-form-hint">Базово для менеджера зі збуту: Продажі та Резерви. Позначте додаткові розділи.</p>
+        {% for value, label in nav_grant_choices %}
+        <label class="stands-picker__item">
+          <input type="checkbox" name="nav_grant" value="{{ value }}" {% if value in form_nav_grants %}checked{% endif %}>
+          {{ label }}
+        </label>
+        {% endfor %}
+      </fieldset>
+    </div>
     <div class="task-form__actions">
       <button type="submit" class="btn btn-primary">{{ submit_label }}</button>
       <a href="/admin/users" class="btn btn-secondary">Скасувати</a>
@@ -80,6 +92,7 @@
   const block = document.getElementById("supervisor-block");
   const scopeBlock = document.getElementById("work-scope-block");
   const supSel = document.getElementById("user-supervisor");
+  const grantsBlock = document.getElementById("nav-grants-block");
   if (!roleSel || !block) return;
   function sync() {
     const isSales = roleSel.value === "sales_manager";
@@ -87,6 +100,7 @@
     block.hidden = !isSales;
     if (supSel) supSel.required = isSales;
     if (scopeBlock) scopeBlock.hidden = isSales ? true : !(isManager || {{ 'true' if show_work_scope else 'false' }});
+    if (grantsBlock) grantsBlock.hidden = !isSales;
   }
   roleSel.addEventListener("change", sync);
   sync();

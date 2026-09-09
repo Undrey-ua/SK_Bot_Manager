@@ -2081,6 +2081,21 @@ form.filters.filters--panelled:has(.filters__field--region) {
   margin: 0;
 }
 
+.nav-grants-picker {
+  margin: 0.35rem 0 0.85rem;
+}
+
+.nav-grants-picker .stands-picker__item {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text);
+}
+
 .table-actions {
   display: flex;
   flex-wrap: wrap;

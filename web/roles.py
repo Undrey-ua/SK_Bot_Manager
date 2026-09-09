@@ -26,6 +26,56 @@ STAND_WAREHOUSE_OPS_ROLES = frozenset({UserRole.ADMIN.value, UserRole.MANAGER.va
 WEB_NAV_ADMIN_EXTRA = frozenset({"users"})
 WEB_NAV_SALES_MANAGER = frozenset({"analytics", "reserves"})
 
+# Розділи, які адмін може додати поверх ролі (насамперед менеджеру зі збуту).
+WEB_NAV_GRANTABLE = frozenset({"visits", "clients", "tasks", "stand_warehouse"})
+WEB_NAV_GRANT_LABELS: dict[str, str] = {
+    "visits": "Візити",
+    "clients": "Клієнти",
+    "tasks": "Задачі",
+    "stand_warehouse": "Склад стендів",
+}
+WEB_NAV_GRANT_CHOICES: list[tuple[str, str]] = [
+    (key, WEB_NAV_GRANT_LABELS[key])
+    for key in ("visits", "clients", "tasks", "stand_warehouse")
+]
+
+
+def parse_nav_grants(raw: str | None) -> tuple[str, ...]:
+    if not raw:
+        return ()
+    seen: list[str] = []
+    for part in raw.replace(",", " ").split():
+        key = part.strip()
+        if key in WEB_NAV_GRANTABLE and key not in seen:
+            seen.append(key)
+    return tuple(seen)
+
+
+def serialize_nav_grants(keys: list[str] | tuple[str, ...] | None) -> str:
+    return ",".join(parse_nav_grants(",".join(keys or [])))
+
+
+def role_default_nav_keys(role: str) -> frozenset[str]:
+    if role == UserRole.ADMIN.value:
+        return WEB_NAV_ALL
+    if role == UserRole.LEADER.value:
+        return WEB_NAV_ALL - WEB_NAV_ADMIN_EXTRA
+    if role == UserRole.SALES_MANAGER.value:
+        return WEB_NAV_SALES_MANAGER
+    return WEB_NAV_ALL - {"users"}
+
+
+def grantable_nav_choices_for_role(role: str) -> list[tuple[str, str]]:
+    defaults = role_default_nav_keys(role)
+    return [(key, label) for key, label in WEB_NAV_GRANT_CHOICES if key not in defaults]
+
+
+def _granted_nav_keys(user: WebUser) -> frozenset[str]:
+    grants = frozenset(getattr(user, "nav_grants", ()) or ()) & WEB_NAV_GRANTABLE
+    if "stand_warehouse" in grants:
+        grants = grants | {"stand_moves"}
+    return grants
+
 
 def work_scope_value(user: WebUser) -> str:
     from config.work_scope import normalize_work_scope
@@ -33,24 +83,36 @@ def work_scope_value(user: WebUser) -> str:
     return normalize_work_scope(getattr(user, "work_scope", None))
 
 
-def show_stand_clients_nav(user: WebUser) -> bool:
+def client_work_scope(user: WebUser) -> str:
+    """Сфера клієнтських баз: у менеджера збуту — як у регіонального керівника."""
+    from config.work_scope import normalize_work_scope
+
     if is_sales_manager(user):
+        return normalize_work_scope(
+            getattr(user, "supervisor_work_scope", None)
+            or getattr(user, "work_scope", None)
+        )
+    return work_scope_value(user)
+
+
+def show_stand_clients_nav(user: WebUser) -> bool:
+    if not nav_allowed(user, "clients"):
         return False
     if user.role in ORG_VIEW_ROLES:
         return True
     from config.work_scope import WorkScope
 
-    return work_scope_value(user) in {WorkScope.STAND.value, WorkScope.BOTH.value}
+    return client_work_scope(user) in {WorkScope.STAND.value, WorkScope.BOTH.value}
 
 
 def show_pvc_clients_nav(user: WebUser) -> bool:
-    if is_sales_manager(user):
+    if not nav_allowed(user, "clients"):
         return False
     if user.role in ORG_VIEW_ROLES:
         return True
     from config.work_scope import WorkScope
 
-    return work_scope_value(user) in {WorkScope.PVC.value, WorkScope.BOTH.value}
+    return client_work_scope(user) in {WorkScope.PVC.value, WorkScope.BOTH.value}
 
 
 def can_filter_managers(user: WebUser) -> bool:
@@ -90,7 +152,7 @@ def can_operate_stand_warehouse(user: WebUser) -> bool:
 
 
 def can_view_stand_warehouse(user: WebUser) -> bool:
-    return not is_sales_manager(user)
+    return nav_allowed(user, "stand_warehouse")
 
 
 def is_leader(user: WebUser) -> bool:
@@ -108,13 +170,7 @@ def panel_subtitle(user: WebUser) -> str:
 
 
 def allowed_nav_keys(user: WebUser) -> frozenset[str]:
-    if user.is_admin:
-        return WEB_NAV_ALL
-    if is_leader(user):
-        return WEB_NAV_ALL - WEB_NAV_ADMIN_EXTRA
-    if is_sales_manager(user):
-        return WEB_NAV_SALES_MANAGER
-    return WEB_NAV_ALL - {"users"}
+    return role_default_nav_keys(user.role) | _granted_nav_keys(user)
 
 
 def nav_allowed(user: WebUser, key: str) -> bool:
@@ -140,6 +196,12 @@ def data_owner_manager_id(user: WebUser) -> int | None:
     if user.role == REGIONAL_MANAGER_ROLE:
         return user.id
     return None
+
+
+def default_owned_manager_id(user: WebUser) -> int:
+    """Менеджер-власник картки клієнта при створенні з панелі."""
+    owner = data_owner_manager_id(user)
+    return owner if owner is not None else user.id
 
 
 def show_reserves_manager_column(user: WebUser) -> bool:

@@ -28,6 +28,7 @@
           <th>Telegram ID</th>
           <th>Роль</th>
           <th>Сфера</th>
+          <th>Доступ</th>
           <th>Менеджер зі збуту</th>
         </tr>
       </thead>
@@ -44,6 +45,7 @@
             <span class="muted">—</span>
             {% endif %}
           </td>
+          <td>{{ user_nav_access_display(u) }}</td>
           <td>
             {% if u.role == 'sales_manager' and u.supervisor %}
             <span class="muted">Регіональний:</span> {{ u.supervisor.name }}
@@ -63,7 +65,7 @@
           </td>
         </tr>
         {% else %}
-        <tr class="empty-row"><td colspan="6">Немає користувачів</td></tr>
+        <tr class="empty-row"><td colspan="7">Немає користувачів</td></tr>
         {% endfor %}
       </tbody>
     </table>
