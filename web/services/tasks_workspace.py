@@ -170,6 +170,7 @@ class WeekDayVM:
 class WeekPlanner:
     start: date
     end: date
+    week_number: int
     label: str
     days: list[WeekDayVM]
     notes: str
@@ -371,6 +372,7 @@ def _build_week_planner(
     return WeekPlanner(
         start=start,
         end=end,
+        week_number=start.isocalendar().week,
         label=format_week_range(start, end),
         days=days,
         notes=notes,

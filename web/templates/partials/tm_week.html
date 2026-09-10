@@ -2,48 +2,44 @@
   <div class="tm-week-toolbar">
     <div class="tm-week-nav">
       <a class="tm-week-nav__arrow" href="/tasks{{ tasks_page_query(manager_id=selected_manager_id, status=status_filter, kind=selected_kind, view='week', q=search_q, client_id=selected_client_id, priority=selected_priority, deadline=selected_deadline, workflow=selected_workflow, week_start=workspace.week.prev_start.isoformat()) }}" aria-label="Попередній тиждень">‹</a>
-      <h2>{{ workspace.week.label }}</h2>
+      <h2>
+        <span class="tm-week-nav__num" title="Номер тижня з початку року">Тиждень {{ workspace.week.week_number }}</span>
+        <span class="tm-week-nav__dates">{{ workspace.week.label }}</span>
+      </h2>
       <a class="tm-week-nav__arrow" href="/tasks{{ tasks_page_query(manager_id=selected_manager_id, status=status_filter, kind=selected_kind, view='week', q=search_q, client_id=selected_client_id, priority=selected_priority, deadline=selected_deadline, workflow=selected_workflow, week_start=workspace.week.next_start.isoformat()) }}" aria-label="Наступний тиждень">›</a>
       <a class="btn btn-secondary btn-sm" href="/tasks{{ tasks_page_query(manager_id=selected_manager_id, status=status_filter, kind=selected_kind, view='week', q=search_q, client_id=selected_client_id, priority=selected_priority, deadline=selected_deadline, workflow=selected_workflow) }}">Сьогодні</a>
     </div>
   </div>
 
   <div class="tm-week">
-    <div class="tm-week__pane tm-week__pane--left">
-      {% for day in workspace.week.days[:3] %}
-      {% include "partials/tm_week_day.html" %}
-      {% endfor %}
-    </div>
-    <div class="tm-week__pane tm-week__pane--right">
-      {% for day in workspace.week.days[3:] %}
-      {% include "partials/tm_week_day.html" %}
-      {% endfor %}
-      <div class="tm-week-extras">
-        <section class="tm-week-notes">
-          <h3>Нотатки на тиждень</h3>
-          {% if workspace.week.notes_manager_id %}
-          <form method="post" action="/tasks/week-notes" class="stand-move-form" data-week-notes-form>
-            <input type="hidden" name="week_start" value="{{ workspace.week.start.isoformat() }}">
-            <input type="hidden" name="manager_id" value="{{ workspace.week.notes_manager_id }}">
-            {% if selected_manager_id %}<input type="hidden" name="return_manager_id" value="{{ selected_manager_id }}">{% endif %}
-            <label class="visually-hidden" for="week-notes">Нотатки</label>
-            <textarea id="week-notes" name="body" rows="6" placeholder="Наприклад: важливі зустрічі, цілі, нагадування…">{{ workspace.week.notes }}</textarea>
-            <button type="submit" class="btn btn-secondary btn-sm">Зберегти нотатки</button>
-          </form>
-          {% else %}
-          <p class="tm-empty">Оберіть менеджера, щоб вести нотатки тижня.</p>
-          {% endif %}
-        </section>
-        <section class="tm-week-summary">
-          <h3>Підсумок тижня</h3>
-          <ul>
-            <li><span>Всього задач</span> <strong>{{ workspace.week.total }}</strong></li>
-            <li><i class="tm-dot tm-dot--high"></i> <span>Високий пріоритет</span> <strong>{{ workspace.week.high }}</strong></li>
-            <li><i class="tm-dot tm-dot--normal"></i> <span>Середній пріоритет</span> <strong>{{ workspace.week.normal }}</strong></li>
-            <li><i class="tm-dot tm-dot--low"></i> <span>Низький пріоритет</span> <strong>{{ workspace.week.low }}</strong></li>
-          </ul>
-        </section>
-      </div>
+    {% for day in workspace.week.days %}
+    {% include "partials/tm_week_day.html" %}
+    {% endfor %}
+    <div class="tm-week-extras">
+      <section class="tm-week-notes">
+        <h3>Нотатки на тиждень</h3>
+        {% if workspace.week.notes_manager_id %}
+        <form method="post" action="/tasks/week-notes" class="stand-move-form" data-week-notes-form>
+          <input type="hidden" name="week_start" value="{{ workspace.week.start.isoformat() }}">
+          <input type="hidden" name="manager_id" value="{{ workspace.week.notes_manager_id }}">
+          {% if selected_manager_id %}<input type="hidden" name="return_manager_id" value="{{ selected_manager_id }}">{% endif %}
+          <label class="visually-hidden" for="week-notes">Нотатки</label>
+          <textarea id="week-notes" name="body" rows="6" placeholder="Наприклад: важливі зустрічі, цілі, нагадування…">{{ workspace.week.notes }}</textarea>
+          <button type="submit" class="btn btn-secondary btn-sm">Зберегти нотатки</button>
+        </form>
+        {% else %}
+        <p class="tm-empty">Оберіть менеджера, щоб вести нотатки тижня.</p>
+        {% endif %}
+      </section>
+      <section class="tm-week-summary">
+        <h3>Підсумок тижня</h3>
+        <ul>
+          <li><span>Всього задач</span> <strong>{{ workspace.week.total }}</strong></li>
+          <li><i class="tm-dot tm-dot--high"></i> <span>Високий пріоритет</span> <strong>{{ workspace.week.high }}</strong></li>
+          <li><i class="tm-dot tm-dot--normal"></i> <span>Середній пріоритет</span> <strong>{{ workspace.week.normal }}</strong></li>
+          <li><i class="tm-dot tm-dot--low"></i> <span>Низький пріоритет</span> <strong>{{ workspace.week.low }}</strong></li>
+        </ul>
+      </section>
     </div>
   </div>
 </div>

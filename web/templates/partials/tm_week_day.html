@@ -1,4 +1,4 @@
-<section class="tm-week-day{% if day.is_today %} is-today{% endif %}">
+<section class="tm-week-day tm-week-day--{{ day.date.weekday() }}{% if day.is_today %} is-today{% endif %}">
   <header class="tm-week-day__head">
     <h2>{{ day.weekday_label }}</h2>
     <span class="tm-week-day__date">{{ day.date_label }}</span>
@@ -8,8 +8,8 @@
     <table class="tm-week-table">
       <thead>
         <tr>
-          <th>Пріоритет</th>
-          <th>Клієнт / Предмет</th>
+          <th class="tm-week-table__prio">Пріоритет</th>
+          <th>Клієнт</th>
           <th>Завдання</th>
           <th class="tm-week-table__check">✓</th>
           <th>Нотатки</th>
@@ -18,10 +18,9 @@
       <tbody>
         {% for card in day.tasks %}
         <tr class="{% if card.status == 'done' %}is-done{% endif %}{% if card.is_overdue %} is-overdue{% endif %}">
-          <td>
-            <span class="tm-week-prio tm-week-prio--{{ card.priority }}">
+          <td class="tm-week-table__prio">
+            <span class="tm-week-prio tm-week-prio--{{ card.priority }}" title="{{ card.priority_label }}" aria-label="{{ card.priority_label }}">
               <i></i>
-              {% if card.priority == 'normal' %}Середній{% else %}{{ card.priority_label }}{% endif %}
             </span>
           </td>
           <td>{% if card.task.client %}{{ card.task.client.name }}{% else %}—{% endif %}</td>
