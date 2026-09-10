@@ -2,6 +2,7 @@
   <header class="tm-week-day__head">
     <h2>{{ day.weekday_label }}</h2>
     <span class="tm-week-day__date">{{ day.date_label }}</span>
+    {% if day.is_today %}<span class="tm-week-day__today">Сьогодні</span>{% endif %}
     <span class="tm-week-day__count">{{ day.tasks|length }}</span>
   </header>
   <div class="table-wrap">

@@ -874,8 +874,9 @@
 }
 
 .tm-week-day.is-today {
-  border-color: #c7c2ff;
-  background: #f7f6ff;
+  border-color: var(--tm-accent);
+  background: #efeefe;
+  box-shadow: inset 4px 0 0 var(--tm-accent);
 }
 
 .tm-week-day .table-wrap {
@@ -916,6 +917,19 @@
   color: var(--tm-accent);
 }
 
+.tm-week-day__today {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  background: var(--tm-accent);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
 .tm-week-table {
   width: 100%;
   border-collapse: separate;
@@ -925,14 +939,14 @@
 
 .tm-week-table thead th {
   text-align: left;
-  background: #312e81;
-  color: #eef2ff;
+  background: #eef0fb;
+  color: #4338ca;
   font-weight: 700;
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  padding: 0.55rem 0.5rem;
-  border-bottom: 0;
+  padding: 0.5rem 0.5rem;
+  border-bottom: 2px solid #c7c2ff;
   white-space: nowrap;
 }
 
