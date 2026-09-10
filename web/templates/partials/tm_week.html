@@ -7,7 +7,9 @@
         <span class="tm-week-nav__dates">{{ workspace.week.label }}</span>
       </h2>
       <a class="tm-week-nav__arrow" href="/tasks{{ tasks_page_query(manager_id=selected_manager_id, status=status_filter, kind=selected_kind, view='week', q=search_q, client_id=selected_client_id, priority=selected_priority, deadline=selected_deadline, workflow=selected_workflow, week_start=workspace.week.next_start.isoformat()) }}" aria-label="Наступний тиждень">›</a>
+      {% if not workspace.week.is_current %}
       <a class="btn btn-secondary btn-sm" href="/tasks{{ tasks_page_query(manager_id=selected_manager_id, status=status_filter, kind=selected_kind, view='week', q=search_q, client_id=selected_client_id, priority=selected_priority, deadline=selected_deadline, workflow=selected_workflow) }}">Сьогодні</a>
+      {% endif %}
     </div>
   </div>
 

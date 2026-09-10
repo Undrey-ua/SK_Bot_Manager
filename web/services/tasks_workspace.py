@@ -182,6 +182,7 @@ class WeekPlanner:
     low: int
     prev_start: date
     next_start: date
+    is_current: bool
 
 
 @dataclass
@@ -396,6 +397,7 @@ def _build_week_planner(
         low=sum(1 for c in week_cards if c.priority == "low"),
         prev_start=start - timedelta(days=7),
         next_start=start + timedelta(days=7),
+        is_current=start == monday_of(today),
     )
 
 
