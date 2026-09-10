@@ -813,7 +813,8 @@ tbody td strong {
 
 .filters select,
 .filters input[type="number"],
-.filters input[type="text"] {
+.filters input[type="text"],
+.filters input[type="search"] {
   padding: 0.55rem 0.85rem;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -3332,7 +3333,8 @@ form.filters.filters--panelled:has(.filters__field--region) {
 
   .filters select,
   .filters input[type="number"],
-  .filters input[type="text"] {
+  .filters input[type="text"],
+  .filters input[type="search"] {
     min-width: 0;
     width: 100%;
     font-size: 16px;
@@ -3588,6 +3590,9 @@ form.filters.filters--panelled:has(.filters__field--region) {
 .stand-move-form select,
 .stand-move-form input[type="text"],
 .stand-move-form input[type="number"],
+.stand-move-form input[type="date"],
+.stand-move-form input[type="time"],
+.stand-move-form input[type="search"],
 .stand-move-form textarea,
 .allocate-form select,
 .allocate-form input[type="text"],

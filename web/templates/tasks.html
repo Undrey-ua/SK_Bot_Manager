@@ -46,68 +46,73 @@
     </a>
   </section>
 
-  <form class="tm-toolbar" method="get" action="/tasks">
+  <form class="filters filters--compact tm-toolbar" method="get" action="/tasks">
     <input type="hidden" name="view" value="{{ current_view }}">
     {% if status_filter != 'active' %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
     <label class="tm-search">
-      <span class="visually-hidden">Пошук</span>
-      <input type="search" name="q" value="{{ search_q or '' }}" placeholder="Пошук задач, клієнтів, нотаток…">
+      Пошук
+      <input type="search" name="q" value="{{ search_q or '' }}" placeholder="Задачі, клієнти, нотатки…">
     </label>
-    <button type="button" class="btn btn-secondary tm-filters-toggle" data-open-filters>Фільтри</button>
-    <div class="tm-filters" id="tm-filters">
-      {% if can_filter_managers %}
-      <label>Менеджер
-        <select name="manager_id" onchange="this.form.submit()">
-          <option value="">Усі менеджери</option>
-          {% for m in managers %}
-          <option value="{{ m.id }}" {% if selected_manager_id == m.id %}selected{% endif %}>{{ m.name }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      {% endif %}
-      <label>Клієнт
-        <select name="client_id" onchange="this.form.submit()">
-          <option value="">Усі клієнти</option>
-          {% for c in workspace.clients %}
-          <option value="{{ c.id }}" {% if selected_client_id == c.id %}selected{% endif %}>{{ c.name }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>Тип
-        <select name="kind" onchange="this.form.submit()">
-          <option value="">Усі типи</option>
-          {% for value, label in manager_task_kind_choices %}
-          <option value="{{ value }}" {% if selected_kind == value %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>Пріоритет
-        <select name="priority" onchange="this.form.submit()">
-          <option value="">Усі пріоритети</option>
-          {% for value, label in priority_choices %}
-          <option value="{{ value }}" {% if selected_priority == value %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>Дедлайн
-        <select name="deadline" onchange="this.form.submit()">
-          <option value="" {% if not selected_deadline %}selected{% endif %}>Усі дедлайни</option>
-          <option value="today" {% if selected_deadline == 'today' %}selected{% endif %}>Сьогодні</option>
-          <option value="overdue" {% if selected_deadline == 'overdue' %}selected{% endif %}>Прострочені</option>
-          <option value="week" {% if selected_deadline == 'week' %}selected{% endif %}>Найближчий тиждень</option>
-          <option value="none" {% if selected_deadline == 'none' %}selected{% endif %}>Без дедлайну</option>
-        </select>
-      </label>
-      <label>Статус
-        <select name="workflow" onchange="this.form.submit()">
-          <option value="">Усі статуси</option>
-          {% for value, label in workflow_choices %}
-          <option value="{{ value }}" {% if selected_workflow == value %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <button type="submit" class="btn btn-primary btn-sm">Показати</button>
-      <a class="btn btn-secondary btn-sm" href="/tasks?view={{ current_view }}">Скинути</a>
+    {% if can_filter_managers %}
+    <label class="filters__field--manager">
+      Менеджер
+      <select name="manager_id">
+        <option value="">Усі менеджери</option>
+        {% for m in managers %}
+        <option value="{{ m.id }}" {% if selected_manager_id == m.id %}selected{% endif %}>{{ m.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% endif %}
+    <label>
+      Клієнт
+      <select name="client_id">
+        <option value="">Усі клієнти</option>
+        {% for c in workspace.clients %}
+        <option value="{{ c.id }}" {% if selected_client_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Тип
+      <select name="kind">
+        <option value="">Усі типи</option>
+        {% for value, label in manager_task_kind_choices %}
+        <option value="{{ value }}" {% if selected_kind == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Пріоритет
+      <select name="priority">
+        <option value="">Усі пріоритети</option>
+        {% for value, label in priority_choices %}
+        <option value="{{ value }}" {% if selected_priority == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Дедлайн
+      <select name="deadline">
+        <option value="" {% if not selected_deadline %}selected{% endif %}>Усі дедлайни</option>
+        <option value="today" {% if selected_deadline == 'today' %}selected{% endif %}>Сьогодні</option>
+        <option value="overdue" {% if selected_deadline == 'overdue' %}selected{% endif %}>Прострочені</option>
+        <option value="week" {% if selected_deadline == 'week' %}selected{% endif %}>Найближчий тиждень</option>
+        <option value="none" {% if selected_deadline == 'none' %}selected{% endif %}>Без дедлайну</option>
+      </select>
+    </label>
+    <label>
+      Статус
+      <select name="workflow">
+        <option value="">Усі статуси</option>
+        {% for value, label in workflow_choices %}
+        <option value="{{ value }}" {% if selected_workflow == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <div class="filters__apply">
+      <button type="submit" class="btn btn-primary btn-sm">Оновити</button>
+      <a class="btn btn-secondary btn-sm clients-filters__reset" href="/tasks?view={{ current_view }}">Скинути</a>
     </div>
   </form>
 
