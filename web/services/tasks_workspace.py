@@ -327,7 +327,7 @@ def format_week_range(start: date, end: date) -> str:
 
 
 def _task_on_date(task: Task, day: date) -> bool:
-    if workflow_status(task) == TaskWorkflowStatus.CANCELLED.value:
+    if not is_open_task(task):
         return False
     if task.deadline == day:
         return True
