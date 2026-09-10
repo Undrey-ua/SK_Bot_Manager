@@ -1,11 +1,12 @@
 import logging
 from datetime import date
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from aiogram import Bot, F, Router
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.keyboards.inline import back_to_menu_keyboard, main_menu_keyboard
 from bot.notifications.reserve_broadcast import broadcast_new_reserve
@@ -23,6 +24,7 @@ from bot.services.reserve import ReserveService
 from bot.services.user import UserService
 from bot.services.brand import BrandService
 from bot.states.reserve import ReserveStates
+from bot.utils.formatting import html_text
 from bot.utils.roles import effective_manager_id
 from database.models import User
 
@@ -30,13 +32,27 @@ logger = logging.getLogger(__name__)
 router = Router(name="reserves")
 
 
+def _reserve_create_error_text(exc: BaseException) -> str:
+    orig = getattr(exc, "orig", None)
+    text = f"{exc} {orig}".lower()
+    if "value too long" in text or "string_data_right_truncation" in text:
+        return "❌ Назва матеріалу занадто довга. Скоротіть текст і спробуйте ще раз."
+    if "numericvalueoutofrange" in text or "numeric field overflow" in text:
+        return "❌ Невірне значення кількості. Введіть число на кшталт 12.5"
+    if "foreign key" in text or "foreignkeyviolation" in text:
+        return "❌ Клієнта або область не знайдено. Почніть створення резерву спочатку."
+    if "does not exist" in text:
+        return "❌ Помилка бази даних. Зверніться до адміністратора."
+    return "❌ Не вдалося створити резерв. Спробуйте ще раз."
+
+
 def _reserve_text(r) -> str:
     lines = [
         f"📦 <b>Резерв #{r.id}</b>\n",
-        f"Менеджер: {r.manager.name}",
-        f"Область: {r.region.name}",
-        f"Клієнт: {r.client.name}",
-        f"Матеріал: {r.material}",
+        f"Менеджер: {html_text(r.manager.name)}",
+        f"Область: {html_text(r.region.name)}",
+        f"Клієнт: {html_text(r.client.name)}",
+        f"Матеріал: {html_text(r.material)}",
         f"Кількість: {r.quantity} кв. м",
     ]
     if r.sold_at:
@@ -190,7 +206,7 @@ async def reserve_pick_client(
 
 @router.message(ReserveStates.enter_material, F.text)
 async def reserve_material(message: Message, state: FSMContext) -> None:
-    material = message.text.strip()
+    material = message.text.replace("\x00", "").strip()
     if not material:
         await message.answer("Введіть матеріал текстом.")
         return
@@ -205,13 +221,17 @@ async def reserve_quantity(
     state: FSMContext,
     bot: Bot,
     db_user: User,
+    session: AsyncSession,
+    client_service: ClientService,
     reserve_service: ReserveService,
     user_service: UserService,
 ) -> None:
     raw = message.text.strip().replace(",", ".")
     try:
-        qty = Decimal(raw)
+        qty = Decimal(raw).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         if qty <= 0:
+            raise InvalidOperation
+        if qty > Decimal("9999999999.99"):
             raise InvalidOperation
     except (InvalidOperation, ValueError):
         await message.answer("Введіть додатне число, наприклад 10 або 12.5")
@@ -224,24 +244,50 @@ async def reserve_quantity(
             await state.clear()
             return
 
+    manager_id = effective_manager_id(db_user)
+    try:
+        region_id = int(data["region_id"])
+        client_id = int(data["client_id"])
+    except (TypeError, ValueError):
+        await message.answer("Дані втрачено. Почніть спочатку.", reply_markup=back_to_menu_keyboard())
+        await state.clear()
+        return
+
+    client = await client_service.get_by_id(client_id)
+    if (
+        client is None
+        or client.manager_id != manager_id
+        or client.region_id != region_id
+    ):
+        await message.answer(
+            "Клієнта не знайдено або область змінилася. Почніть спочатку.",
+            reply_markup=back_to_menu_keyboard(),
+        )
+        await state.clear()
+        return
+
     try:
         reserve = await reserve_service.create(
-            manager_id=effective_manager_id(db_user),
-            region_id=int(data["region_id"]),
-            client_id=int(data["client_id"]),
-            material=data["material"],
+            manager_id=manager_id,
+            region_id=region_id,
+            client_id=client_id,
+            material=str(data["material"]),
             quantity=qty,
             created_by_id=db_user.id,
         )
-    except Exception:
+    except Exception as exc:
         logger.exception("Failed to create reserve")
-        await message.answer("❌ Не вдалося створити резерв. Спробуйте ще раз.")
+        try:
+            await session.rollback()
+        except Exception:
+            logger.exception("Failed to rollback after reserve create error")
+        await message.answer(_reserve_create_error_text(exc))
         return
 
     await state.clear()
     await message.answer(
         f"✅ <b>Резерв #{reserve.id} створено</b>\n\n"
-        f"Матеріал: {reserve.material}\n"
+        f"Матеріал: {html_text(reserve.material)}\n"
         f"Кількість: {reserve.quantity} кв. м",
         reply_markup=back_to_menu_keyboard(),
     )

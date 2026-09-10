@@ -219,7 +219,7 @@ class Reserve(Base):
     region_id: Mapped[int] = mapped_column(ForeignKey("manager_regions.id"), index=True)
     client_id: Mapped[int] = mapped_column(ForeignKey("clients.id"), index=True)
 
-    material: Mapped[str] = mapped_column(String(200))
+    material: Mapped[str] = mapped_column(Text)
     quantity: Mapped[Decimal] = mapped_column(Numeric(12, 2))
 
     created_at: Mapped[datetime] = mapped_column(

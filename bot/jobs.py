@@ -9,6 +9,7 @@ from aiogram import Bot
 from bot.container import Container
 from bot.keyboards.reserves import reserve_owner_actions_keyboard
 from bot.keyboards.tasks import WEEKDAYS_UA, tasks_hub_keyboard
+from bot.utils.formatting import html_text
 from database.models import User
 
 logger = logging.getLogger(__name__)
@@ -25,8 +26,8 @@ async def _notify_expired_reserves(bot: Bot, container: Container) -> None:
                     chat_id=r.manager.telegram_id,
                     text=(
                         f"⏰ <b>Резерв #{r.id} закінчився</b>\n\n"
-                        f"{r.client.name} · {r.region.name}\n"
-                        f"{r.material} — {r.quantity} кв. м\n\n"
+                        f"{html_text(r.client.name)} · {html_text(r.region.name)}\n"
+                        f"{html_text(r.material)} — {r.quantity} кв. м\n\n"
                         "Продовжити ще на 7 днів або скасувати?"
                     ),
                     reply_markup=reserve_owner_actions_keyboard(r.id),

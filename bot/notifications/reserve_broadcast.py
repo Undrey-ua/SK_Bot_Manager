@@ -8,6 +8,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from bot.keyboards.inline import back_to_menu_keyboard
+from bot.utils.formatting import html_text
 from database.models import User
 
 logger = logging.getLogger(__name__)
@@ -25,9 +26,9 @@ def format_new_reserve_message(
 ) -> str:
     return (
         f"📦 <b>Новий резерв</b>\n\n"
-        f"{manager_name} поставив резерв #{reserve_id}:\n"
-        f"{client_name} · {region_name}\n"
-        f"{material} — {quantity} кв. м\n"
+        f"{html_text(manager_name)} поставив резерв #{reserve_id}:\n"
+        f"{html_text(client_name)} · {html_text(region_name)}\n"
+        f"{html_text(material)} — {quantity} кв. м\n"
         f"Діє до: {expires_at.strftime('%Y-%m-%d %H:%M')} UTC"
     )
 

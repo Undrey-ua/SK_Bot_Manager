@@ -1,8 +1,15 @@
 from __future__ import annotations
 
+import html
+
 from database.models import VISIT_TYPE_LABELS, Client, Stand, VisitType
 from visit_task_labels import visit_task_label
 from web.client_geo import client_display_city, client_display_comment
+
+
+def html_text(value: object) -> str:
+    """Екранує текст для Telegram HTML (назви з каталогу можуть містити <, &)."""
+    return html.escape(str(value or ""), quote=False)
 
 
 def user_first_name(full_name: str) -> str:

@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from database.models import Client, ManagerRegion, Reserve, User
+from database.models import Client, Reserve
 from database.repositories.base import BaseRepository
+
+_QTY_QUANT = Decimal("0.01")
+_QTY_MAX = Decimal("9999999999.99")
 
 
 class ReserveRepository(BaseRepository):
@@ -34,14 +37,20 @@ class ReserveRepository(BaseRepository):
         created_by_id: int | None = None,
         ttl_days: int = 7,
     ) -> Reserve:
+        cleaned = (material or "").replace("\x00", "").strip()
+        qty = quantity.quantize(_QTY_QUANT, rounding=ROUND_HALF_UP)
+        if not cleaned:
+            raise ValueError("material is empty")
+        if qty <= 0 or qty > _QTY_MAX:
+            raise ValueError("quantity out of range")
         now = datetime.now(timezone.utc)
         reserve = Reserve(
             manager_id=manager_id,
             created_by_id=created_by_id if created_by_id is not None else manager_id,
             region_id=region_id,
             client_id=client_id,
-            material=material.strip(),
-            quantity=quantity,
+            material=cleaned,
+            quantity=qty,
             expires_at=now + timedelta(days=ttl_days),
         )
         self._session.add(reserve)
