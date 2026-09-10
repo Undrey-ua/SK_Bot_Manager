@@ -706,7 +706,7 @@ async def tasks_done(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.message(VisitStates.enter_comment, F.text)
 async def enter_comment(message: Message, state: FSMContext) -> None:
-    comment = message.text.strip()
+    comment = (message.text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
     if comment == "-":
         comment = None
     await state.update_data(comment=comment, photo_urls=[])

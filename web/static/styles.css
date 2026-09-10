@@ -1458,6 +1458,13 @@ form.filters.filters--panelled:has(.filters__field--region) {
   font-size: 0.92rem;
 }
 
+.multiline-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
 .client-detail-grid {
   margin-bottom: 1.25rem;
 }
@@ -1951,10 +1958,10 @@ form.filters.filters--panelled:has(.filters__field--region) {
 }
 
 .comment-cell {
-  max-width: 200px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  max-width: 280px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
   color: var(--text-secondary);
 }
 
