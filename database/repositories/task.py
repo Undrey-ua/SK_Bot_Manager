@@ -36,6 +36,8 @@ class TaskRepository(BaseRepository):
             weekday=weekday,
             comment=comment.strip() if comment else None,
             kind=normalize_manager_task_kind(kind),
+            status="new",
+            priority="normal",
         )
         self._session.add(task)
         await self._session.flush()
@@ -74,6 +76,8 @@ class TaskRepository(BaseRepository):
         if task is None:
             return None
         task.completed_at = datetime.now(timezone.utc)
+        task.deleted_at = None
+        task.status = "done"
         await self._session.flush()
         return task
 
@@ -82,6 +86,8 @@ class TaskRepository(BaseRepository):
         if task is None:
             return None
         task.completed_at = None
+        if task.deleted_at is None:
+            task.status = "in_progress"
         await self._session.flush()
         return task
 
@@ -99,6 +105,7 @@ class TaskRepository(BaseRepository):
         if task is None:
             return None
         task.deleted_at = datetime.now(timezone.utc)
+        task.status = "cancelled"
         await self._session.flush()
         return task
 

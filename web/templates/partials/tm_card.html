@@ -1,0 +1,25 @@
+<a class="tm-card tm-card--{{ card.status }}{% if card.is_overdue %} tm-card--overdue{% endif %}"
+   href="/tasks{{ tasks_page_query(manager_id=selected_manager_id, status=status_filter, kind=selected_kind, view=current_view, q=search_q, client_id=selected_client_id, priority=selected_priority, deadline=selected_deadline, workflow=selected_workflow, year=workspace.calendar_year, month=workspace.calendar_month, task=card.task.id, cal_day=cal_day) }}"
+   data-task-id="{{ card.task.id }}"
+   data-status="{{ card.status }}"
+   draggable="{% if can_manage_task(current_user, assignee_id=card.task.assignee_id) %}true{% else %}false{% endif %}">
+  <div class="tm-card__top">
+    <span class="tm-dot tm-dot--{{ card.priority }}" title="{{ card.priority_label }}"></span>
+    <span class="tm-card__title">{{ card.task.title }}</span>
+  </div>
+  {% if card.task.client %}
+  <div class="tm-card__client">{{ card.task.client.name }}</div>
+  {% endif %}
+  <div class="tm-card__meta">
+    <span class="tm-card__when{% if card.is_overdue %} tm-card__when--overdue{% endif %}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      {{ card.when_short }}
+    </span>
+    {% if current_view == 'board' %}
+    <span class="tm-avatar tm-avatar--sm" title="{{ card.task.assignee.name if card.task.assignee else '' }}">{{ user_initials(card.task.assignee.name if card.task.assignee else '') }}</span>
+    {% elif current_view == 'list' %}
+    <span class="tm-pill tm-pill--{{ card.status }}">{{ card.status_label }}</span>
+    <span class="tm-avatar tm-avatar--sm" title="{{ card.task.assignee.name if card.task.assignee else '' }}">{{ user_initials(card.task.assignee.name if card.task.assignee else '') }}</span>
+    {% endif %}
+  </div>
+</a>

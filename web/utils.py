@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from datetime import date, datetime
 from decimal import Decimal
+from urllib.parse import quote_plus
 from zoneinfo import ZoneInfo
 
 from database.models import (
@@ -113,15 +114,45 @@ def tasks_page_query(
     status: str | None = None,
     kind: str | None = None,
     show_completed: bool = False,
+    view: str | None = None,
+    q: str | None = None,
+    client_id: int | None = None,
+    priority: str | None = None,
+    deadline: str | None = None,
+    workflow: str | None = None,
+    year: int | None = None,
+    month: int | None = None,
+    task: int | None = None,
+    cal_day: str | None = None,
 ) -> str:
     """Query string for /tasks links (без leading ? якщо порожньо)."""
     parts: list[str] = []
+    if view and view != "list":
+        parts.append(f"view={view}")
     if manager_id is not None:
         parts.append(f"manager_id={manager_id}")
     if status and status != "active":
         parts.append(f"status={status}")
     if kind:
         parts.append(f"kind={kind}")
+    if q:
+        parts.append(f"q={quote_plus(q)}")
+    if client_id is not None:
+        parts.append(f"client_id={client_id}")
+    if priority:
+        parts.append(f"priority={priority}")
+    if deadline:
+        parts.append(f"deadline={deadline}")
+    if workflow:
+        parts.append(f"workflow={workflow}")
+    if year is not None:
+        parts.append(f"year={year}")
+    if month is not None:
+        parts.append(f"month={month}")
+    if cal_day:
+        parts.append(f"cal_day={cal_day}")
+    if task is not None:
+        parts.append(f"task={task}")
     if show_completed:
         parts.append("show_completed=1")
     return ("?" + "&".join(parts)) if parts else ""

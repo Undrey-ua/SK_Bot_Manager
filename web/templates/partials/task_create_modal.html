@@ -1,0 +1,67 @@
+<div class="modal" id="tm-create-modal" hidden>
+  <div class="modal__backdrop" data-close-modal></div>
+  <div class="modal__dialog" role="dialog" aria-labelledby="tm-create-title">
+    <header class="modal__header">
+      <h2 id="tm-create-title">Нова задача</h2>
+      <button type="button" class="modal__close" data-close-modal aria-label="Закрити">×</button>
+    </header>
+    <form method="post" action="/tasks" class="tm-create" id="tm-create-form">
+      <input type="hidden" name="return_view" value="{{ current_view }}">
+      <label>Назва задачі *
+        <input type="text" name="title" required placeholder="Наприклад: Підготувати договір">
+      </label>
+      <label>Клієнт
+        <select name="client_id">
+          <option value="">Оберіть клієнта</option>
+          {% for c in workspace.clients %}
+          <option value="{{ c.id }}">{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Тип задачі
+        <select name="kind">
+          <option value="">Оберіть тип</option>
+          {% for value, label in manager_task_kind_choices %}
+          <option value="{{ value }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <div class="tm-edit__row">
+        <label>Дата
+          <input type="date" name="deadline">
+        </label>
+        <label>Час
+          <input type="time" name="due_time">
+        </label>
+      </div>
+      <fieldset class="tm-prio">
+        <legend>Пріоритет</legend>
+        <label><input type="radio" name="priority" value="low"> Низький</label>
+        <label><input type="radio" name="priority" value="normal" checked> Звичайний</label>
+        <label><input type="radio" name="priority" value="high"> Високий</label>
+      </fieldset>
+      {% if can_manage_tasks %}
+      <label>Відповідальний
+        <select name="assignee_id" required>
+          {% for m in managers %}
+          <option value="{{ m.id }}" {% if selected_manager_id == m.id or (not selected_manager_id and m.id == current_user.id) %}selected{% endif %}>{{ m.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      {% else %}
+      <input type="hidden" name="assignee_id" value="{{ current_user.id }}">
+      {% endif %}
+      <label>Опис
+        <textarea name="comment" rows="3" placeholder="Додайте деталі…"></textarea>
+      </label>
+      <label class="tm-toggle">
+        <input type="checkbox" name="add_to_calendar" value="1" checked>
+        Додати в календар
+      </label>
+      <input type="hidden" name="status" id="tm-create-status" value="new">
+      <div class="modal__actions">
+        <button type="submit" class="btn btn-primary">Створити задачу</button>
+      </div>
+    </form>
+  </div>
+</div>

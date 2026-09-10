@@ -1,219 +1,273 @@
 {% extends "base.html" %}
 {% block title %}Задачі — SK Bot Manager{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="/static/tasks.css">
+{% endblock %}
 {% block content %}
-<header class="page-header">
-  <h1 class="page-title">Задачі</h1>
-  <p class="page-subtitle">Призначення та контроль — по менеджерах і днях</p>
-</header>
+<div class="tm{% if open_task %} tm--drawer-open{% endif %}" id="tm-root"
+     data-view="{{ current_view }}"
+     data-status-url="/tasks/status">
+  <header class="tm-hero">
+    <div class="tm-hero__who">
+      <span class="tm-avatar tm-avatar--lg">{{ user_initials(current_user.name) }}</span>
+      <div>
+        <h1 class="tm-hero__title">Задачі</h1>
+        <p class="tm-hero__sub">{% if workspace.focus_manager_name %}{{ workspace.focus_manager_name }}{% else %}{{ current_user.name }}{% endif %}</p>
+      </div>
+    </div>
+    <div class="tm-hero__actions">
+      <div class="tm-views" role="tablist" aria-label="Вигляд">
+        <a class="tm-views__btn{% if current_view == 'list' %} is-active{% endif %}" href="/tasks{{ tasks_page_query(manager_id=selected_manager_id, status=status_filter, kind=selected_kind, view='list', q=search_q, client_id=selected_client_id, priority=selected_priority, deadline=selected_deadline, workflow=selected_workflow) }}">Список</a>
+        <a class="tm-views__btn{% if current_view == 'board' %} is-active{% endif %}" href="/tasks{{ tasks_page_query(manager_id=selected_manager_id, status=status_filter, kind=selected_kind, view='board', q=search_q, client_id=selected_client_id, priority=selected_priority, deadline=selected_deadline, workflow=selected_workflow) }}">Дошка</a>
+        <a class="tm-views__btn{% if current_view == 'calendar' %} is-active{% endif %}" href="/tasks{{ tasks_page_query(manager_id=selected_manager_id, status=status_filter, kind=selected_kind, view='calendar', q=search_q, client_id=selected_client_id, priority=selected_priority, deadline=selected_deadline, workflow=selected_workflow, year=workspace.calendar_year, month=workspace.calendar_month) }}">Календар</a>
+      </div>
+      {% if can_create_tasks %}
+      <button type="button" class="btn btn-primary tm-new" data-open-create>+ Нова задача</button>
+      {% endif %}
+    </div>
+  </header>
 
-{% if can_manage_sales_plans %}
-<section class="card card--compact-form sales-plans-admin">
-  <h2>План продажів на місяць</h2>
-  <p class="muted sales-plans-admin__hint">Ціль у кв. м для кожного менеджера. Виконання — у розділі «Продажі».</p>
-  <form method="post" action="/tasks/sales-plans" class="sales-plans-form">
-    <div class="sales-plans-form__period">
-      <label>Рік
-        <select name="plan_year">
-          {% for y in range(plan_year - 1, plan_year + 2) %}
-          <option value="{{ y }}" {% if plan_year == y %}selected{% endif %}>{{ y }}</option>
+  <section class="tm-stats" aria-label="Підсумок">
+    <a class="tm-stat" href="/tasks{{ tasks_page_query(manager_id=selected_manager_id, status='active', kind=selected_kind, view=current_view, q=search_q, client_id=selected_client_id, priority=selected_priority, deadline=selected_deadline) }}">
+      <span class="tm-stat__label">Активних</span>
+      <strong>{{ workspace.stats.active }}</strong>
+    </a>
+    <a class="tm-stat tm-stat--danger" href="/tasks{{ tasks_page_query(manager_id=selected_manager_id, status='overdue', kind=selected_kind, view=current_view, q=search_q, client_id=selected_client_id, priority=selected_priority, deadline=selected_deadline) }}">
+      <span class="tm-stat__label">Прострочені</span>
+      <strong>{{ workspace.stats.overdue }}</strong>
+    </a>
+    <a class="tm-stat tm-stat--today" href="/tasks{{ tasks_page_query(manager_id=selected_manager_id, kind=selected_kind, view=current_view, q=search_q, client_id=selected_client_id, priority=selected_priority, deadline='today') }}">
+      <span class="tm-stat__label">Сьогодні</span>
+      <strong>{{ workspace.stats.today }}</strong>
+    </a>
+    <a class="tm-stat tm-stat--ok" href="/tasks{{ tasks_page_query(manager_id=selected_manager_id, status='completed', kind=selected_kind, view=current_view, q=search_q, client_id=selected_client_id, priority=selected_priority, deadline=selected_deadline) }}">
+      <span class="tm-stat__label">Виконано</span>
+      <strong>{{ workspace.stats.done }}</strong>
+    </a>
+  </section>
+
+  <form class="tm-toolbar" method="get" action="/tasks">
+    <input type="hidden" name="view" value="{{ current_view }}">
+    {% if status_filter != 'active' %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
+    <label class="tm-search">
+      <span class="visually-hidden">Пошук</span>
+      <input type="search" name="q" value="{{ search_q or '' }}" placeholder="Пошук задач, клієнтів, нотаток…">
+    </label>
+    <button type="button" class="btn btn-secondary tm-filters-toggle" data-open-filters>Фільтри</button>
+    <div class="tm-filters" id="tm-filters">
+      {% if can_filter_managers %}
+      <label>Менеджер
+        <select name="manager_id" onchange="this.form.submit()">
+          <option value="">Усі менеджери</option>
+          {% for m in managers %}
+          <option value="{{ m.id }}" {% if selected_manager_id == m.id %}selected{% endif %}>{{ m.name }}</option>
           {% endfor %}
         </select>
       </label>
-      <label>Місяць
-        <select name="plan_month">
-          {% for num, name in uk_months %}
-          <option value="{{ num }}" {% if plan_month == num %}selected{% endif %}>{{ name }}</option>
+      {% endif %}
+      <label>Клієнт
+        <select name="client_id" onchange="this.form.submit()">
+          <option value="">Усі клієнти</option>
+          {% for c in workspace.clients %}
+          <option value="{{ c.id }}" {% if selected_client_id == c.id %}selected{% endif %}>{{ c.name }}</option>
           {% endfor %}
         </select>
       </label>
-    </div>
-    <div class="table-wrap">
-      <table class="sales-plans-table">
-        <thead>
-          <tr>
-            <th>Менеджер</th>
-            <th>План, кв. м</th>
-            <th>Факт</th>
-            <th>%</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in sales_plan_rows %}
-          <tr>
-            <td>{{ row.manager_name }}</td>
-            <td>
-              <input type="text" name="plan_{{ row.manager_id }}" inputmode="decimal"
-                     value="{% if row.target %}{{ row.target }}{% endif %}"
-                     placeholder="0" class="sales-plans-table__input">
-            </td>
-            <td>{{ format_qty(row.actual, decimals=1) }}</td>
-            <td>{% if row.target %}{{ row.pct }}%{% else %}—{% endif %}</td>
-          </tr>
+      <label>Тип
+        <select name="kind" onchange="this.form.submit()">
+          <option value="">Усі типи</option>
+          {% for value, label in manager_task_kind_choices %}
+          <option value="{{ value }}" {% if selected_kind == value %}selected{% endif %}>{{ label }}</option>
           {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    <div class="task-form__actions">
-      <button type="submit" class="btn btn-primary">Зберегти плани</button>
+        </select>
+      </label>
+      <label>Пріоритет
+        <select name="priority" onchange="this.form.submit()">
+          <option value="">Усі пріоритети</option>
+          {% for value, label in priority_choices %}
+          <option value="{{ value }}" {% if selected_priority == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Дедлайн
+        <select name="deadline" onchange="this.form.submit()">
+          <option value="" {% if not selected_deadline %}selected{% endif %}>Усі дедлайни</option>
+          <option value="today" {% if selected_deadline == 'today' %}selected{% endif %}>Сьогодні</option>
+          <option value="overdue" {% if selected_deadline == 'overdue' %}selected{% endif %}>Прострочені</option>
+          <option value="week" {% if selected_deadline == 'week' %}selected{% endif %}>Найближчий тиждень</option>
+          <option value="none" {% if selected_deadline == 'none' %}selected{% endif %}>Без дедлайну</option>
+        </select>
+      </label>
+      <label>Статус
+        <select name="workflow" onchange="this.form.submit()">
+          <option value="">Усі статуси</option>
+          {% for value, label in workflow_choices %}
+          <option value="{{ value }}" {% if selected_workflow == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button type="submit" class="btn btn-primary btn-sm">Показати</button>
+      <a class="btn btn-secondary btn-sm" href="/tasks?view={{ current_view }}">Скинути</a>
     </div>
   </form>
-</section>
+
+  <div class="tm-body">
+    <div class="tm-main">
+      {% if current_view == 'board' %}
+      <div class="tm-kanban">
+        {% for col in workspace.kanban %}
+        <section class="tm-col" data-drop-status="{{ col.status }}">
+          <header class="tm-col__head">
+            <span class="tm-col__dot tm-col__dot--{{ col.status }}"></span>
+            <h2>{{ col.label }}</h2>
+            <span class="tm-col__count">{{ col.tasks|length }}</span>
+            {% if can_create_tasks %}
+            <button type="button" class="tm-col__add" data-open-create data-status="{{ col.status }}" aria-label="Додати">+</button>
+            {% endif %}
+          </header>
+          <div class="tm-col__list">
+            {% for card in col.tasks %}
+            {% include "partials/tm_card.html" %}
+            {% else %}
+            <p class="tm-col__empty">
+              {% if col.status == 'done' %}Тут будуть виконані задачі{% elif col.status == 'cancelled' %}Скасовані задачі{% else %}Немає задач{% endif %}
+            </p>
+            {% endfor %}
+          </div>
+        </section>
+        {% endfor %}
+      </div>
+
+      {% elif current_view == 'calendar' %}
+      <div class="tm-cal">
+        <header class="tm-cal__nav">
+          <a class="tm-cal__arrow" href="/tasks{{ tasks_page_query(manager_id=selected_manager_id, status=status_filter, kind=selected_kind, view='calendar', q=search_q, client_id=selected_client_id, priority=selected_priority, deadline=selected_deadline, workflow=selected_workflow, year=prev_cal_year, month=prev_cal_month) }}" aria-label="Попередній місяць">‹</a>
+          <h2>{{ workspace.calendar_label }}</h2>
+          <a class="tm-cal__arrow" href="/tasks{{ tasks_page_query(manager_id=selected_manager_id, status=status_filter, kind=selected_kind, view='calendar', q=search_q, client_id=selected_client_id, priority=selected_priority, deadline=selected_deadline, workflow=selected_workflow, year=next_cal_year, month=next_cal_month) }}" aria-label="Наступний місяць">›</a>
+        </header>
+        <div class="tm-cal__weekdays">
+          {% for wd in calendar_weekdays %}
+          <span>{{ wd }}</span>
+          {% endfor %}
+        </div>
+        <div class="tm-cal__grid">
+          {% for week in workspace.calendar_weeks %}
+            {% for day in week %}
+            <a class="tm-cal__cell{% if not day.in_month %} is-out{% endif %}{% if day.is_today %} is-today{% endif %}{% if day.date == workspace.selected_day %} is-selected{% endif %}"
+               href="/tasks{{ tasks_page_query(manager_id=selected_manager_id, status=status_filter, kind=selected_kind, view='calendar', q=search_q, client_id=selected_client_id, priority=selected_priority, deadline=selected_deadline, workflow=selected_workflow, year=workspace.calendar_year, month=workspace.calendar_month, cal_day=day.date.isoformat()) }}">
+              <span class="tm-cal__num">{{ day.date.day }}</span>
+              <span class="tm-cal__chips">
+                {% for card in day.tasks[:3] %}
+                <span class="tm-cal__chip tm-cal__chip--{{ card.priority }}">{{ card.task.title }}</span>
+                {% endfor %}
+                {% if day.tasks|length > 3 %}
+                <span class="tm-cal__more">+{{ day.tasks|length - 3 }}</span>
+                {% endif %}
+              </span>
+              <span class="tm-cal__dots">
+                {% for card in day.tasks[:4] %}
+                <i class="tm-dot tm-dot--{{ card.priority }}"></i>
+                {% endfor %}
+              </span>
+            </a>
+            {% endfor %}
+          {% endfor %}
+        </div>
+        <section class="tm-cal__agenda">
+          <h3>{{ workspace.selected_day_label }} · {{ workspace.selected_day_tasks|length }} задач</h3>
+          {% for card in workspace.selected_day_tasks %}
+          {% include "partials/tm_card.html" %}
+          {% else %}
+          <p class="tm-empty">На цей день задач немає</p>
+          {% endfor %}
+        </section>
+      </div>
+
+      {% else %}
+      {% if workspace.list_groups %}
+      {% for group in workspace.list_groups %}
+      <section class="tm-group tm-group--{{ group.tone }}">
+        <h2>{{ group.label }} <span>{{ group.tasks|length }}</span></h2>
+        <div class="tm-group__list">
+          {% for card in group.tasks %}
+          {% include "partials/tm_list_row.html" %}
+          {% endfor %}
+        </div>
+      </section>
+      {% endfor %}
+      {% else %}
+      <div class="card"><p class="muted" style="margin:0">Немає задач за обраними фільтрами.</p></div>
+      {% endif %}
+      {% endif %}
+    </div>
+    {% include "partials/tm_drawer.html" %}
+  </div>
+</div>
+
+{% if can_manage_sales_plans %}
+<details class="tm-plans">
+  <summary>План продажів на місяць</summary>
+  <section class="card card--compact-form sales-plans-admin">
+    <p class="muted sales-plans-admin__hint">Ціль у кв. м для кожного менеджера. Виконання — у розділі «Продажі».</p>
+    <form method="post" action="/tasks/sales-plans" class="sales-plans-form">
+      <div class="sales-plans-form__period">
+        <label>Рік
+          <select name="plan_year">
+            {% for y in range(plan_year - 1, plan_year + 2) %}
+            <option value="{{ y }}" {% if plan_year == y %}selected{% endif %}>{{ y }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Місяць
+          <select name="plan_month">
+            {% for num, name in uk_months %}
+            <option value="{{ num }}" {% if plan_month == num %}selected{% endif %}>{{ name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
+      <div class="table-wrap">
+        <table class="sales-plans-table">
+          <thead>
+            <tr>
+              <th>Менеджер</th>
+              <th>План, кв. м</th>
+              <th>Факт</th>
+              <th>%</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in sales_plan_rows %}
+            <tr>
+              <td>{{ row.manager_name }}</td>
+              <td>
+                <input type="text" name="plan_{{ row.manager_id }}" inputmode="decimal"
+                       value="{% if row.target %}{{ row.target }}{% endif %}"
+                       placeholder="0" class="sales-plans-table__input">
+              </td>
+              <td>{{ format_qty(row.actual, decimals=1) }}</td>
+              <td>{% if row.target %}{{ row.pct }}%{% else %}—{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="task-form__actions">
+        <button type="submit" class="btn btn-primary">Зберегти плани</button>
+      </div>
+    </form>
+  </section>
+</details>
 {% endif %}
 
-<div class="tasks-top-layout">
-{% if can_create_tasks %}
-<div class="card card--compact-form tasks-top-layout__form">
-  <h2>{% if can_manage_tasks %}Додати задачу{% else %}Додати задачу собі{% endif %}</h2>
-  {% with form_action='/tasks', submit_label='Додати' %}
-  {% include "partials/task_form.html" %}
-  {% endwith %}
-</div>
-{% endif %}
 {% if sales_plan_progress %}
 {% include "partials/sales_plan_ring.html" %}
 {% endif %}
-</div>
 
-<nav class="stats tasks-stats tasks-stats--filters" aria-label="Фільтр за статусом">
-  <a href="/tasks{{ tasks_page_query(manager_id=selected_manager_id, status='active', kind=selected_kind, show_completed=show_completed) }}"
-     class="stat-card stat-card--filter{% if status_filter == 'active' %} stat-card--selected{% endif %}"
-     aria-current="{% if status_filter == 'active' %}true{% else %}false{% endif %}">
-    <div class="label">Активних</div>
-    <div class="value">{{ board_stats.active }}</div>
-  </a>
-  <a href="/tasks{{ tasks_page_query(manager_id=selected_manager_id, status='overdue', kind=selected_kind, show_completed=show_completed) }}"
-     class="stat-card stat-card--filter stat-card--warn{% if status_filter == 'overdue' %} stat-card--selected{% endif %}"
-     aria-current="{% if status_filter == 'overdue' %}true{% else %}false{% endif %}">
-    <div class="label">Прострочені</div>
-    <div class="value">{{ board_stats.overdue }}</div>
-  </a>
-  <a href="/tasks{{ tasks_page_query(manager_id=selected_manager_id, status='completed', kind=selected_kind, show_completed=show_completed) }}"
-     class="stat-card stat-card--filter stat-card--success{% if status_filter == 'completed' %} stat-card--selected{% endif %}"
-     aria-current="{% if status_filter == 'completed' %}true{% else %}false{% endif %}">
-    <div class="label">Виконано</div>
-    <div class="value">{{ board_stats.completed }}</div>
-  </a>
-</nav>
-
-<form class="filters filters--compact tasks-filters" method="get" action="/tasks">
-  {% if status_filter != 'active' %}
-  <input type="hidden" name="status" value="{{ status_filter }}">
-  {% endif %}
-  <label class="filters__field--kind">
-    Тип задачі
-    <select name="kind" onchange="this.form.submit()">
-      <option value="">Усі типи</option>
-      {% for value, label in manager_task_kind_choices %}
-      <option value="{{ value }}" {% if selected_kind == value %}selected{% endif %}>{{ label }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  {% if can_filter_managers %}
-  <label class="filters__field--manager">
-    Менеджер
-    <select name="manager_id" onchange="this.form.submit()">
-      <option value="">Усі менеджери</option>
-      {% for m in managers %}
-      <option value="{{ m.id }}" {% if selected_manager_id == m.id %}selected{% endif %}>
-        {{ m.name }}
-      </option>
-      {% endfor %}
-    </select>
-  </label>
-  {% endif %}
-  {% if status_filter == 'active' %}
-  <label class="tasks-filters__checkbox">
-    <input type="checkbox" name="show_completed" value="1" {% if show_completed %}checked{% endif %} onchange="this.form.submit()">
-    Показати виконані та видалені
-  </label>
-  {% elif status_filter == 'completed' %}
-  <input type="hidden" name="status" value="completed">
-  <label class="tasks-filters__checkbox">
-    <input type="checkbox" name="show_completed" value="1" {% if show_completed %}checked{% endif %} onchange="this.form.submit()">
-    Також показати видалені
-  </label>
-  {% endif %}
-</form>
-
-{% if manager_sections %}
-<div class="tasks-board">
-  {% for section in manager_sections %}
-  <section class="tasks-manager" id="manager-{{ section.manager.id }}">
-    <header class="tasks-manager__header">
-      <div class="tasks-manager__identity">
-        <span class="tasks-manager__avatar" aria-hidden="true">{{ section.manager.name[:1] }}</span>
-        <div>
-          <h2 class="tasks-manager__name">{{ section.manager.name }}</h2>
-          {% if section.manager.role == 'admin' %}
-          <span class="tasks-manager__role">Адміністратор</span>
-          {% endif %}
-        </div>
-      </div>
-      {% if section.visible_count %}
-      <div class="tasks-manager__counts">
-        {% if status_filter == 'overdue' %}
-        <span class="tasks-count tasks-count--overdue">{{ section.visible_count }} простроч.</span>
-        {% elif status_filter == 'completed' %}
-        <span class="tasks-count tasks-count--done">{{ section.visible_count }} виконано</span>
-        {% else %}
-        <span class="tasks-count tasks-count--active">{{ section.visible_count }} активних</span>
-        {% endif %}
-      </div>
-      {% endif %}
-    </header>
-
-    {% if section.day_groups %}
-    <div class="tasks-manager__groups">
-      {% for group in section.day_groups %}
-      <div class="tasks-day-group{% if group.label == 'Прострочені' %} tasks-day-group--overdue{% elif group.label == 'Сьогодні' %} tasks-day-group--today{% endif %}">
-        <h3 class="tasks-day-group__title">
-          <span class="tasks-day-group__label">{{ group.label }}</span>
-          <span class="tasks-day-group__count">{{ group.tasks|length }}</span>
-        </h3>
-        <div class="tasks-day-group__list">
-          {% for item in group.tasks %}
-          {% include "partials/task_card.html" %}
-          {% endfor %}
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-    {% endif %}
-
-    {% if section.archive %}
-      {% if status_filter == 'completed' %}
-      <div class="tasks-manager__groups tasks-manager__groups--archive">
-        <div class="tasks-day-group__list">
-          {% for item in section.archive %}
-          {% include "partials/task_card.html" %}
-          {% endfor %}
-        </div>
-      </div>
-      {% else %}
-      <details class="tasks-archive" {% if show_completed and not section.day_groups %}open{% endif %}>
-        <summary class="tasks-archive__summary">
-          Архів
-          <span class="tasks-day-group__count">{{ section.archive|length }}</span>
-        </summary>
-        <div class="tasks-day-group__list">
-          {% for item in section.archive %}
-          {% include "partials/task_card.html" %}
-          {% endfor %}
-        </div>
-      </details>
-      {% endif %}
-    {% endif %}
-  </section>
-  {% endfor %}
-</div>
-{% else %}
-<div class="card">
-  <p class="muted" style="margin:0">
-    {% if status_filter == 'overdue' %}Немає прострочених задач
-    {% elif status_filter == 'completed' %}Немає виконаних задач
-    {% else %}Немає активних задач
-    {% endif %}{% if selected_manager_id %} у обраного менеджера{% endif %}{% if selected_kind %} з обраним типом{% endif %}.
-  </p>
-</div>
+{% if can_create_tasks %}
+{% include "partials/task_create_modal.html" %}
 {% endif %}
+{% endblock %}
+{% block scripts %}
+<script src="/static/tasks_workspace.js" defer></script>
 {% endblock %}

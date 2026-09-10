@@ -17,12 +17,18 @@ from bot.notifications.reserve_broadcast import broadcast_new_reserve
 from bot.notifications.task_assign import notify_task_assigned
 from config.settings import Settings
 from database.models import (
+    TASK_PRIORITY_LABELS,
+    TASK_WORKFLOW_LABELS,
     ManagerTaskKind,
     Reserve,
     Task,
+    TaskChecklistItem,
+    TaskComment,
     User,
     UserRole,
     normalize_manager_task_kind,
+    normalize_task_priority,
+    normalize_task_workflow_status,
 )
 from database.repositories.client import ClientRepository
 from database.repositories.region import RegionRepository
@@ -86,7 +92,14 @@ from web.services.tasks_board import (
     TASK_STATUS_ACTIVE,
     TASK_STATUS_COMPLETED,
     TASK_STATUS_OVERDUE,
-    build_tasks_board,
+)
+from web.services.tasks_workspace import (
+    UK_WEEKDAYS_SHORT,
+    WORKFLOW_COLUMNS,
+    _to_card,
+    apply_workflow_status,
+    build_task_workspace,
+    filter_workspace_tasks,
 )
 from web.sales_matrix_pdf import build_sales_matrix_pdf
 from web.stands_pdf import build_stands_clients_pdf
@@ -108,6 +121,32 @@ _STANDS_DETAIL_BUCKETS = frozenset({
     "oblast_total",
     "oblast_stand",
 })
+
+_TASK_VIEWS = frozenset({"list", "board", "calendar"})
+
+
+def _parse_due_time(raw: str) -> str | None:
+    value = (raw or "").strip()
+    if len(value) >= 5 and value[2] == ":":
+        return value[:5]
+    return None
+
+
+def _task_return_qs(form: dict[str, str]) -> str:
+    manager_id = form.get("return_manager_id", "").strip()
+    view = form.get("return_view", "").strip() or None
+    status = form.get("return_status", "").strip() or None
+    kind = form.get("return_kind", "").strip() or None
+    task_id = form.get("return_task", "").strip()
+    return tasks_page_query(
+        manager_id=int(manager_id) if manager_id.isdigit() else None,
+        status=status,
+        kind=kind,
+        view=view if view in _TASK_VIEWS else None,
+        task=int(task_id) if task_id.isdigit() else None,
+        show_completed=form.get("return_show_completed", "").strip()
+        in ("1", "true", "yes", "on"),
+    )
 
 
 async def _load_stands_clients_detail(request, user, service: AnalyticsService):
@@ -1191,70 +1230,113 @@ def register_panel_routes(
         filter_manager_id = scoped_manager_filter(
             user, query_int(request, "manager_id")
         )
-        status_filter = query_str(request, "status") or TASK_STATUS_ACTIVE
-        if status_filter not in (
+        view = query_str(request, "view") or "list"
+        if view not in _TASK_VIEWS:
+            view = "list"
+        status_filter = query_str(request, "status") or (
+            TASK_STATUS_ACTIVE if view == "list" else ""
+        )
+        if status_filter and status_filter not in (
             TASK_STATUS_ACTIVE,
             TASK_STATUS_OVERDUE,
             TASK_STATUS_COMPLETED,
         ):
-            status_filter = TASK_STATUS_ACTIVE
+            status_filter = TASK_STATUS_ACTIVE if view == "list" else ""
         kind_filter = parse_manager_task_kind_filter(query_str(request, "kind"))
-        show_archive = request.query_params.get("show_completed", "").strip() in (
-            "1",
-            "true",
-            "yes",
-            "on",
-        )
+        search_q = query_str(request, "q") or ""
+        client_filter = query_int(request, "client_id")
+        priority_filter = query_str(request, "priority") or ""
+        if priority_filter not in TASK_PRIORITY_LABELS:
+            priority_filter = ""
+        deadline_filter = query_str(request, "deadline") or ""
+        workflow_filter = query_str(request, "workflow") or ""
+        if workflow_filter not in TASK_WORKFLOW_LABELS:
+            workflow_filter = ""
+        cal_year = query_int(request, "year", default=today.year) or today.year
+        cal_month = query_int(request, "month", default=today.month) or today.month
+        if cal_month < 1 or cal_month > 12:
+            cal_month = today.month
+        cal_day_raw = query_str(request, "cal_day") or ""
+        selected_day = None
+        if cal_day_raw:
+            try:
+                selected_day = date_cls.fromisoformat(cal_day_raw)
+            except ValueError:
+                selected_day = None
+        open_task_id = query_int(request, "task")
 
         stmt = (
             select(Task)
-            .options(selectinload(Task.assignee), selectinload(Task.created_by))
+            .options(
+                selectinload(Task.assignee),
+                selectinload(Task.created_by),
+                selectinload(Task.client),
+                selectinload(Task.checklist_items),
+                selectinload(Task.comments).selectinload(TaskComment.author),
+            )
             .order_by(
-                Task.deleted_at.asc().nullslast(),
-                Task.completed_at.asc().nullslast(),
                 Task.deadline.asc().nullslast(),
-                Task.weekday.asc().nullslast(),
+                Task.due_time.asc().nullslast(),
                 Task.created_at.desc(),
             )
         )
         if filter_manager_id is not None:
             stmt = stmt.where(Task.assignee_id == filter_manager_id)
-        if kind_filter:
-            stmt = stmt.where(Task.kind == kind_filter)
-        if status_filter == TASK_STATUS_COMPLETED:
-            if show_archive:
-                stmt = stmt.where(
-                    (Task.completed_at.is_not(None)) | (Task.deleted_at.is_not(None))
-                )
-            else:
-                stmt = stmt.where(
-                    Task.completed_at.is_not(None),
-                    Task.deleted_at.is_(None),
-                )
-        elif status_filter == TASK_STATUS_OVERDUE:
-            stmt = stmt.where(
-                Task.deleted_at.is_(None),
-                Task.completed_at.is_(None),
-                Task.deadline < today,
-            )
-        else:
-            stmt = stmt.where(
-                Task.deleted_at.is_(None),
-                Task.completed_at.is_(None),
-            )
-        stmt = stmt.limit(500)
+        stmt = stmt.limit(800)
         result = await session.execute(stmt)
-        tasks = list(result.scalars().all())
-
-        board_stats, manager_sections = build_tasks_board(
-            tasks,
-            managers,
-            today=date_cls.today(),
-            manager_id=filter_manager_id,
-            show_completed=show_archive,
-            status_filter=status_filter,
-            kind_filter=kind_filter,
+        all_tasks = list(result.scalars().all())
+        visible_tasks = filter_workspace_tasks(
+            all_tasks,
+            today=today,
+            q=search_q,
+            client_id=client_filter,
+            kind=kind_filter,
+            priority=priority_filter or None,
+            deadline_key=deadline_filter or None,
+            workflow=workflow_filter or None,
+            status_bucket=status_filter or None if view == "list" else None,
         )
+
+        client_repo = ClientRepository(session)
+        if filter_manager_id is not None:
+            clients = await client_repo.list_by_manager(filter_manager_id, is_pvc=None)
+        elif user.is_manager:
+            clients = await client_repo.list_by_manager(user.id, is_pvc=None)
+        else:
+            seen: dict[int, object] = {}
+            for task in all_tasks:
+                if task.client is not None:
+                    seen[task.client.id] = task.client
+            clients = sorted(seen.values(), key=lambda c: (c.name or "").lower())
+
+        focus_manager = next((m for m in managers if m.id == filter_manager_id), None)
+        workspace = build_task_workspace(
+            visible_tasks,
+            today=today,
+            calendar_year=cal_year,
+            calendar_month=cal_month,
+            selected_day=selected_day,
+            focus_manager=focus_manager,
+            clients=clients,
+            status_bucket=status_filter or None if view == "list" else None,
+        )
+        open_task = next((t for t in all_tasks if t.id == open_task_id), None)
+        open_card = next((c for c in workspace.cards if c.task.id == open_task_id), None)
+        if open_task is not None and open_card is None:
+            open_card = _to_card(open_task, today)
+        prev_month = cal_month - 1 or 12
+        prev_year = cal_year if cal_month > 1 else cal_year - 1
+        next_month = cal_month + 1 if cal_month < 12 else 1
+        next_year = cal_year if cal_month < 12 else cal_year + 1
+        stats_for_cards = build_task_workspace(
+            all_tasks,
+            today=today,
+            calendar_year=cal_year,
+            calendar_month=cal_month,
+            clients=clients,
+            focus_manager=focus_manager,
+        )
+        workspace.stats = stats_for_cards.stats
 
         sales_plan_progress = None
         if user.is_manager:
@@ -1282,12 +1364,27 @@ def register_panel_routes(
                 user,
                 active_nav="tasks",
                 managers=managers,
-                board_stats=board_stats,
-                manager_sections=manager_sections,
+                workspace=workspace,
+                open_task=open_task,
+                open_card=open_card,
+                current_view=view,
                 selected_manager_id=filter_manager_id,
                 selected_kind=kind_filter,
-                status_filter=status_filter,
-                show_completed=show_archive,
+                selected_client_id=client_filter,
+                selected_priority=priority_filter,
+                selected_deadline=deadline_filter,
+                selected_workflow=workflow_filter,
+                search_q=search_q,
+                status_filter=status_filter or TASK_STATUS_ACTIVE,
+                show_completed=False,
+                cal_day=cal_day_raw,
+                calendar_weekdays=UK_WEEKDAYS_SHORT,
+                prev_cal_year=prev_year,
+                prev_cal_month=prev_month,
+                next_cal_year=next_year,
+                next_cal_month=next_month,
+                workflow_choices=WORKFLOW_COLUMNS,
+                priority_choices=list(TASK_PRIORITY_LABELS.items()),
                 sales_plan_progress=sales_plan_progress,
                 sales_plan_rows=sales_plan_rows,
                 plan_year=plan_year,
@@ -1361,6 +1458,13 @@ def register_panel_routes(
         weekday: str = Form(""),
         kind: str = Form(ManagerTaskKind.GENERAL.value),
         comment: str = Form(""),
+        client_id: str = Form(""),
+        status: str = Form("new"),
+        priority: str = Form("normal"),
+        due_time: str = Form(""),
+        add_to_calendar: str = Form(""),
+        return_view: str = Form(""),
+        return_manager_id: str = Form(""),
     ) -> Response:
         user = await load_web_user(request, session)
         require_nav(user, "tasks")
@@ -1372,16 +1476,26 @@ def register_panel_routes(
         if deadline.strip():
             dl = date_cls.fromisoformat(deadline.strip())
         wd = int(weekday) if weekday.strip() else None
+        cid = int(client_id) if client_id.strip().isdigit() else None
 
         creator = await session.get(User, user.id)
         task = Task(
             assignee_id=effective_assignee_id,
             created_by_id=user.id,
+            client_id=cid,
             title=title.strip(),
             comment=comment.strip() or None,
             deadline=dl,
+            due_time=_parse_due_time(due_time),
             weekday=wd,
             kind=normalize_manager_task_kind(kind),
+            status=normalize_task_workflow_status(status, completed=False, cancelled=False),
+            priority=normalize_task_priority(priority),
+            add_to_calendar=(
+                True
+                if not add_to_calendar.strip()
+                else add_to_calendar.strip() in ("1", "true", "on", "yes")
+            ),
         )
         session.add(task)
         await session.flush()
@@ -1394,7 +1508,12 @@ def register_panel_routes(
                 assignee=assignee,
                 creator=creator,
             )
-        return RedirectResponse("/tasks", status_code=303)
+        qs = tasks_page_query(
+            manager_id=int(return_manager_id) if return_manager_id.strip().isdigit() else None,
+            view=return_view.strip() or "list",
+            task=task.id,
+        )
+        return RedirectResponse(f"/tasks{qs}", status_code=303)
 
     @app.get("/tasks/{task_id}/edit", response_class=HTMLResponse)
     async def tasks_edit_page(
@@ -1436,6 +1555,13 @@ def register_panel_routes(
         weekday: str = Form(""),
         kind: str = Form(ManagerTaskKind.GENERAL.value),
         comment: str = Form(""),
+        client_id: str = Form(""),
+        status: str = Form(""),
+        priority: str = Form(""),
+        due_time: str = Form(""),
+        add_to_calendar: str = Form(""),
+        return_view: str = Form(""),
+        return_manager_id: str = Form(""),
     ) -> Response:
         user = await load_web_user(request, session)
         require_nav(user, "tasks")
@@ -1453,11 +1579,23 @@ def register_panel_routes(
         task.assignee_id = assignee_id if can_manage_tasks(user) else user.id
         task.title = title.strip()
         task.deadline = dl
+        task.due_time = _parse_due_time(due_time)
         task.weekday = wd
         task.kind = normalize_manager_task_kind(kind)
         task.comment = comment.strip() or None
+        task.client_id = int(client_id) if client_id.strip().isdigit() else None
+        if status.strip():
+            apply_workflow_status(task, status.strip())
+        if priority.strip():
+            task.priority = normalize_task_priority(priority)
+        task.add_to_calendar = add_to_calendar.strip() in ("1", "true", "on", "yes")
         await session.commit()
-        return RedirectResponse("/tasks", status_code=303)
+        qs = tasks_page_query(
+            manager_id=int(return_manager_id) if return_manager_id.strip().isdigit() else None,
+            view=return_view.strip() or "list",
+            task=task.id,
+        )
+        return RedirectResponse(f"/tasks{qs}", status_code=303)
 
     @app.post("/tasks/complete")
     async def tasks_complete(
@@ -1469,6 +1607,7 @@ def register_panel_routes(
         return_show_completed: str = Form(""),
         return_status: str = Form(""),
         return_kind: str = Form(""),
+        return_view: str = Form(""),
     ) -> Response:
         user = await load_web_user(request, session)
         require_nav(user, "tasks")
@@ -1476,8 +1615,8 @@ def register_panel_routes(
         if t is None:
             raise HTTPException(status_code=404, detail="Task not found")
         assert_task_manage_access(user, t)
-        if t.completed_at is None and t.deleted_at is None:
-            t.completed_at = datetime.now(timezone.utc)
+        if t.deleted_at is None:
+            apply_workflow_status(t, "done")
             await session.commit()
         qs = tasks_page_query(
             manager_id=int(return_manager_id.strip())
@@ -1485,8 +1624,118 @@ def register_panel_routes(
             else None,
             status=return_status.strip() or None,
             kind=return_kind.strip() or None,
+            view=return_view.strip() or None,
             show_completed=return_show_completed.strip()
             in ("1", "true", "yes", "on"),
+        )
+        return RedirectResponse(f"/tasks{qs}", status_code=303)
+
+    @app.post("/tasks/status")
+    async def tasks_set_status(
+        request: Request,
+        session: AsyncSession = Depends(get_session),
+        _auth: Response | None = Depends(require_auth),
+        task_id: int = Form(...),
+        status: str = Form(...),
+        return_view: str = Form("board"),
+        return_manager_id: str = Form(""),
+    ) -> Response:
+        user = await load_web_user(request, session)
+        require_nav(user, "tasks")
+        t = await session.get(Task, task_id)
+        if t is None:
+            raise HTTPException(status_code=404, detail="Task not found")
+        assert_task_manage_access(user, t)
+        apply_workflow_status(t, status)
+        await session.commit()
+        qs = tasks_page_query(
+            manager_id=int(return_manager_id) if return_manager_id.strip().isdigit() else None,
+            view=return_view.strip() or "board",
+            task=t.id,
+        )
+        return RedirectResponse(f"/tasks{qs}", status_code=303)
+
+    @app.post("/tasks/{task_id}/checklist")
+    async def tasks_toggle_checklist(
+        request: Request,
+        task_id: int,
+        session: AsyncSession = Depends(get_session),
+        _auth: Response | None = Depends(require_auth),
+        item_id: int = Form(...),
+        is_done: str = Form("1"),
+        return_view: str = Form(""),
+        return_manager_id: str = Form(""),
+    ) -> Response:
+        user = await load_web_user(request, session)
+        require_nav(user, "tasks")
+        task = await session.get(Task, task_id)
+        if task is None:
+            raise HTTPException(status_code=404, detail="Task not found")
+        assert_task_manage_access(user, task)
+        item = await session.get(TaskChecklistItem, item_id)
+        if item is None or item.task_id != task_id:
+            raise HTTPException(status_code=404, detail="Item not found")
+        item.is_done = is_done.strip() not in ("0", "false", "")
+        await session.commit()
+        qs = tasks_page_query(
+            manager_id=int(return_manager_id) if return_manager_id.strip().isdigit() else None,
+            view=return_view.strip() or "list",
+            task=task_id,
+        )
+        return RedirectResponse(f"/tasks{qs}", status_code=303)
+
+    @app.post("/tasks/{task_id}/checklist/add")
+    async def tasks_add_checklist(
+        request: Request,
+        task_id: int,
+        session: AsyncSession = Depends(get_session),
+        _auth: Response | None = Depends(require_auth),
+        title: str = Form(...),
+        return_view: str = Form(""),
+        return_manager_id: str = Form(""),
+    ) -> Response:
+        user = await load_web_user(request, session)
+        require_nav(user, "tasks")
+        task = await session.get(Task, task_id)
+        if task is None:
+            raise HTTPException(status_code=404, detail="Task not found")
+        assert_task_manage_access(user, task)
+        text = title.strip()
+        if not text:
+            raise HTTPException(status_code=400, detail="Вкажіть пункт")
+        session.add(TaskChecklistItem(task_id=task_id, title=text, sort_order=100))
+        await session.commit()
+        qs = tasks_page_query(
+            manager_id=int(return_manager_id) if return_manager_id.strip().isdigit() else None,
+            view=return_view.strip() or "list",
+            task=task_id,
+        )
+        return RedirectResponse(f"/tasks{qs}", status_code=303)
+
+    @app.post("/tasks/{task_id}/comments")
+    async def tasks_add_comment(
+        request: Request,
+        task_id: int,
+        session: AsyncSession = Depends(get_session),
+        _auth: Response | None = Depends(require_auth),
+        body: str = Form(...),
+        return_view: str = Form(""),
+        return_manager_id: str = Form(""),
+    ) -> Response:
+        user = await load_web_user(request, session)
+        require_nav(user, "tasks")
+        task = await session.get(Task, task_id)
+        if task is None:
+            raise HTTPException(status_code=404, detail="Task not found")
+        text = body.strip()
+        if not text:
+            raise HTTPException(status_code=400, detail="Порожній коментар")
+        session.add(TaskComment(task_id=task_id, author_id=user.id, body=text))
+        await session.commit()
+        qs = tasks_page_query(
+            manager_id=int(return_manager_id) if return_manager_id.strip().isdigit() else None,
+            view=return_view.strip() or "list",
+            task=task_id,
         )
         return RedirectResponse(f"/tasks{qs}", status_code=303)
 
@@ -1500,6 +1749,7 @@ def register_panel_routes(
         return_show_completed: str = Form(""),
         return_status: str = Form(""),
         return_kind: str = Form(""),
+        return_view: str = Form(""),
     ) -> Response:
         user = await load_web_user(request, session)
         require_nav(user, "tasks")
@@ -1507,7 +1757,7 @@ def register_panel_routes(
         if t is None:
             raise HTTPException(status_code=404, detail="Task not found")
         assert_task_manage_access(user, t)
-        t.deleted_at = datetime.now(timezone.utc)
+        apply_workflow_status(t, "cancelled")
         await session.commit()
         qs = tasks_page_query(
             manager_id=int(return_manager_id.strip())
@@ -1515,6 +1765,7 @@ def register_panel_routes(
             else None,
             status=return_status.strip() or None,
             kind=return_kind.strip() or None,
+            view=return_view.strip() or None,
             show_completed=return_show_completed.strip()
             in ("1", "true", "yes", "on"),
         )

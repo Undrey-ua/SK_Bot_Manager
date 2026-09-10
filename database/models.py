@@ -60,16 +60,77 @@ class ManagerTaskKind(str, Enum):
     STAND_INSTALL = "stand_install"
     STAND_MOVE = "stand_move"
     DOCUMENTS = "documents"
+    COMMUNICATION = "communication"
 
 
 MANAGER_TASK_KIND_LABELS: dict[ManagerTaskKind, str] = {
     ManagerTaskKind.GENERAL: "Загальна",
     ManagerTaskKind.STAND_INSTALL: "Установка стендів",
     ManagerTaskKind.STAND_MOVE: "Переміщення стендів",
-    ManagerTaskKind.DOCUMENTS: "Документообіг",
+    ManagerTaskKind.DOCUMENTS: "Договори",
+    ManagerTaskKind.COMMUNICATION: "Комунікація",
 }
 
 MANAGER_TASK_KIND_DEFAULT = ManagerTaskKind.GENERAL.value
+
+
+class TaskWorkflowStatus(str, Enum):
+    NEW = "new"
+    IN_PROGRESS = "in_progress"
+    WAITING = "waiting"
+    DONE = "done"
+    CANCELLED = "cancelled"
+
+
+TASK_WORKFLOW_LABELS: dict[str, str] = {
+    TaskWorkflowStatus.NEW.value: "Нова",
+    TaskWorkflowStatus.IN_PROGRESS.value: "В роботі",
+    TaskWorkflowStatus.WAITING.value: "Очікує",
+    TaskWorkflowStatus.DONE.value: "Виконано",
+    TaskWorkflowStatus.CANCELLED.value: "Скасовано",
+}
+
+TASK_WORKFLOW_DEFAULT = TaskWorkflowStatus.NEW.value
+TASK_WORKFLOW_OPEN = frozenset(
+    {
+        TaskWorkflowStatus.NEW.value,
+        TaskWorkflowStatus.IN_PROGRESS.value,
+        TaskWorkflowStatus.WAITING.value,
+    }
+)
+
+
+class TaskPriority(str, Enum):
+    LOW = "low"
+    NORMAL = "normal"
+    HIGH = "high"
+
+
+TASK_PRIORITY_LABELS: dict[str, str] = {
+    TaskPriority.LOW.value: "Низький",
+    TaskPriority.NORMAL.value: "Звичайний",
+    TaskPriority.HIGH.value: "Високий",
+}
+
+TASK_PRIORITY_DEFAULT = TaskPriority.NORMAL.value
+
+
+def normalize_task_workflow_status(status: str | None, *, completed: bool, cancelled: bool) -> str:
+    raw = (status or "").strip()
+    if raw in TASK_WORKFLOW_LABELS:
+        return raw
+    if cancelled:
+        return TaskWorkflowStatus.CANCELLED.value
+    if completed:
+        return TaskWorkflowStatus.DONE.value
+    return TASK_WORKFLOW_DEFAULT
+
+
+def normalize_task_priority(priority: str | None) -> str:
+    raw = (priority or "").strip()
+    if raw in TASK_PRIORITY_LABELS:
+        return raw
+    return TASK_PRIORITY_DEFAULT
 
 
 def normalize_manager_task_kind(kind: str | None) -> str:
@@ -277,6 +338,11 @@ class Task(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     assignee_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    client_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("clients.id"),
+        nullable=True,
+        index=True,
+    )
 
     title: Mapped[str] = mapped_column(String(300))
     comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -286,9 +352,23 @@ class Task(Base):
         server_default=MANAGER_TASK_KIND_DEFAULT,
         index=True,
     )
+    status: Mapped[str] = mapped_column(
+        String(20),
+        default=TASK_WORKFLOW_DEFAULT,
+        server_default=TASK_WORKFLOW_DEFAULT,
+        index=True,
+    )
+    priority: Mapped[str] = mapped_column(
+        String(20),
+        default=TASK_PRIORITY_DEFAULT,
+        server_default=TASK_PRIORITY_DEFAULT,
+        index=True,
+    )
 
     deadline: Mapped[Optional[date]] = mapped_column(Date, index=True, nullable=True)
+    due_time: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
     weekday: Mapped[Optional[int]] = mapped_column(nullable=True)  # 0=Mon ... 6=Sun
+    add_to_calendar: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
@@ -306,6 +386,45 @@ class Task(Base):
         foreign_keys=[assignee_id],
     )
     created_by: Mapped["User"] = relationship(foreign_keys=[created_by_id])
+    client: Mapped[Optional["Client"]] = relationship()
+    checklist_items: Mapped[list["TaskChecklistItem"]] = relationship(
+        back_populates="task",
+        cascade="all, delete-orphan",
+        order_by="TaskChecklistItem.sort_order",
+    )
+    comments: Mapped[list["TaskComment"]] = relationship(
+        back_populates="task",
+        cascade="all, delete-orphan",
+        order_by="TaskComment.created_at",
+    )
+
+
+class TaskChecklistItem(Base):
+    __tablename__ = "task_checklist_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    task_id: Mapped[int] = mapped_column(ForeignKey("tasks.id", ondelete="CASCADE"), index=True)
+    title: Mapped[str] = mapped_column(String(300))
+    is_done: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    sort_order: Mapped[int] = mapped_column(default=0)
+
+    task: Mapped["Task"] = relationship(back_populates="checklist_items")
+
+
+class TaskComment(Base):
+    __tablename__ = "task_comments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    task_id: Mapped[int] = mapped_column(ForeignKey("tasks.id", ondelete="CASCADE"), index=True)
+    author_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    body: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+    task: Mapped["Task"] = relationship(back_populates="comments")
+    author: Mapped["User"] = relationship()
 
 class ClientStand(Base):
     __tablename__ = "client_stands"

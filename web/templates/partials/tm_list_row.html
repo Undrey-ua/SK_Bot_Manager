@@ -1,0 +1,28 @@
+<article class="tm-row tm-row--{{ card.status }}{% if card.is_overdue %} tm-row--overdue{% endif %}{% if open_task and open_task.id == card.task.id %} tm-row--active{% endif %}">
+  {% if can_manage_task(current_user, assignee_id=card.task.assignee_id) and card.status != 'done' and card.status != 'cancelled' %}
+  <form method="post" action="/tasks/complete" class="tm-row__check">
+    <input type="hidden" name="task_id" value="{{ card.task.id }}">
+    <input type="hidden" name="return_view" value="{{ current_view }}">
+    {% if selected_manager_id %}<input type="hidden" name="return_manager_id" value="{{ selected_manager_id }}">{% endif %}
+    {% if status_filter and status_filter != 'active' %}<input type="hidden" name="return_status" value="{{ status_filter }}">{% endif %}
+    {% if selected_kind %}<input type="hidden" name="return_kind" value="{{ selected_kind }}">{% endif %}
+    <button type="submit" class="tm-check" title="Позначити виконаною" aria-label="Виконано"></button>
+  </form>
+  {% else %}
+  <span class="tm-check tm-check--static{% if card.status == 'done' %} tm-check--done{% endif %}"></span>
+  {% endif %}
+  <a class="tm-row__body" href="/tasks{{ tasks_page_query(manager_id=selected_manager_id, status=status_filter, kind=selected_kind, view=current_view, q=search_q, client_id=selected_client_id, priority=selected_priority, deadline=selected_deadline, workflow=selected_workflow, year=workspace.calendar_year, month=workspace.calendar_month, task=card.task.id, cal_day=cal_day) }}" data-task-id="{{ card.task.id }}">
+    <div class="tm-row__main">
+      <span class="tm-dot tm-dot--{{ card.priority }}" title="{{ card.priority_label }}"></span>
+      <span class="tm-row__title">{{ card.task.title }}</span>
+    </div>
+    <div class="tm-row__sub">
+      {% if card.task.client %}<span>{{ card.task.client.name }}</span>{% endif %}
+      {% if card.task.client and card.task.kind %}<span class="tm-sep">·</span>{% endif %}
+      <span>{{ manager_task_kind_label(card.task.kind) }}</span>
+    </div>
+  </a>
+  <span class="tm-row__when{% if card.is_overdue %} tm-row__when--overdue{% endif %}">{{ card.when_short }}</span>
+  <span class="tm-pill tm-pill--{{ card.status }}">{{ card.status_label }}</span>
+  <span class="tm-avatar" title="{{ card.task.assignee.name if card.task.assignee else '' }}">{{ user_initials(card.task.assignee.name if card.task.assignee else '') }}</span>
+</article>

@@ -1,0 +1,181 @@
+<aside class="tm-drawer" id="tm-drawer" {% if not open_task %}hidden{% endif %} data-open="{% if open_task %}1{% else %}0{% endif %}">
+  {% if open_task %}
+  <header class="tm-drawer__header">
+    <a class="tm-drawer__back" href="/tasks{{ tasks_page_query(manager_id=selected_manager_id, status=status_filter, kind=selected_kind, view=current_view, q=search_q, client_id=selected_client_id, priority=selected_priority, deadline=selected_deadline, workflow=selected_workflow, year=workspace.calendar_year, month=workspace.calendar_month, cal_day=cal_day) }}" aria-label="Закрити">←</a>
+    <div class="tm-drawer__heading">
+      <h2>{{ open_task.title }}</h2>
+      <span class="tm-drawer__id">#{{ open_task.id }}</span>
+    </div>
+  </header>
+  <div class="tm-drawer__badges">
+    <span class="tm-pill tm-pill--{{ open_card.status }}">{{ open_card.status_label }}</span>
+    <span class="tm-pill tm-pill--prio-{{ open_card.priority }}">{{ open_card.priority_label }} пріоритет</span>
+  </div>
+  <nav class="tm-tabs" role="tablist">
+    <button type="button" class="tm-tabs__btn is-active" data-tm-tab="details">Деталі</button>
+    <button type="button" class="tm-tabs__btn" data-tm-tab="comments">Коментарі {% if open_task.comments %}<span>{{ open_task.comments|length }}</span>{% endif %}</button>
+    <button type="button" class="tm-tabs__btn" data-tm-tab="history">Історія</button>
+  </nav>
+
+  <section class="tm-tab is-active" data-tm-panel="details">
+    <dl class="tm-facts">
+      <div><dt>Клієнт</dt><dd>{% if open_task.client %}{{ open_task.client.name }}{% else %}—{% endif %}</dd></div>
+      <div><dt>Дата і час</dt><dd>{{ open_card.when_label }}</dd></div>
+      <div><dt>Відповідальний</dt><dd><span class="tm-avatar tm-avatar--sm">{{ user_initials(open_task.assignee.name if open_task.assignee else '') }}</span> {{ open_task.assignee.name if open_task.assignee else '—' }}</dd></div>
+      <div><dt>Тип задачі</dt><dd>{{ manager_task_kind_label(open_task.kind) }}</dd></div>
+      <div><dt>Створено</dt><dd>{{ format_dt(open_task.created_at) }}</dd></div>
+    </dl>
+
+    {% if can_manage_task(current_user, assignee_id=open_task.assignee_id) %}
+    <form method="post" action="/tasks/{{ open_task.id }}/edit" class="tm-edit" id="tm-edit-form">
+      <input type="hidden" name="return_view" value="{{ current_view }}">
+      {% if selected_manager_id %}<input type="hidden" name="return_manager_id" value="{{ selected_manager_id }}">{% endif %}
+      {% if open_task.weekday is not none %}
+      <input type="hidden" name="weekday" value="{{ open_task.weekday }}">
+      {% endif %}
+      <label>Назва
+        <input type="text" name="title" required value="{{ open_task.title }}">
+      </label>
+      {% if can_manage_tasks %}
+      <label>Відповідальний
+        <select name="assignee_id" required>
+          {% for m in managers %}
+          <option value="{{ m.id }}" {% if open_task.assignee_id == m.id %}selected{% endif %}>{{ m.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      {% else %}
+      <input type="hidden" name="assignee_id" value="{{ current_user.id }}">
+      {% endif %}
+      <label>Клієнт
+        <select name="client_id">
+          <option value="">Без клієнта</option>
+          {% for c in workspace.clients %}
+          <option value="{{ c.id }}" {% if open_task.client_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Тип задачі
+        <select name="kind">
+          {% for value, label in manager_task_kind_choices %}
+          <option value="{{ value }}" {% if open_task.kind == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Статус
+        <select name="status">
+          {% for value, label in workflow_choices %}
+          <option value="{{ value }}" {% if open_card.status == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Пріоритет
+        <select name="priority">
+          {% for value, label in priority_choices %}
+          <option value="{{ value }}" {% if open_card.priority == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <div class="tm-edit__row">
+        <label>Дата
+          <input type="date" name="deadline" value="{% if open_task.deadline %}{{ open_task.deadline.isoformat() }}{% endif %}">
+        </label>
+        <label>Час
+          <input type="time" name="due_time" value="{{ open_task.due_time or '' }}">
+        </label>
+      </div>
+      <label>Опис
+        <textarea name="comment" rows="4" class="multiline-text">{{ open_task.comment or '' }}</textarea>
+      </label>
+      <label class="tm-toggle">
+        <input type="checkbox" name="add_to_calendar" value="1" {% if open_task.add_to_calendar %}checked{% endif %}>
+        Показувати в календарі
+      </label>
+    </form>
+    {% else %}
+    {% if open_task.comment %}
+    <div class="tm-desc">
+      <h3>Опис</h3>
+      <p class="multiline-text">{{ open_task.comment }}</p>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    <div class="tm-checklist">
+      <div class="tm-checklist__head">
+        <h3>Чек-лист {% if open_card.checklist_total %}{{ open_card.checklist_done }}/{{ open_card.checklist_total }}{% endif %}</h3>
+      </div>
+      {% if open_card.checklist_total %}
+      <div class="tm-checklist__bar"><i style="width: {{ (open_card.checklist_done / open_card.checklist_total * 100)|round }}%"></i></div>
+      {% endif %}
+      <ul>
+        {% for item in open_task.checklist_items %}
+        <li>
+          <form method="post" action="/tasks/{{ open_task.id }}/checklist">
+            <input type="hidden" name="item_id" value="{{ item.id }}">
+            <input type="hidden" name="is_done" value="{% if item.is_done %}0{% else %}1{% endif %}">
+            <input type="hidden" name="return_view" value="{{ current_view }}">
+            <button type="submit" class="tm-check{% if item.is_done %} tm-check--done{% endif %}" {% if not can_manage_task(current_user, assignee_id=open_task.assignee_id) %}disabled{% endif %}></button>
+          </form>
+          <span class="{% if item.is_done %}is-done{% endif %}">{{ item.title }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% if can_manage_task(current_user, assignee_id=open_task.assignee_id) %}
+      <form method="post" action="/tasks/{{ open_task.id }}/checklist/add" class="tm-checklist__add">
+        <input type="hidden" name="return_view" value="{{ current_view }}">
+        <input type="text" name="title" placeholder="Додати пункт" required>
+        <button type="submit" class="btn btn-secondary btn-sm">Додати</button>
+      </form>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="tm-tab" data-tm-panel="comments" hidden>
+    <ul class="tm-comments">
+      {% for c in open_task.comments %}
+      <li>
+        <span class="tm-avatar tm-avatar--sm">{{ user_initials(c.author.name if c.author else '') }}</span>
+        <div>
+          <strong>{{ c.author.name if c.author else '—' }}</strong>
+          <time>{{ format_dt(c.created_at) }}</time>
+          <p class="multiline-text">{{ c.body }}</p>
+        </div>
+      </li>
+      {% else %}
+      <li class="tm-empty">Коментарів ще немає</li>
+      {% endfor %}
+    </ul>
+    {% if can_manage_task(current_user, assignee_id=open_task.assignee_id) or current_user.id == open_task.created_by_id or can_manage_tasks %}
+    <form method="post" action="/tasks/{{ open_task.id }}/comments" class="tm-comments__form">
+      <input type="hidden" name="return_view" value="{{ current_view }}">
+      <textarea name="body" rows="3" required placeholder="Написати коментар…"></textarea>
+      <button type="submit" class="btn btn-primary btn-sm">Надіслати</button>
+    </form>
+    {% endif %}
+  </section>
+
+  <section class="tm-tab" data-tm-panel="history" hidden>
+    <ol class="tm-history">
+      <li>Створено {{ format_dt(open_task.created_at) }}{% if open_task.created_by %} · {{ open_task.created_by.name }}{% endif %}</li>
+      {% if open_task.completed_at %}
+      <li>Виконано {{ format_dt(open_task.completed_at) }}</li>
+      {% endif %}
+      {% if open_task.deleted_at %}
+      <li>Скасовано {{ format_dt(open_task.deleted_at) }}</li>
+      {% endif %}
+    </ol>
+  </section>
+
+  {% if can_manage_task(current_user, assignee_id=open_task.assignee_id) %}
+  <footer class="tm-drawer__footer">
+    <button type="submit" form="tm-edit-form" class="btn btn-primary">Зберегти зміни</button>
+    <form method="post" action="/tasks/delete" onsubmit="return confirm('Скасувати задачу #{{ open_task.id }}?');">
+      <input type="hidden" name="task_id" value="{{ open_task.id }}">
+      <input type="hidden" name="return_view" value="{{ current_view }}">
+      <button type="submit" class="btn btn-danger">Скасувати задачу</button>
+    </form>
+  </footer>
+  {% endif %}
+  {% endif %}
+</aside>
