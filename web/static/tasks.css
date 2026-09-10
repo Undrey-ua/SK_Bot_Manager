@@ -847,8 +847,8 @@
   grid-template-areas:
     "d0 d3"
     "d1 d4"
-    "d2 side"
-    "summary summary";
+    "d2 inbox"
+    "summary notes";
   gap: 1rem 1.25rem;
   align-items: stretch;
   padding: 1.15rem 1.25rem 1.35rem;
@@ -860,15 +860,9 @@
 .tm-week-day--2 { grid-area: d2; }
 .tm-week-day--3 { grid-area: d3; }
 .tm-week-day--4 { grid-area: d4; }
-.tm-week-side { grid-area: side; }
+.tm-week-inbox { grid-area: inbox; }
 .tm-week-summary { grid-area: summary; }
-
-.tm-week-side {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  min-height: 0;
-}
+.tm-week-notes { grid-area: notes; }
 
 .tm-week-day,
 .tm-week-notes,
@@ -881,10 +875,6 @@
   border: 1px solid #e8eaf6;
   border-radius: 16px;
   background: #fbfbfe;
-}
-
-.tm-week-inbox {
-  flex: 1;
 }
 
 .tm-week-day.is-today {
@@ -1052,44 +1042,28 @@
   font-size: 0.95rem;
 }
 
-.tm-week-notes {
-  flex: 0 0 auto;
-}
-
 .tm-week-notes form {
+  flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 .tm-week-notes textarea {
-  min-height: 4.5rem;
+  flex: 1;
+  min-height: 5.5rem;
 }
 
 .tm-week-notes .btn {
   margin-top: 0.5rem;
 }
 
-.tm-week-summary {
-  flex-direction: row;
-  align-items: center;
-  gap: 1.25rem 1.75rem;
-  padding: 0.75rem 1rem;
-}
-
-.tm-week-summary h3 {
-  margin: 0;
-  white-space: nowrap;
-}
-
 .tm-week-summary ul {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem 1.75rem;
-  flex: 1;
+  display: grid;
+  gap: 0.5rem;
 }
 
 .tm-week-summary li {
@@ -1105,6 +1079,7 @@
 }
 
 .tm-week-summary strong {
+  margin-left: auto;
   color: var(--text);
   font-size: 1.05rem;
 }
@@ -1118,14 +1093,9 @@
       "d2"
       "d3"
       "d4"
-      "side"
-      "summary";
-  }
-  .tm-week-summary {
-    flex-wrap: wrap;
-  }
-  .tm-week-summary h3 {
-    width: 100%;
+      "inbox"
+      "summary"
+      "notes";
   }
   .tm-week-nav h2 {
     min-width: 0;
