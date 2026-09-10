@@ -441,7 +441,7 @@ def build_task_workspace(
         for key, label in WORKFLOW_COLUMNS
     ]
 
-    week = _build_week_planner(
+    week_planner = _build_week_planner(
         cards,
         today=today,
         week_start=week_start or today,
@@ -461,9 +461,9 @@ def build_task_workspace(
             continue
         by_day.setdefault(task.deadline, []).append(card)
 
-    for week in cal.monthdatescalendar(calendar_year, calendar_month):
+    for cal_week in cal.monthdatescalendar(calendar_year, calendar_month):
         row: list[CalendarDay] = []
-        for day in week:
+        for day in cal_week:
             row.append(
                 CalendarDay(
                     date=day,
@@ -483,7 +483,7 @@ def build_task_workspace(
         cards=cards,
         list_groups=list_groups,
         kanban=kanban,
-        week=week,
+        week=week_planner,
         calendar_weeks=weeks,
         calendar_label=calendar_label,
         calendar_year=calendar_year,
