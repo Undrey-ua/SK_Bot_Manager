@@ -1,11 +1,12 @@
 <aside class="tm-drawer" id="tm-drawer" {% if not open_task %}hidden{% endif %} data-open="{% if open_task %}1{% else %}0{% endif %}">
   {% if open_task %}
+  {% set close_href = "/tasks" ~ tasks_page_query(manager_id=selected_manager_id, status=status_filter, kind=selected_kind, view=current_view, q=search_q, client_id=selected_client_id, priority=selected_priority, deadline=selected_deadline, workflow=selected_workflow, year=workspace.calendar_year, month=workspace.calendar_month, cal_day=cal_day) %}
   <header class="tm-drawer__header">
-    <a class="tm-drawer__back" href="/tasks{{ tasks_page_query(manager_id=selected_manager_id, status=status_filter, kind=selected_kind, view=current_view, q=search_q, client_id=selected_client_id, priority=selected_priority, deadline=selected_deadline, workflow=selected_workflow, year=workspace.calendar_year, month=workspace.calendar_month, cal_day=cal_day) }}" aria-label="Закрити">←</a>
     <div class="tm-drawer__heading">
       <h2>{{ open_task.title }}</h2>
       <span class="tm-drawer__id">#{{ open_task.id }}</span>
     </div>
+    <a class="btn btn-secondary btn-sm tm-drawer__close" href="{{ close_href }}">Закрити</a>
   </header>
   <div class="tm-drawer__badges">
     <span class="tm-pill tm-pill--{{ open_card.status }}">{{ open_card.status_label }}</span>
@@ -20,7 +21,7 @@
   <section class="tm-tab is-active" data-tm-panel="details">
     <dl class="tm-facts">
       <div><dt>Клієнт</dt><dd>{% if open_task.client %}{{ open_task.client.name }}{% else %}—{% endif %}</dd></div>
-      <div><dt>Дата і час</dt><dd>{{ open_card.when_label }}</dd></div>
+      <div><dt>Дата</dt><dd>{{ open_card.when_label }}</dd></div>
       <div><dt>Відповідальний</dt><dd><span class="tm-avatar tm-avatar--sm">{{ user_initials(open_task.assignee.name if open_task.assignee else '') }}</span> {{ open_task.assignee.name if open_task.assignee else '—' }}</dd></div>
       <div><dt>Тип задачі</dt><dd>{{ manager_task_kind_label(open_task.kind) }}</dd></div>
       <div><dt>Створено</dt><dd>{{ format_dt(open_task.created_at) }}</dd></div>
@@ -76,14 +77,9 @@
           {% endfor %}
         </select>
       </label>
-      <div class="tm-edit__row">
-        <label>Дата
-          <input type="date" name="deadline" value="{% if open_task.deadline %}{{ open_task.deadline.isoformat() }}{% endif %}">
-        </label>
-        <label>Час
-          <input type="time" name="due_time" value="{{ open_task.due_time or '' }}">
-        </label>
-      </div>
+      <label>Дата
+        <input type="date" name="deadline" value="{% if open_task.deadline %}{{ open_task.deadline.isoformat() }}{% endif %}">
+      </label>
       <label>Опис
         <textarea name="comment" rows="4" class="multiline-text">{{ open_task.comment or '' }}</textarea>
       </label>
@@ -167,15 +163,16 @@
     </ol>
   </section>
 
-  {% if can_manage_task(current_user, assignee_id=open_task.assignee_id) %}
   <footer class="tm-drawer__footer">
+    <a class="btn btn-secondary" href="{{ close_href }}">Закрити</a>
+    {% if can_manage_task(current_user, assignee_id=open_task.assignee_id) %}
     <button type="submit" form="tm-edit-form" class="btn btn-primary">Зберегти зміни</button>
     <form method="post" action="/tasks/delete" onsubmit="return confirm('Скасувати задачу #{{ open_task.id }}?');">
       <input type="hidden" name="task_id" value="{{ open_task.id }}">
       <input type="hidden" name="return_view" value="{{ current_view }}">
       <button type="submit" class="btn btn-danger">Скасувати задачу</button>
     </form>
+    {% endif %}
   </footer>
-  {% endif %}
   {% endif %}
 </aside>

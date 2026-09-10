@@ -125,13 +125,6 @@ _STANDS_DETAIL_BUCKETS = frozenset({
 _TASK_VIEWS = frozenset({"list", "board", "calendar"})
 
 
-def _parse_due_time(raw: str) -> str | None:
-    value = (raw or "").strip()
-    if len(value) >= 5 and value[2] == ":":
-        return value[:5]
-    return None
-
-
 def _task_return_qs(form: dict[str, str]) -> str:
     manager_id = form.get("return_manager_id", "").strip()
     view = form.get("return_view", "").strip() or None
@@ -1461,7 +1454,6 @@ def register_panel_routes(
         client_id: str = Form(""),
         status: str = Form("new"),
         priority: str = Form("normal"),
-        due_time: str = Form(""),
         add_to_calendar: str = Form(""),
         return_view: str = Form(""),
         return_manager_id: str = Form(""),
@@ -1486,7 +1478,6 @@ def register_panel_routes(
             title=title.strip(),
             comment=comment.strip() or None,
             deadline=dl,
-            due_time=_parse_due_time(due_time),
             weekday=wd,
             kind=normalize_manager_task_kind(kind),
             status=normalize_task_workflow_status(status, completed=False, cancelled=False),
@@ -1558,7 +1549,6 @@ def register_panel_routes(
         client_id: str = Form(""),
         status: str = Form(""),
         priority: str = Form(""),
-        due_time: str = Form(""),
         add_to_calendar: str = Form(""),
         return_view: str = Form(""),
         return_manager_id: str = Form(""),
@@ -1579,7 +1569,6 @@ def register_panel_routes(
         task.assignee_id = assignee_id if can_manage_tasks(user) else user.id
         task.title = title.strip()
         task.deadline = dl
-        task.due_time = _parse_due_time(due_time)
         task.weekday = wd
         task.kind = normalize_manager_task_kind(kind)
         task.comment = comment.strip() or None
@@ -1593,7 +1582,6 @@ def register_panel_routes(
         qs = tasks_page_query(
             manager_id=int(return_manager_id) if return_manager_id.strip().isdigit() else None,
             view=return_view.strip() or "list",
-            task=task.id,
         )
         return RedirectResponse(f"/tasks{qs}", status_code=303)
 

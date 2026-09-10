@@ -519,6 +519,12 @@
   display: flex;
   gap: 0.6rem;
   align-items: flex-start;
+  justify-content: space-between;
+}
+
+.tm-drawer__heading {
+  min-width: 0;
+  flex: 1;
 }
 
 .tm-drawer__heading h2 {
@@ -529,15 +535,8 @@
 
 .tm-drawer__id { color: var(--muted); font-size: 0.8rem; }
 
-.tm-drawer__back {
-  display: none;
-  width: 32px;
-  height: 32px;
-  border-radius: 999px;
-  background: #f1f5f9;
-  align-items: center;
-  justify-content: center;
-  color: inherit;
+.tm-drawer__close {
+  flex-shrink: 0;
 }
 
 .tm-drawer__badges {
@@ -756,6 +755,18 @@
   border-top: 1px solid var(--border);
 }
 
+.tm-drawer__footer .btn {
+  min-height: 2.4rem;
+}
+
+.tm-drawer__footer form {
+  flex: 1 1 100%;
+}
+
+.tm-drawer__footer form .btn {
+  width: 100%;
+}
+
 .tm-empty { color: var(--muted); margin: 0.5rem 0; }
 
 .tm-plans {
@@ -782,8 +793,24 @@
     z-index: 40;
     border-radius: 0;
     overflow: auto;
+    padding-top: max(1rem, env(safe-area-inset-top));
+    padding-bottom: 0;
   }
-  .tm-drawer__back { display: inline-flex; }
+  .tm-drawer__header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #fff;
+    padding-bottom: 0.65rem;
+  }
+  .tm-drawer__footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    background: #fff;
+    margin-top: auto;
+    padding-bottom: max(0.85rem, env(safe-area-inset-bottom));
+  }
   .tm-kanban { grid-template-columns: repeat(5, minmax(240px, 1fr)); }
   .tm-cal__chips { display: none; }
   .tm-cal__dots { display: flex; }
