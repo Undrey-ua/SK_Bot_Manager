@@ -173,6 +173,7 @@ class WeekPlanner:
     week_number: int
     label: str
     days: list[WeekDayVM]
+    undated: list[TaskCardVM]
     notes: str
     notes_manager_id: int | None
     total: int
@@ -369,12 +370,24 @@ def _build_week_planner(
                 tasks=day_cards,
             )
         )
+    undated = [
+        c
+        for c in cards
+        if is_open_task(c.task) and c.task.deadline is None and c.task.weekday is None
+    ]
+    undated.sort(
+        key=lambda c: (
+            0 if c.priority == "high" else 1 if c.priority == "normal" else 2,
+            c.task.created_at.timestamp() if c.task.created_at else 0,
+        )
+    )
     return WeekPlanner(
         start=start,
         end=end,
         week_number=start.isocalendar().week,
         label=format_week_range(start, end),
         days=days,
+        undated=undated,
         notes=notes,
         notes_manager_id=notes_manager_id,
         total=len(week_cards),
