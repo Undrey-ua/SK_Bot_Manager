@@ -47,6 +47,15 @@ UK_MONTHS_NOM: list[str] = [
 ]
 
 UK_WEEKDAYS_SHORT: list[str] = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"]
+UK_WEEKDAYS_FULL: list[str] = [
+    "Понеділок",
+    "Вівторок",
+    "Середа",
+    "Четвер",
+    "Пʼятниця",
+    "Субота",
+    "Неділя",
+]
 
 WORKFLOW_COLUMNS: list[tuple[str, str]] = [
     (TaskWorkflowStatus.NEW.value, "Нова"),
@@ -149,6 +158,31 @@ class TaskKanbanColumn:
 
 
 @dataclass
+class WeekDayVM:
+    date: date
+    weekday_label: str
+    date_label: str
+    is_today: bool
+    tasks: list[TaskCardVM]
+
+
+@dataclass
+class WeekPlanner:
+    start: date
+    end: date
+    label: str
+    days: list[WeekDayVM]
+    notes: str
+    notes_manager_id: int | None
+    total: int
+    high: int
+    normal: int
+    low: int
+    prev_start: date
+    next_start: date
+
+
+@dataclass
 class CalendarDay:
     date: date
     in_month: bool
@@ -162,6 +196,7 @@ class TaskWorkspace:
     cards: list[TaskCardVM]
     list_groups: list[TaskListGroup]
     kanban: list[TaskKanbanColumn]
+    week: WeekPlanner
     calendar_weeks: list[list[CalendarDay]]
     calendar_label: str
     calendar_year: int
@@ -272,6 +307,83 @@ def _list_group_key(task: Task, today: date) -> tuple[int, int, str, str]:
     return 5, 0, "none", "Без дедлайну"
 
 
+def monday_of(day: date) -> date:
+    return day - timedelta(days=day.weekday())
+
+
+def format_week_range(start: date, end: date) -> str:
+    if start.month == end.month and start.year == end.year:
+        return f"{start.day} – {end.day} {UK_MONTHS_GEN[start.month - 1]} {start.year}"
+    if start.year == end.year:
+        return (
+            f"{start.day} {UK_MONTHS_GEN[start.month - 1]} – "
+            f"{end.day} {UK_MONTHS_GEN[end.month - 1]} {end.year}"
+        )
+    return (
+        f"{start.day} {UK_MONTHS_GEN[start.month - 1]} {start.year} – "
+        f"{end.day} {UK_MONTHS_GEN[end.month - 1]} {end.year}"
+    )
+
+
+def _task_on_date(task: Task, day: date) -> bool:
+    if workflow_status(task) == TaskWorkflowStatus.CANCELLED.value:
+        return False
+    if task.deadline == day:
+        return True
+    return (
+        task.deadline is None
+        and task.weekday is not None
+        and task.weekday == day.weekday()
+    )
+
+
+def _build_week_planner(
+    cards: list[TaskCardVM],
+    *,
+    today: date,
+    week_start: date,
+    notes: str = "",
+    notes_manager_id: int | None = None,
+) -> WeekPlanner:
+    start = monday_of(week_start)
+    end = start + timedelta(days=4)
+    days: list[WeekDayVM] = []
+    week_cards: list[TaskCardVM] = []
+    for offset in range(5):
+        day = start + timedelta(days=offset)
+        day_cards = [c for c in cards if _task_on_date(c.task, day)]
+        day_cards.sort(
+            key=lambda c: (
+                0 if c.priority == "high" else 1 if c.priority == "normal" else 2,
+                c.task.created_at.timestamp() if c.task.created_at else 0,
+            )
+        )
+        week_cards.extend(day_cards)
+        days.append(
+            WeekDayVM(
+                date=day,
+                weekday_label=UK_WEEKDAYS_FULL[offset],
+                date_label=f"{day.day} {UK_MONTHS_GEN[day.month - 1]}",
+                is_today=day == today,
+                tasks=day_cards,
+            )
+        )
+    return WeekPlanner(
+        start=start,
+        end=end,
+        label=format_week_range(start, end),
+        days=days,
+        notes=notes,
+        notes_manager_id=notes_manager_id,
+        total=len(week_cards),
+        high=sum(1 for c in week_cards if c.priority == "high"),
+        normal=sum(1 for c in week_cards if c.priority == "normal"),
+        low=sum(1 for c in week_cards if c.priority == "low"),
+        prev_start=start - timedelta(days=7),
+        next_start=start + timedelta(days=7),
+    )
+
+
 def build_task_workspace(
     tasks: list[Task],
     *,
@@ -282,6 +394,9 @@ def build_task_workspace(
     focus_manager: User | None = None,
     clients: list | None = None,
     status_bucket: str | None = None,
+    week_start: date | None = None,
+    week_notes: str = "",
+    notes_manager_id: int | None = None,
 ) -> TaskWorkspace:
     cards = [_to_card(t, today) for t in tasks]
     stats = TaskWorkspaceStats(
@@ -326,6 +441,14 @@ def build_task_workspace(
         for key, label in WORKFLOW_COLUMNS
     ]
 
+    week = _build_week_planner(
+        cards,
+        today=today,
+        week_start=week_start or today,
+        notes=week_notes,
+        notes_manager_id=notes_manager_id,
+    )
+
     cal = calendar.Calendar(firstweekday=0)
     selected = selected_day or today
     weeks: list[list[CalendarDay]] = []
@@ -360,6 +483,7 @@ def build_task_workspace(
         cards=cards,
         list_groups=list_groups,
         kanban=kanban,
+        week=week,
         calendar_weeks=weeks,
         calendar_label=calendar_label,
         calendar_year=calendar_year,

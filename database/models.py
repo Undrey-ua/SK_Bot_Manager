@@ -426,6 +426,22 @@ class TaskComment(Base):
     task: Mapped["Task"] = relationship(back_populates="comments")
     author: Mapped["User"] = relationship()
 
+
+class TaskWeekNote(Base):
+    __tablename__ = "task_week_notes"
+    __table_args__ = (UniqueConstraint("manager_id", "week_start", name="uq_task_week_note"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    manager_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    week_start: Mapped[date] = mapped_column(Date, index=True)
+    body: Mapped[str] = mapped_column(Text, default="", server_default="")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+
 class ClientStand(Base):
     __tablename__ = "client_stands"
     __table_args__ = (UniqueConstraint("client_id", "stand_id", name="uq_client_stand"),)

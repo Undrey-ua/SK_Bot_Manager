@@ -7,6 +7,7 @@
     </header>
     <form method="post" action="/tasks" class="tm-create stand-move-form" id="tm-create-form">
       <input type="hidden" name="return_view" value="{{ current_view }}">
+      {% if week_start %}<input type="hidden" name="return_week_start" value="{{ week_start }}">{% endif %}
       <label>Назва задачі *
         <input type="text" name="title" required placeholder="Наприклад: Підготувати договір">
       </label>
@@ -27,7 +28,7 @@
         </select>
       </label>
       <label>Дата
-        <input type="date" name="deadline">
+        <input type="date" name="deadline"{% if current_view == 'week' and week_default_deadline %} value="{{ week_default_deadline }}"{% endif %}>
       </label>
       <fieldset class="tm-prio">
         <legend>Пріоритет</legend>

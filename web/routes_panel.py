@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date as date_cls
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from decimal import Decimal, InvalidOperation
 
@@ -24,6 +24,7 @@ from database.models import (
     Task,
     TaskChecklistItem,
     TaskComment,
+    TaskWeekNote,
     User,
     UserRole,
     normalize_manager_task_kind,
@@ -100,6 +101,7 @@ from web.services.tasks_workspace import (
     apply_workflow_status,
     build_task_workspace,
     filter_workspace_tasks,
+    monday_of,
 )
 from web.sales_matrix_pdf import build_sales_matrix_pdf
 from web.stands_pdf import build_stands_clients_pdf
@@ -122,7 +124,36 @@ _STANDS_DETAIL_BUCKETS = frozenset({
     "oblast_stand",
 })
 
-_TASK_VIEWS = frozenset({"list", "board", "calendar"})
+_TASK_VIEWS = frozenset({"list", "week", "calendar"})
+
+
+def _normalize_task_view(raw: str | None) -> str:
+    view = (raw or "").strip() or "list"
+    if view == "board":
+        return "week"
+    if view not in _TASK_VIEWS:
+        return "list"
+    return view
+
+
+def _parse_iso_date(raw: str | None) -> date_cls | None:
+    value = (raw or "").strip()
+    if not value:
+        return None
+    try:
+        return date_cls.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+def _week_start_param(raw: str | None, *, view: str | None = None) -> str | None:
+    resolved_view = _normalize_task_view(view) if view else None
+    if resolved_view and resolved_view != "week":
+        return None
+    day = _parse_iso_date(raw)
+    if day is None:
+        return None
+    return monday_of(day).isoformat()
 
 
 def _task_return_qs(form: dict[str, str]) -> str:
@@ -135,8 +166,9 @@ def _task_return_qs(form: dict[str, str]) -> str:
         manager_id=int(manager_id) if manager_id.isdigit() else None,
         status=status,
         kind=kind,
-        view=view if view in _TASK_VIEWS else None,
+        view=_normalize_task_view(view) if view else None,
         task=int(task_id) if task_id.isdigit() else None,
+        week_start=_week_start_param(form.get("return_week_start"), view=view),
         show_completed=form.get("return_show_completed", "").strip()
         in ("1", "true", "yes", "on"),
     )
@@ -1223,9 +1255,7 @@ def register_panel_routes(
         filter_manager_id = scoped_manager_filter(
             user, query_int(request, "manager_id")
         )
-        view = query_str(request, "view") or "list"
-        if view not in _TASK_VIEWS:
-            view = "list"
+        view = _normalize_task_view(query_str(request, "view"))
         status_filter = query_str(request, "status") or (
             TASK_STATUS_ACTIVE if view == "list" else ""
         )
@@ -1257,6 +1287,17 @@ def register_panel_routes(
             except ValueError:
                 selected_day = None
         open_task_id = query_int(request, "task")
+        week_start = monday_of(_parse_iso_date(query_str(request, "week_start")) or today)
+        notes_manager_id = filter_manager_id or (user.id if user.is_manager else None)
+        week_notes = ""
+        if notes_manager_id is not None:
+            note = await session.scalar(
+                select(TaskWeekNote).where(
+                    TaskWeekNote.manager_id == notes_manager_id,
+                    TaskWeekNote.week_start == week_start,
+                )
+            )
+            week_notes = note.body if note else ""
 
         stmt = (
             select(Task)
@@ -1312,6 +1353,9 @@ def register_panel_routes(
             focus_manager=focus_manager,
             clients=clients,
             status_bucket=status_filter or None if view == "list" else None,
+            week_start=week_start,
+            week_notes=week_notes,
+            notes_manager_id=notes_manager_id,
         )
         open_task = next((t for t in all_tasks if t.id == open_task_id), None)
         open_card = next((c for c in workspace.cards if c.task.id == open_task_id), None)
@@ -1376,6 +1420,12 @@ def register_panel_routes(
                 prev_cal_month=prev_month,
                 next_cal_year=next_year,
                 next_cal_month=next_month,
+                week_start=week_start.isoformat(),
+                week_default_deadline=(
+                    today.isoformat()
+                    if week_start <= today <= week_start + timedelta(days=4)
+                    else week_start.isoformat()
+                ),
                 workflow_choices=WORKFLOW_COLUMNS,
                 priority_choices=list(TASK_PRIORITY_LABELS.items()),
                 sales_plan_progress=sales_plan_progress,
@@ -1457,6 +1507,7 @@ def register_panel_routes(
         add_to_calendar: str = Form(""),
         return_view: str = Form(""),
         return_manager_id: str = Form(""),
+        return_week_start: str = Form(""),
     ) -> Response:
         user = await load_web_user(request, session)
         require_nav(user, "tasks")
@@ -1501,8 +1552,9 @@ def register_panel_routes(
             )
         qs = tasks_page_query(
             manager_id=int(return_manager_id) if return_manager_id.strip().isdigit() else None,
-            view=return_view.strip() or "list",
+            view=_normalize_task_view(return_view),
             task=task.id,
+            week_start=_week_start_param(return_week_start, view=return_view),
         )
         return RedirectResponse(f"/tasks{qs}", status_code=303)
 
@@ -1552,6 +1604,7 @@ def register_panel_routes(
         add_to_calendar: str = Form(""),
         return_view: str = Form(""),
         return_manager_id: str = Form(""),
+        return_week_start: str = Form(""),
     ) -> Response:
         user = await load_web_user(request, session)
         require_nav(user, "tasks")
@@ -1581,7 +1634,8 @@ def register_panel_routes(
         await session.commit()
         qs = tasks_page_query(
             manager_id=int(return_manager_id) if return_manager_id.strip().isdigit() else None,
-            view=return_view.strip() or "list",
+            view=_normalize_task_view(return_view),
+            week_start=_week_start_param(return_week_start, view=return_view),
         )
         return RedirectResponse(f"/tasks{qs}", status_code=303)
 
@@ -1596,6 +1650,7 @@ def register_panel_routes(
         return_status: str = Form(""),
         return_kind: str = Form(""),
         return_view: str = Form(""),
+        return_week_start: str = Form(""),
     ) -> Response:
         user = await load_web_user(request, session)
         require_nav(user, "tasks")
@@ -1612,7 +1667,8 @@ def register_panel_routes(
             else None,
             status=return_status.strip() or None,
             kind=return_kind.strip() or None,
-            view=return_view.strip() or None,
+            view=_normalize_task_view(return_view) if return_view.strip() else None,
+            week_start=_week_start_param(return_week_start, view=return_view),
             show_completed=return_show_completed.strip()
             in ("1", "true", "yes", "on"),
         )
@@ -1625,8 +1681,9 @@ def register_panel_routes(
         _auth: Response | None = Depends(require_auth),
         task_id: int = Form(...),
         status: str = Form(...),
-        return_view: str = Form("board"),
+        return_view: str = Form("week"),
         return_manager_id: str = Form(""),
+        return_week_start: str = Form(""),
     ) -> Response:
         user = await load_web_user(request, session)
         require_nav(user, "tasks")
@@ -1638,8 +1695,9 @@ def register_panel_routes(
         await session.commit()
         qs = tasks_page_query(
             manager_id=int(return_manager_id) if return_manager_id.strip().isdigit() else None,
-            view=return_view.strip() or "board",
+            view=_normalize_task_view(return_view),
             task=t.id,
+            week_start=_week_start_param(return_week_start, view=return_view),
         )
         return RedirectResponse(f"/tasks{qs}", status_code=303)
 
@@ -1653,6 +1711,7 @@ def register_panel_routes(
         is_done: str = Form("1"),
         return_view: str = Form(""),
         return_manager_id: str = Form(""),
+        return_week_start: str = Form(""),
     ) -> Response:
         user = await load_web_user(request, session)
         require_nav(user, "tasks")
@@ -1667,8 +1726,9 @@ def register_panel_routes(
         await session.commit()
         qs = tasks_page_query(
             manager_id=int(return_manager_id) if return_manager_id.strip().isdigit() else None,
-            view=return_view.strip() or "list",
+            view=_normalize_task_view(return_view),
             task=task_id,
+            week_start=_week_start_param(return_week_start, view=return_view),
         )
         return RedirectResponse(f"/tasks{qs}", status_code=303)
 
@@ -1681,6 +1741,7 @@ def register_panel_routes(
         title: str = Form(...),
         return_view: str = Form(""),
         return_manager_id: str = Form(""),
+        return_week_start: str = Form(""),
     ) -> Response:
         user = await load_web_user(request, session)
         require_nav(user, "tasks")
@@ -1695,8 +1756,9 @@ def register_panel_routes(
         await session.commit()
         qs = tasks_page_query(
             manager_id=int(return_manager_id) if return_manager_id.strip().isdigit() else None,
-            view=return_view.strip() or "list",
+            view=_normalize_task_view(return_view),
             task=task_id,
+            week_start=_week_start_param(return_week_start, view=return_view),
         )
         return RedirectResponse(f"/tasks{qs}", status_code=303)
 
@@ -1709,6 +1771,7 @@ def register_panel_routes(
         body: str = Form(...),
         return_view: str = Form(""),
         return_manager_id: str = Form(""),
+        return_week_start: str = Form(""),
     ) -> Response:
         user = await load_web_user(request, session)
         require_nav(user, "tasks")
@@ -1722,8 +1785,9 @@ def register_panel_routes(
         await session.commit()
         qs = tasks_page_query(
             manager_id=int(return_manager_id) if return_manager_id.strip().isdigit() else None,
-            view=return_view.strip() or "list",
+            view=_normalize_task_view(return_view),
             task=task_id,
+            week_start=_week_start_param(return_week_start, view=return_view),
         )
         return RedirectResponse(f"/tasks{qs}", status_code=303)
 
@@ -1738,6 +1802,7 @@ def register_panel_routes(
         return_status: str = Form(""),
         return_kind: str = Form(""),
         return_view: str = Form(""),
+        return_week_start: str = Form(""),
     ) -> Response:
         user = await load_web_user(request, session)
         require_nav(user, "tasks")
@@ -1753,8 +1818,50 @@ def register_panel_routes(
             else None,
             status=return_status.strip() or None,
             kind=return_kind.strip() or None,
-            view=return_view.strip() or None,
+            view=_normalize_task_view(return_view) if return_view.strip() else None,
+            week_start=_week_start_param(return_week_start, view=return_view),
             show_completed=return_show_completed.strip()
             in ("1", "true", "yes", "on"),
+        )
+        return RedirectResponse(f"/tasks{qs}", status_code=303)
+
+    @app.post("/tasks/week-notes")
+    async def tasks_week_notes_save(
+        request: Request,
+        session: AsyncSession = Depends(get_session),
+        _auth: Response | None = Depends(require_auth),
+        body: str = Form(""),
+        week_start: str = Form(""),
+        manager_id: str = Form(""),
+        return_manager_id: str = Form(""),
+    ) -> Response:
+        user = await load_web_user(request, session)
+        require_nav(user, "tasks")
+        start = monday_of(_parse_iso_date(week_start) or date_cls.today())
+        if can_filter_managers(user) and manager_id.strip().isdigit():
+            target_id = int(manager_id)
+        else:
+            target_id = user.id
+        scoped = scoped_manager_filter(user, target_id)
+        if scoped is not None:
+            target_id = scoped
+        text = body.replace("\r\n", "\n").strip()
+        note = await session.scalar(
+            select(TaskWeekNote).where(
+                TaskWeekNote.manager_id == target_id,
+                TaskWeekNote.week_start == start,
+            )
+        )
+        if note is None:
+            session.add(TaskWeekNote(manager_id=target_id, week_start=start, body=text))
+        else:
+            note.body = text
+        await session.commit()
+        if request.headers.get("x-requested-with") == "fetch":
+            return Response(status_code=204)
+        qs = tasks_page_query(
+            manager_id=int(return_manager_id) if return_manager_id.strip().isdigit() else None,
+            view="week",
+            week_start=start.isoformat(),
         )
         return RedirectResponse(f"/tasks{qs}", status_code=303)

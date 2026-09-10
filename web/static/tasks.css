@@ -783,7 +783,245 @@
 
 .tm-col.is-drop { outline: 2px dashed var(--tm-accent); }
 
+.tm-week-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.tm-week-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.tm-week-nav h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  min-width: 12rem;
+  text-align: center;
+}
+
+.tm-week-nav__arrow {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--tm-accent-soft);
+  color: var(--tm-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.tm-week {
+  background: #fff;
+  border-radius: 24px;
+  box-shadow: var(--shadow-card);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 32rem;
+}
+
+.tm-week__pane {
+  padding: 1.15rem 1.25rem 1.35rem;
+}
+
+.tm-week__pane--left {
+  border-right: 1px solid #eef2ff;
+  background: linear-gradient(90deg, #fff 0%, #fff 96%, #f8f7ff 100%);
+}
+
+.tm-week-day {
+  margin-bottom: 1.35rem;
+}
+
+.tm-week-day:last-child {
+  margin-bottom: 0;
+}
+
+.tm-week-day__head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  margin-bottom: 0.45rem;
+}
+
+.tm-week-day__head h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.tm-week-day__date {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.tm-week-day__count {
+  margin-left: auto;
+  background: var(--tm-accent-soft);
+  color: var(--tm-accent);
+  border-radius: 999px;
+  min-width: 1.5rem;
+  text-align: center;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.tm-week-day.is-today .tm-week-day__head h2 {
+  color: var(--tm-accent);
+}
+
+.tm-week-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.tm-week-table th {
+  text-align: left;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.4rem 0.3rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.tm-week-table td {
+  padding: 0.45rem 0.3rem;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: top;
+}
+
+.tm-week-table__check {
+  width: 2rem;
+  text-align: center;
+}
+
+.tm-week-table td a {
+  color: inherit;
+  font-weight: 600;
+}
+
+.tm-week-table td a:hover {
+  color: var(--primary);
+}
+
+.tm-week-table tr.is-done td a {
+  text-decoration: line-through;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.tm-week-table tr.is-overdue td a {
+  color: var(--tm-red);
+}
+
+.tm-week-table__notes {
+  color: var(--muted);
+  max-width: 9.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tm-week-table__empty td {
+  color: var(--muted);
+  font-style: italic;
+  border-bottom: 0;
+}
+
+.tm-week-prio {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-weight: 700;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.tm-week-prio i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.tm-week-prio--high { color: #e11d48; }
+.tm-week-prio--normal { color: #d97706; }
+.tm-week-prio--low { color: #2563eb; }
+
+.tm-week-extras {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 0.9rem;
+  margin-top: 1.25rem;
+  padding-top: 0.35rem;
+}
+
+.tm-week-notes h3,
+.tm-week-summary h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+}
+
+.tm-week-notes textarea {
+  min-height: 7rem;
+}
+
+.tm-week-notes .btn {
+  margin-top: 0.5rem;
+}
+
+.tm-week-summary ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.tm-week-summary li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.tm-week-summary li .tm-dot {
+  margin: 0;
+}
+
+.tm-week-summary strong {
+  margin-left: auto;
+  color: var(--text);
+}
+
 @media (max-width: 1100px) {
+  .tm-week {
+    grid-template-columns: 1fr;
+  }
+  .tm-week__pane--left {
+    border-right: 0;
+    background: #fff;
+  }
+  .tm-week-extras {
+    grid-template-columns: 1fr;
+  }
+  .tm-week-nav h2 {
+    min-width: 0;
+    font-size: 0.95rem;
+  }
   .tm--drawer-open .tm-body {
     grid-template-columns: 1fr;
   }

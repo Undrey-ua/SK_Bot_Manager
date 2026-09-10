@@ -124,6 +124,7 @@ def tasks_page_query(
     month: int | None = None,
     task: int | None = None,
     cal_day: str | None = None,
+    week_start: str | None = None,
 ) -> str:
     """Query string for /tasks links (без leading ? якщо порожньо)."""
     parts: list[str] = []
@@ -151,6 +152,8 @@ def tasks_page_query(
         parts.append(f"month={month}")
     if cal_day:
         parts.append(f"cal_day={cal_day}")
+    if week_start and (view is None or view == "week"):
+        parts.append(f"week_start={week_start}")
     if task is not None:
         parts.append(f"task={task}")
     if show_completed:

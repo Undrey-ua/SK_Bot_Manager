@@ -12,13 +12,13 @@
       <span class="tm-avatar tm-avatar--lg">{{ user_initials(current_user.name) }}</span>
       <div>
         <h1 class="tm-hero__title">Задачі</h1>
-        <p class="tm-hero__sub">{% if workspace.focus_manager_name %}{{ workspace.focus_manager_name }}{% else %}{{ current_user.name }}{% endif %}</p>
+        <p class="tm-hero__sub">{% if current_view == 'week' %}Тиждень · {% endif %}{% if workspace.focus_manager_name %}{{ workspace.focus_manager_name }}{% else %}{{ current_user.name }}{% endif %}</p>
       </div>
     </div>
     <div class="tm-hero__actions">
       <div class="tm-views" role="tablist" aria-label="Вигляд">
         <a class="tm-views__btn{% if current_view == 'list' %} is-active{% endif %}" href="/tasks{{ tasks_page_query(manager_id=selected_manager_id, status=status_filter, kind=selected_kind, view='list', q=search_q, client_id=selected_client_id, priority=selected_priority, deadline=selected_deadline, workflow=selected_workflow) }}">Список</a>
-        <a class="tm-views__btn{% if current_view == 'board' %} is-active{% endif %}" href="/tasks{{ tasks_page_query(manager_id=selected_manager_id, status=status_filter, kind=selected_kind, view='board', q=search_q, client_id=selected_client_id, priority=selected_priority, deadline=selected_deadline, workflow=selected_workflow) }}">Дошка</a>
+        <a class="tm-views__btn{% if current_view == 'week' %} is-active{% endif %}" href="/tasks{{ tasks_page_query(manager_id=selected_manager_id, status=status_filter, kind=selected_kind, view='week', q=search_q, client_id=selected_client_id, priority=selected_priority, deadline=selected_deadline, workflow=selected_workflow, week_start=week_start) }}">Тиждень</a>
         <a class="tm-views__btn{% if current_view == 'calendar' %} is-active{% endif %}" href="/tasks{{ tasks_page_query(manager_id=selected_manager_id, status=status_filter, kind=selected_kind, view='calendar', q=search_q, client_id=selected_client_id, priority=selected_priority, deadline=selected_deadline, workflow=selected_workflow, year=workspace.calendar_year, month=workspace.calendar_month) }}">Календар</a>
       </div>
       {% if can_create_tasks %}
@@ -27,6 +27,7 @@
     </div>
   </header>
 
+  {% if current_view != 'week' %}
   <section class="tm-stats" aria-label="Підсумок">
     <a class="tm-stat" href="/tasks{{ tasks_page_query(manager_id=selected_manager_id, status='active', kind=selected_kind, view=current_view, q=search_q, client_id=selected_client_id, priority=selected_priority, deadline=selected_deadline) }}">
       <span class="tm-stat__label">Активних</span>
@@ -45,9 +46,11 @@
       <strong>{{ workspace.stats.done }}</strong>
     </a>
   </section>
+  {% endif %}
 
   <form class="filters filters--compact tm-toolbar" method="get" action="/tasks">
     <input type="hidden" name="view" value="{{ current_view }}">
+    {% if current_view == 'week' %}<input type="hidden" name="week_start" value="{{ week_start }}">{% endif %}
     {% if status_filter != 'active' %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
     <label class="tm-search">
       Пошук
@@ -118,30 +121,8 @@
 
   <div class="tm-body">
     <div class="tm-main">
-      {% if current_view == 'board' %}
-      <div class="tm-kanban">
-        {% for col in workspace.kanban %}
-        <section class="tm-col" data-drop-status="{{ col.status }}">
-          <header class="tm-col__head">
-            <span class="tm-col__dot tm-col__dot--{{ col.status }}"></span>
-            <h2>{{ col.label }}</h2>
-            <span class="tm-col__count">{{ col.tasks|length }}</span>
-            {% if can_create_tasks %}
-            <button type="button" class="tm-col__add" data-open-create data-status="{{ col.status }}" aria-label="Додати">+</button>
-            {% endif %}
-          </header>
-          <div class="tm-col__list">
-            {% for card in col.tasks %}
-            {% include "partials/tm_card.html" %}
-            {% else %}
-            <p class="tm-col__empty">
-              {% if col.status == 'done' %}Тут будуть виконані задачі{% elif col.status == 'cancelled' %}Скасовані задачі{% else %}Немає задач{% endif %}
-            </p>
-            {% endfor %}
-          </div>
-        </section>
-        {% endfor %}
-      </div>
+      {% if current_view == 'week' %}
+      {% include "partials/tm_week.html" %}
 
       {% elif current_view == 'calendar' %}
       <div class="tm-cal">

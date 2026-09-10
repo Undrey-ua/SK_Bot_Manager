@@ -1,0 +1,54 @@
+<section class="tm-week-day{% if day.is_today %} is-today{% endif %}">
+  <header class="tm-week-day__head">
+    <h2>{{ day.weekday_label }}</h2>
+    <span class="tm-week-day__date">{{ day.date_label }}</span>
+    <span class="tm-week-day__count">{{ day.tasks|length }}</span>
+  </header>
+  <div class="table-wrap">
+    <table class="tm-week-table">
+      <thead>
+        <tr>
+          <th>Пріоритет</th>
+          <th>Клієнт / Предмет</th>
+          <th>Завдання</th>
+          <th class="tm-week-table__check">✓</th>
+          <th>Нотатки</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for card in day.tasks %}
+        <tr class="{% if card.status == 'done' %}is-done{% endif %}{% if card.is_overdue %} is-overdue{% endif %}">
+          <td>
+            <span class="tm-week-prio tm-week-prio--{{ card.priority }}">
+              <i></i>
+              {% if card.priority == 'normal' %}Середній{% else %}{{ card.priority_label }}{% endif %}
+            </span>
+          </td>
+          <td>{% if card.task.client %}{{ card.task.client.name }}{% else %}—{% endif %}</td>
+          <td>
+            <a href="/tasks{{ tasks_page_query(manager_id=selected_manager_id, status=status_filter, kind=selected_kind, view='week', q=search_q, client_id=selected_client_id, priority=selected_priority, deadline=selected_deadline, workflow=selected_workflow, week_start=week_start, task=card.task.id) }}">{{ card.task.title }}</a>
+          </td>
+          <td class="tm-week-table__check">
+            {% if can_manage_task(current_user, assignee_id=card.task.assignee_id) and card.status != 'done' and card.status != 'cancelled' %}
+            <form method="post" action="/tasks/complete">
+              <input type="hidden" name="task_id" value="{{ card.task.id }}">
+              <input type="hidden" name="return_view" value="week">
+              <input type="hidden" name="return_week_start" value="{{ week_start }}">
+              {% if selected_manager_id %}<input type="hidden" name="return_manager_id" value="{{ selected_manager_id }}">{% endif %}
+              <button type="submit" class="tm-check" title="Позначити виконаною" aria-label="Виконано"></button>
+            </form>
+            {% else %}
+            <span class="tm-check tm-check--static{% if card.status == 'done' %} tm-check--done{% endif %}"></span>
+            {% endif %}
+          </td>
+          <td class="tm-week-table__notes">{% if card.task.comment %}{{ card.task.comment }}{% endif %}</td>
+        </tr>
+        {% else %}
+        <tr class="tm-week-table__empty">
+          <td colspan="5">Немає задач</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>

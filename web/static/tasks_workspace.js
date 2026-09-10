@@ -44,6 +44,31 @@
     });
   });
 
+  const notesForm = document.querySelector("[data-week-notes-form]");
+  if (notesForm) {
+    let timer = null;
+    const textarea = notesForm.querySelector("textarea");
+    const saveNotes = async () => {
+      const body = new FormData(notesForm);
+      try {
+        await fetch(notesForm.action, {
+          method: "POST",
+          body,
+          credentials: "same-origin",
+          headers: { "X-Requested-With": "fetch" },
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    if (textarea) {
+      textarea.addEventListener("input", () => {
+        clearTimeout(timer);
+        timer = setTimeout(saveNotes, 700);
+      });
+    }
+  }
+
   let draggedId = null;
 
   document.querySelectorAll(".tm-card[draggable='true']").forEach((card) => {
@@ -65,7 +90,7 @@
       const body = new FormData();
       body.set("task_id", draggedId);
       body.set("status", col.dataset.dropStatus);
-      body.set("return_view", "board");
+      body.set("return_view", "week");
       try {
         await fetch(statusUrl, { method: "POST", body, credentials: "same-origin" });
         window.location.reload();
