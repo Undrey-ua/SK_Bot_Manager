@@ -38,6 +38,10 @@ UK_MONTHS: list[tuple[int, str]] = [
 
 KYIV = ZoneInfo("Europe/Kyiv")
 
+
+def today_kyiv() -> date:
+    return datetime.now(KYIV).date()
+
 WEEKDAY_LABELS: list[str] = [
     "Понеділок",
     "Вівторок",

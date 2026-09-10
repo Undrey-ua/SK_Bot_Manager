@@ -110,6 +110,7 @@ from web.utils import (
     client_stands_map_json,
     parse_manager_task_kind_filter,
     tasks_page_query,
+    today_kyiv,
     uk_month_name,
     warehouse_stands_map_json,
 )
@@ -1245,7 +1246,7 @@ def register_panel_routes(
         user = await load_web_user(request, session)
         require_nav(user, "tasks")
 
-        today = date_cls.today()
+        today = today_kyiv()
         plan_year = query_int(request, "plan_year", default=today.year) or today.year
         plan_month = query_int(request, "plan_month", default=today.month) or today.month
         if plan_month < 1 or plan_month > 12:
@@ -1837,7 +1838,7 @@ def register_panel_routes(
     ) -> Response:
         user = await load_web_user(request, session)
         require_nav(user, "tasks")
-        start = monday_of(_parse_iso_date(week_start) or date_cls.today())
+        start = monday_of(_parse_iso_date(week_start) or today_kyiv())
         if can_filter_managers(user) and manager_id.strip().isdigit():
             target_id = int(manager_id)
         else:
