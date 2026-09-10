@@ -748,23 +748,32 @@
 
 .tm-drawer__footer {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: stretch;
   gap: 0.5rem;
   margin-top: 1rem;
   padding-top: 0.85rem;
   border-top: 1px solid var(--border);
 }
 
-.tm-drawer__footer .btn {
-  min-height: 2.4rem;
+.tm-drawer__footer > .btn,
+.tm-drawer__footer form {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .tm-drawer__footer form {
-  flex: 1 1 100%;
+  display: flex;
+  margin: 0;
 }
 
-.tm-drawer__footer form .btn {
+.tm-drawer__footer .btn {
+  min-height: 2.4rem;
   width: 100%;
+  justify-content: center;
+  text-align: center;
+  padding-left: 0.55rem;
+  padding-right: 0.55rem;
 }
 
 .tm-empty { color: var(--muted); margin: 0.5rem 0; }
@@ -1128,6 +1137,7 @@
     z-index: 2;
     background: #fff;
     margin-top: auto;
+    flex-wrap: nowrap;
     padding-bottom: max(0.85rem, env(safe-area-inset-bottom));
   }
   .tm-kanban { grid-template-columns: repeat(5, minmax(240px, 1fr)); }
@@ -1167,6 +1177,14 @@
 }
 
 @media (max-width: 720px) {
+  .tm-drawer__footer {
+    gap: 0.4rem;
+  }
+  .tm-drawer__footer .btn {
+    font-size: 0.78rem;
+    padding-left: 0.4rem;
+    padding-right: 0.4rem;
+  }
   .tm-toolbar .tm-search {
     max-width: none;
     flex: 1 1 100%;
