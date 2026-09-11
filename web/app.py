@@ -62,6 +62,8 @@ from web.visit_periods import (
     visits_title_with_type,
     week_options,
 )
+from database.repositories.reserve import ReserveRepository
+from database.repositories.task import TaskRepository
 from web.visits_pdf import (
     build_visit_detail_pdf,
     build_visits_pdf,
@@ -356,11 +358,32 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             start_at=period_filter.start_at,
             end_at=period_filter.end_at,
         )
+        include_week_extras = period_filter.week is not None
+        completed_tasks = []
+        week_reserves = []
+        if (
+            include_week_extras
+            and period_filter.start_at is not None
+            and period_filter.end_at is not None
+        ):
+            completed_tasks = await TaskRepository(session).list_completed_in_range(
+                start_at=period_filter.start_at,
+                end_at=period_filter.end_at,
+                assignee_id=manager_id,
+            )
+            week_reserves = await ReserveRepository(session).list_created_in_range(
+                start_at=period_filter.start_at,
+                end_at=period_filter.end_at,
+                manager_id=manager_id,
+            )
         try:
             pdf_bytes = build_visits_pdf(
                 title=visits_title_with_type(period_filter.title, visit_type),
                 visits=visits,
                 show_manager=can_filter_managers(user),
+                completed_tasks=completed_tasks,
+                week_reserves=week_reserves,
+                include_week_extras=include_week_extras,
             )
         except FileNotFoundError as e:
             raise HTTPException(status_code=500, detail=str(e)) from e

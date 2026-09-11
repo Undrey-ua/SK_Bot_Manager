@@ -122,6 +122,32 @@ class TaskRepository(BaseRepository):
         )
         return list(result.scalars().all())
 
+    async def list_completed_in_range(
+        self,
+        *,
+        start_at: datetime,
+        end_at: datetime,
+        assignee_id: int | None = None,
+    ) -> list[Task]:
+        stmt = (
+            select(Task)
+            .where(
+                Task.completed_at.isnot(None),
+                Task.completed_at >= start_at,
+                Task.completed_at < end_at,
+                Task.deleted_at.is_(None),
+            )
+            .options(
+                selectinload(Task.assignee),
+                selectinload(Task.client),
+            )
+            .order_by(Task.completed_at.asc(), Task.id.asc())
+        )
+        if assignee_id is not None:
+            stmt = stmt.where(Task.assignee_id == assignee_id)
+        result = await self._session.execute(stmt)
+        return list(result.scalars().all())
+
     async def mark_reminded(self, task_id: int, day: date) -> None:
         task = await self.get_by_id(task_id)
         if task is None:

@@ -11,11 +11,11 @@ from fpdf.errors import FPDFException
 from fpdf.enums import XPos, YPos
 from fpdf.fonts import FontFace
 
-from database.models import Visit
+from database.models import Reserve, Task, Visit
 from web.client_geo import client_city
 from web.pdf_report import ReportPDF, draw_empty_message, draw_title_block
 from web.stands_pdf import COLOR_HEADER_BG, COLOR_HEADER_TEXT, COLOR_MUTED, COLOR_ROW_ALT, KYIV
-from web.utils import format_visit_date, task_label, visit_type_label
+from web.utils import format_qty, format_visit_date, task_label, visit_type_label
 
 logger = logging.getLogger(__name__)
 
@@ -46,27 +46,7 @@ def _visit_row(visit: Visit, *, show_manager: bool) -> list[str]:
     return cells
 
 
-def build_visits_pdf(
-    *,
-    title: str,
-    visits: list[Visit],
-    show_manager: bool = True,
-    generated_at: datetime | None = None,
-) -> bytes:
-    when = generated_at or datetime.now(KYIV)
-    pdf = ReportPDF(doc_title=title, strip_label="Звіт по візитах")
-    pdf.add_page()
-    draw_title_block(
-        pdf,
-        title=title,
-        generated_at=when,
-        summaries=[("Візитів", str(len(visits)))],
-    )
-
-    if not visits:
-        draw_empty_message(pdf, "Візитів за обраний період немає.")
-        return bytes(pdf.output())
-
+def _table_styles() -> tuple[FontFace, FontFace, FontFace]:
     headings_style = FontFace(
         family="Unicode",
         emphasis="BOLD",
@@ -76,40 +56,31 @@ def build_visits_pdf(
     )
     body_style = FontFace(family="Unicode", size_pt=7)
     alt_style = FontFace(family="Unicode", size_pt=7, fill_color=COLOR_ROW_ALT)
+    return headings_style, body_style, alt_style
 
-    headers = ["Дата"]
-    if show_manager:
-        headers.append("Менеджер")
-    headers.extend(
-        ["Клієнт", "Область", "Місто", "Адреса", "Тип", "Задачі", "Коментар"]
-    )
 
-    if show_manager:
-        col_widths = [22, 30, 34, 28, 22, 36, 16, 32, pdf.epw - 220]
-        align = (
-            "LEFT",
-            "LEFT",
-            "LEFT",
-            "LEFT",
-            "LEFT",
-            "LEFT",
-            "CENTER",
-            "LEFT",
-            "LEFT",
-        )
-    else:
-        col_widths = [24, 38, 30, 24, 42, 18, 36, pdf.epw - 212]
-        align = (
-            "LEFT",
-            "LEFT",
-            "LEFT",
-            "LEFT",
-            "LEFT",
-            "CENTER",
-            "LEFT",
-            "LEFT",
-        )
+def _draw_section_heading(pdf: ReportPDF, title: str) -> None:
+    pdf.ln(6)
+    pdf.set_font("Unicode", "B", 11)
+    pdf.set_text_color(15, 23, 42)
+    pdf.cell(0, 7, title, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.ln(1)
 
+
+def _draw_rows_table(
+    pdf: ReportPDF,
+    *,
+    headers: list[str],
+    rows: list[list[str]],
+    col_widths: list[float],
+    align: tuple[str, ...],
+    empty_text: str,
+) -> None:
+    if not rows:
+        draw_empty_message(pdf, empty_text)
+        return
+
+    headings_style, body_style, alt_style = _table_styles()
     with pdf.table(
         width=pdf.epw,
         col_widths=col_widths,
@@ -120,12 +91,145 @@ def build_visits_pdf(
         header_row = table.row()
         for h in headers:
             header_row.cell(h)
-
-        for idx, visit in enumerate(visits, 1):
+        for idx, cells in enumerate(rows, 1):
             style = alt_style if idx % 2 == 0 else body_style
             data_row = table.row()
-            for text in _visit_row(visit, show_manager=show_manager):
+            for text in cells:
                 data_row.cell(text, style=style)
+
+
+def _reserve_status(reserve: Reserve, *, now: datetime) -> str:
+    if reserve.sold_at:
+        return "Продаж"
+    if reserve.cancelled_at:
+        return "Скасовано"
+    if reserve.expires_at is not None and reserve.expires_at <= now:
+        return "Прострочений"
+    return "Активний"
+
+
+def _task_pdf_row(task: Task, *, show_manager: bool) -> list[str]:
+    cells = [format_visit_date(task.completed_at)]
+    if show_manager:
+        cells.append(task.assignee.name if task.assignee else "—")
+    cells.extend(
+        [
+            task.client.name if task.client else "—",
+            task.title or "—",
+            task.comment or "—",
+        ]
+    )
+    return cells
+
+
+def _reserve_pdf_row(reserve: Reserve, *, show_manager: bool, now: datetime) -> list[str]:
+    cells = [format_visit_date(reserve.created_at)]
+    if show_manager:
+        cells.append(reserve.manager.name if reserve.manager else "—")
+    cells.extend(
+        [
+            reserve.region.name if reserve.region else "—",
+            reserve.client.name if reserve.client else "—",
+            reserve.material or "—",
+            format_qty(reserve.quantity, decimals=2),
+            _reserve_status(reserve, now=now),
+        ]
+    )
+    return cells
+
+
+def build_visits_pdf(
+    *,
+    title: str,
+    visits: list[Visit],
+    show_manager: bool = True,
+    generated_at: datetime | None = None,
+    completed_tasks: list[Task] | None = None,
+    week_reserves: list[Reserve] | None = None,
+    include_week_extras: bool = False,
+) -> bytes:
+    when = generated_at or datetime.now(KYIV)
+    tasks = completed_tasks or []
+    reserves = week_reserves or []
+    pdf = ReportPDF(doc_title=title, strip_label="Звіт по візитах")
+    pdf.add_page()
+    summaries = [("Візитів", str(len(visits)))]
+    if include_week_extras:
+        summaries.extend(
+            [
+                ("Виконано задач", str(len(tasks))),
+                ("Резервів", str(len(reserves))),
+            ]
+        )
+    draw_title_block(
+        pdf,
+        title=title,
+        generated_at=when,
+        summaries=summaries,
+    )
+
+    headers = ["Дата"]
+    if show_manager:
+        headers.append("Менеджер")
+    headers.extend(
+        ["Клієнт", "Область", "Місто", "Адреса", "Тип", "Задачі", "Коментар"]
+    )
+    if show_manager:
+        col_widths = [22, 30, 34, 28, 22, 36, 16, 32, pdf.epw - 220]
+        align = ("LEFT", "LEFT", "LEFT", "LEFT", "LEFT", "LEFT", "CENTER", "LEFT", "LEFT")
+    else:
+        col_widths = [24, 38, 30, 24, 42, 18, 36, pdf.epw - 212]
+        align = ("LEFT", "LEFT", "LEFT", "LEFT", "LEFT", "CENTER", "LEFT", "LEFT")
+
+    _draw_rows_table(
+        pdf,
+        headers=headers,
+        rows=[_visit_row(v, show_manager=show_manager) for v in visits],
+        col_widths=col_widths,
+        align=align,
+        empty_text="Візитів за обраний період немає.",
+    )
+
+    if include_week_extras:
+        _draw_section_heading(pdf, "Виконані задачі за тиждень")
+        task_headers = ["Дата"]
+        if show_manager:
+            task_headers.append("Менеджер")
+        task_headers.extend(["Клієнт", "Завдання", "Нотатки"])
+        if show_manager:
+            task_widths = [24, 36, 48, 70, pdf.epw - 178]
+            task_align = ("LEFT", "LEFT", "LEFT", "LEFT", "LEFT")
+        else:
+            task_widths = [28, 52, 80, pdf.epw - 160]
+            task_align = ("LEFT", "LEFT", "LEFT", "LEFT")
+        _draw_rows_table(
+            pdf,
+            headers=task_headers,
+            rows=[_task_pdf_row(t, show_manager=show_manager) for t in tasks],
+            col_widths=task_widths,
+            align=task_align,
+            empty_text="Виконаних задач за цей тиждень немає.",
+        )
+
+        _draw_section_heading(pdf, "Резерви, створені за тиждень")
+        reserve_headers = ["Дата"]
+        if show_manager:
+            reserve_headers.append("Менеджер")
+        reserve_headers.extend(["Область", "Клієнт", "Матеріал", "Кв. м", "Статус"])
+        if show_manager:
+            reserve_widths = [22, 32, 32, 42, 70, 22, pdf.epw - 220]
+            reserve_align = ("LEFT", "LEFT", "LEFT", "LEFT", "LEFT", "RIGHT", "CENTER")
+        else:
+            reserve_widths = [24, 36, 48, 78, 24, pdf.epw - 210]
+            reserve_align = ("LEFT", "LEFT", "LEFT", "LEFT", "RIGHT", "CENTER")
+        _draw_rows_table(
+            pdf,
+            headers=reserve_headers,
+            rows=[_reserve_pdf_row(r, show_manager=show_manager, now=when) for r in reserves],
+            col_widths=reserve_widths,
+            align=reserve_align,
+            empty_text="Резервів, створених за цей тиждень, немає.",
+        )
 
     return bytes(pdf.output())
 

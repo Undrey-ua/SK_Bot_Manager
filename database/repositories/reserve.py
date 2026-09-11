@@ -79,6 +79,27 @@ class ReserveRepository(BaseRepository):
             or_(Reserve.sold_at.isnot(None), Reserve.expires_at > now),
         )
 
+    async def list_created_in_range(
+        self,
+        *,
+        start_at: datetime,
+        end_at: datetime,
+        manager_id: int | None = None,
+    ) -> list[Reserve]:
+        stmt = (
+            select(Reserve)
+            .where(
+                Reserve.created_at >= start_at,
+                Reserve.created_at < end_at,
+            )
+            .options(*self._detail_options())
+            .order_by(Reserve.created_at.asc(), Reserve.id.asc())
+        )
+        if manager_id is not None:
+            stmt = stmt.where(Reserve.manager_id == manager_id)
+        result = await self._session.execute(stmt)
+        return list(result.scalars().all())
+
     async def get_by_id(self, reserve_id: int) -> Reserve | None:
         result = await self._session.execute(
             select(Reserve)
