@@ -59,8 +59,14 @@ def _table_styles() -> tuple[FontFace, FontFace, FontFace]:
     return headings_style, body_style, alt_style
 
 
+_SECTION_KEEP_MM = 32
+
+
 def _draw_section_heading(pdf: ReportPDF, title: str) -> None:
-    pdf.ln(6)
+    if pdf.will_page_break(_SECTION_KEEP_MM):
+        pdf.add_page()
+    else:
+        pdf.ln(6)
     pdf.set_font("Unicode", "B", 11)
     pdf.set_text_color(15, 23, 42)
     pdf.cell(0, 7, title, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
@@ -191,45 +197,47 @@ def build_visits_pdf(
     )
 
     if include_week_extras:
-        _draw_section_heading(pdf, "Виконані задачі за тиждень")
-        task_headers = ["Дата"]
-        if show_manager:
-            task_headers.append("Менеджер")
-        task_headers.extend(["Клієнт", "Завдання", "Нотатки"])
-        if show_manager:
-            task_widths = [24, 36, 48, 70, pdf.epw - 178]
-            task_align = ("LEFT", "LEFT", "LEFT", "LEFT", "LEFT")
-        else:
-            task_widths = [28, 52, 80, pdf.epw - 160]
-            task_align = ("LEFT", "LEFT", "LEFT", "LEFT")
-        _draw_rows_table(
-            pdf,
-            headers=task_headers,
-            rows=[_task_pdf_row(t, show_manager=show_manager) for t in tasks],
-            col_widths=task_widths,
-            align=task_align,
-            empty_text="Виконаних задач за цей тиждень немає.",
-        )
+        if tasks:
+            _draw_section_heading(pdf, "Виконані задачі за тиждень")
+            task_headers = ["Дата"]
+            if show_manager:
+                task_headers.append("Менеджер")
+            task_headers.extend(["Клієнт", "Завдання", "Нотатки"])
+            if show_manager:
+                task_widths = [24, 36, 48, 70, pdf.epw - 178]
+                task_align = ("LEFT", "LEFT", "LEFT", "LEFT", "LEFT")
+            else:
+                task_widths = [28, 52, 80, pdf.epw - 160]
+                task_align = ("LEFT", "LEFT", "LEFT", "LEFT")
+            _draw_rows_table(
+                pdf,
+                headers=task_headers,
+                rows=[_task_pdf_row(t, show_manager=show_manager) for t in tasks],
+                col_widths=task_widths,
+                align=task_align,
+                empty_text="Виконаних задач за цей тиждень немає.",
+            )
 
-        _draw_section_heading(pdf, "Резерви, створені за тиждень")
-        reserve_headers = ["Дата"]
-        if show_manager:
-            reserve_headers.append("Менеджер")
-        reserve_headers.extend(["Область", "Клієнт", "Матеріал", "Кв. м", "Статус"])
-        if show_manager:
-            reserve_widths = [22, 32, 32, 42, 70, 22, pdf.epw - 220]
-            reserve_align = ("LEFT", "LEFT", "LEFT", "LEFT", "LEFT", "RIGHT", "CENTER")
-        else:
-            reserve_widths = [24, 36, 48, 78, 24, pdf.epw - 210]
-            reserve_align = ("LEFT", "LEFT", "LEFT", "LEFT", "RIGHT", "CENTER")
-        _draw_rows_table(
-            pdf,
-            headers=reserve_headers,
-            rows=[_reserve_pdf_row(r, show_manager=show_manager, now=when) for r in reserves],
-            col_widths=reserve_widths,
-            align=reserve_align,
-            empty_text="Резервів, створених за цей тиждень, немає.",
-        )
+        if reserves:
+            _draw_section_heading(pdf, "Резерви, створені за тиждень")
+            reserve_headers = ["Дата"]
+            if show_manager:
+                reserve_headers.append("Менеджер")
+            reserve_headers.extend(["Область", "Клієнт", "Матеріал", "Кв. м", "Статус"])
+            if show_manager:
+                reserve_widths = [22, 32, 32, 42, 70, 22, pdf.epw - 220]
+                reserve_align = ("LEFT", "LEFT", "LEFT", "LEFT", "LEFT", "RIGHT", "CENTER")
+            else:
+                reserve_widths = [24, 36, 48, 78, 24, pdf.epw - 210]
+                reserve_align = ("LEFT", "LEFT", "LEFT", "LEFT", "RIGHT", "CENTER")
+            _draw_rows_table(
+                pdf,
+                headers=reserve_headers,
+                rows=[_reserve_pdf_row(r, show_manager=show_manager, now=when) for r in reserves],
+                col_widths=reserve_widths,
+                align=reserve_align,
+                empty_text="Резервів, створених за цей тиждень, немає.",
+            )
 
     return bytes(pdf.output())
 
