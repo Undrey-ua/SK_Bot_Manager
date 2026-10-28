@@ -188,6 +188,22 @@ def format_visit_date(dt: datetime | None) -> str:
     return dt.astimezone(KYIV).strftime("%d.%m.%Y")
 
 
+def reserve_extension_label(count: int | None) -> str:
+    """Скільки разів резерв продовжували: «—», «1 раз», «2 рази», «5 разів»."""
+    n = int(count or 0)
+    if n <= 0:
+        return "—"
+    mod10 = n % 10
+    mod100 = n % 100
+    if mod10 == 1 and mod100 != 11:
+        word = "раз"
+    elif mod10 in (2, 3, 4) and mod100 not in (12, 13, 14):
+        word = "рази"
+    else:
+        word = "разів"
+    return f"{n} {word}"
+
+
 def format_qty(value: Decimal | float | int | None, *, decimals: int = 3) -> str:
     if value is None:
         return "—"

@@ -995,7 +995,26 @@ def register_panel_routes(
 
         now = datetime.now(timezone.utc)
         per_page = DashboardService.RESERVES_PER_PAGE
-        filters = list(ReserveRepository.list_visible_filter(now))
+        reserves_view = query_str(request, "view") or "active"
+        if reserves_view not in {"active", "history"}:
+            reserves_view = "active"
+        is_history = reserves_view == "history"
+        if is_history:
+            filters = [ReserveRepository.list_history_filter(now)]
+            order_by = (
+                func.coalesce(
+                    Reserve.sold_at,
+                    Reserve.cancelled_at,
+                    Reserve.expires_at,
+                ).desc(),
+                Reserve.id.desc(),
+            )
+        else:
+            filters = list(ReserveRepository.list_visible_filter(now))
+            order_by = (
+                Reserve.sold_at.asc().nullsfirst(),
+                Reserve.expires_at.asc(),
+            )
         if manager_id is not None:
             filters.append(Reserve.manager_id == manager_id)
 
@@ -1016,7 +1035,7 @@ def register_panel_routes(
                 selectinload(Reserve.client),
                 selectinload(Reserve.region),
             )
-            .order_by(Reserve.sold_at.asc().nullsfirst(), Reserve.expires_at.asc())
+            .order_by(*order_by)
             .limit(per_page)
             .offset(offset)
         )
@@ -1037,6 +1056,7 @@ def register_panel_routes(
                 page=page,
                 total_pages=total_pages,
                 reserves_total=total,
+                reserves_view=reserves_view,
             ),
         )
 

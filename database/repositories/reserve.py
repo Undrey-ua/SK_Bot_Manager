@@ -79,6 +79,15 @@ class ReserveRepository(BaseRepository):
             or_(Reserve.sold_at.isnot(None), Reserve.expires_at > now),
         )
 
+    @staticmethod
+    def list_history_filter(now: datetime):
+        """Закриті резерви: продаж, скасування або минулий термін."""
+        return or_(
+            Reserve.sold_at.isnot(None),
+            Reserve.cancelled_at.isnot(None),
+            Reserve.expires_at <= now,
+        )
+
     async def list_created_in_range(
         self,
         *,

@@ -1656,15 +1656,68 @@ form.filters.filters--panelled:has(.filters__field--region) {
   cursor: help;
 }
 
-.reserve-status--sold {
+.reserves-views {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.2rem;
+  margin-bottom: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+}
+
+.reserves-views__btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.85rem;
+  border-radius: var(--radius-full);
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.reserves-views__btn:hover {
+  color: var(--text);
+  background: var(--primary-light);
+}
+
+.reserves-views__btn.is-active,
+.reserves-views__btn.is-active:hover {
+  color: #fff;
+  background: var(--primary);
+}
+
+.reserve-status {
   display: inline-flex;
   padding: 0.2rem 0.55rem;
   border-radius: 999px;
   font-size: 0.78rem;
   font-weight: 600;
+  white-space: nowrap;
+}
+
+.reserve-status--sold {
   color: #166534;
   background: rgba(22, 163, 74, 0.12);
   border: 1px solid rgba(22, 163, 74, 0.25);
+}
+
+.reserve-status--cancelled {
+  color: var(--danger);
+  background: var(--danger-bg);
+  border: 1px solid rgba(220, 38, 38, 0.25);
+}
+
+.reserve-status--expired {
+  color: #92400e;
+  background: rgba(217, 119, 6, 0.12);
+  border: 1px solid rgba(217, 119, 6, 0.28);
+}
+
+.reserve-outcome-when {
+  margin-top: 0.25rem;
+  font-size: 0.78rem;
 }
 
 /* ——— Sales plans ——— */

@@ -4,15 +4,21 @@
 <header class="page-header page-header--row">
   <div>
     <h1 class="page-title">Резерви</h1>
-    <p class="page-subtitle">{% if show_reserves_manager %}Залишки та резерви по менеджерах{% else %}Залишки та резерви{% endif %}</p>
+    <p class="page-subtitle">{% if reserves_view == 'history' %}Продаж, скасування і резерви з минулим терміном{% elif show_reserves_manager %}Залишки та резерви по менеджерах{% else %}Залишки та резерви{% endif %}</p>
   </div>
-  {% if can_create_reserves %}
+  {% if can_create_reserves and reserves_view != 'history' %}
   <button type="button" class="btn btn-primary" data-open-reserve>+ Додати резерв</button>
   {% endif %}
 </header>
 
+<nav class="reserves-views" aria-label="Перегляд резервів">
+  <a class="reserves-views__btn{% if reserves_view != 'history' %} is-active{% endif %}" href="/reserves{% if selected_manager_id %}?manager_id={{ selected_manager_id }}{% endif %}">Активні</a>
+  <a class="reserves-views__btn{% if reserves_view == 'history' %} is-active{% endif %}" href="/reserves?view=history{% if selected_manager_id %}&manager_id={{ selected_manager_id }}{% endif %}">Історія</a>
+</nav>
+
 {% if can_filter_reserves %}
 <form class="filters filters--compact" method="get" action="/reserves">
+  {% if reserves_view == 'history' %}<input type="hidden" name="view" value="history">{% endif %}
   <label class="filters__field--manager">
     Менеджер
     <select name="manager_id" onchange="this.form.submit()">
@@ -36,9 +42,16 @@
         <th>Клієнт</th>
         <th>Матеріал</th>
         <th>Кв. м</th>
+        {% if reserves_view == 'history' %}
+        <th>Створено</th>
+        <th>Термін до</th>
+        <th>Продовження</th>
+        <th>Відміна / продаж</th>
+        {% else %}
         <th>Діє до</th>
         <th>Статус</th>
         <th></th>
+        {% endif %}
       </tr>
     </thead>
     <tbody>
@@ -57,6 +70,22 @@
         <td>{{ r.client.name if r.client else '—' }}</td>
         <td>{{ r.material }}</td>
         <td>{{ format_qty(r.quantity, decimals=2) }}</td>
+        {% if reserves_view == 'history' %}
+        <td class="col-datetime">{{ format_dt(r.created_at) }}</td>
+        <td class="col-datetime">{{ format_dt(r.expires_at) }}</td>
+        <td>{{ reserve_extension_label(r.extended_count) }}</td>
+        <td>
+          {% if r.sold_at %}
+          <span class="reserve-status reserve-status--sold">Продаж</span>
+          <div class="muted reserve-outcome-when">{{ format_dt(r.sold_at) }}</div>
+          {% elif r.cancelled_at %}
+          <span class="reserve-status reserve-status--cancelled">Скасовано</span>
+          <div class="muted reserve-outcome-when">{{ format_dt(r.cancelled_at) }}</div>
+          {% else %}
+          <span class="reserve-status reserve-status--expired">Термін минув</span>
+          {% endif %}
+        </td>
+        {% else %}
         <td class="col-datetime">{{ format_dt(r.expires_at) }}</td>
         <td>
           {% if r.sold_at %}<span class="reserve-status reserve-status--sold">Продаж</span>
@@ -82,9 +111,10 @@
           <span class="muted">—</span>
           {% endif %}
         </td>
+        {% endif %}
       </tr>
       {% else %}
-      <tr><td colspan="{% if show_reserves_manager %}9{% else %}8{% endif %}">Немає резервів</td></tr>
+      <tr><td colspan="{% if reserves_view == 'history' %}{% if show_reserves_manager %}10{% else %}9{% endif %}{% else %}{% if show_reserves_manager %}9{% else %}8{% endif %}{% endif %}">{% if reserves_view == 'history' %}Історії ще немає{% else %}Немає резервів{% endif %}</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -94,11 +124,11 @@
 {% if total_pages > 1 %}
 <nav class="pagination">
   {% if page > 1 %}
-  <a href="?page={{ page - 1 }}{% if selected_manager_id %}&manager_id={{ selected_manager_id }}{% endif %}">←</a>
+  <a href="?page={{ page - 1 }}{% if reserves_view == 'history' %}&view=history{% endif %}{% if selected_manager_id %}&manager_id={{ selected_manager_id }}{% endif %}">←</a>
   {% endif %}
   <span class="current">{{ page }} / {{ total_pages }}</span>
   {% if page < total_pages %}
-  <a href="?page={{ page + 1 }}{% if selected_manager_id %}&manager_id={{ selected_manager_id }}{% endif %}">→</a>
+  <a href="?page={{ page + 1 }}{% if reserves_view == 'history' %}&view=history{% endif %}{% if selected_manager_id %}&manager_id={{ selected_manager_id }}{% endif %}">→</a>
   {% endif %}
 </nav>
 {% endif %}
