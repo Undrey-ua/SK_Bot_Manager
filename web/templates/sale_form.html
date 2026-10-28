@@ -11,7 +11,7 @@
   <h2>Редагувати продаж</h2>
   <p class="muted">
     Додано: <strong>{{ format_dt(sale.created_at) }}</strong>
-    {% if sale.manager %} · {{ sale.manager.name }}{% endif %}
+    {% if sale.manager %} · {{ credited_manager_name(sale) }}{% endif %}
   </p>
   <form method="post" action="/sales/{{ sale.id }}/edit" class="client-web-form">
     <input type="hidden" name="return_url" value="{{ return_url }}">

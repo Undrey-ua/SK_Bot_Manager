@@ -95,17 +95,18 @@ async def pick_region(
     if callback.message is None:
         return
 
+    owner_id = effective_manager_id(db_user)
     region_id = int(callback.data.split(":")[-1])
     region = await region_service.get_by_id(region_id)
-    if region is None or region.manager_id != db_user.id:
+    if region is None or region.manager_id != owner_id:
         await callback.answer("Область не знайдена", show_alert=True)
         return
 
     clients = await client_service.list_by_manager_and_region(
-        db_user.id, region_id, exclude_potential=True
+        owner_id, region_id, exclude_potential=True
     )
     if not clients:
-        regions = await region_service.list_by_manager(db_user.id)
+        regions = await region_service.list_by_manager(owner_id)
         await callback.message.edit_text(
             f"💰 <b>Додати продаж</b>\n\n"
             f"<b>{region.name}</b> — немає клієнтів. Оберіть іншу область:",
@@ -138,9 +139,10 @@ async def pick_client(
     if callback.message is None:
         return
 
+    owner_id = effective_manager_id(db_user)
     client_id = int(callback.data.split(":")[-1])
     client = await client_service.get_by_id(client_id)
-    if client is None or client.manager_id != db_user.id:
+    if client is None or client.manager_id != owner_id:
         await callback.answer("Клієнта не знайдено", show_alert=True)
         return
 
@@ -150,7 +152,7 @@ async def pick_client(
         region_id = data.get("region_id")
         if region_id:
             clients_back = await client_service.list_by_manager_and_region(
-                db_user.id,
+                effective_manager_id(db_user),
                 int(region_id),
                 exclude_potential=True,
             )
@@ -347,7 +349,7 @@ async def _save_sale(
     from_swatch = brand_id in swatch_ids and brand_id not in stand_ids
 
     sale = await sale_service.create(
-        manager_id=db_user.id,
+        manager_id=effective_manager_id(db_user),
         client_id=int(data["client_id"]),
         brand_id=brand_id,
         quantity=Decimal(data["quantity"]),
@@ -386,7 +388,7 @@ async def back_regions(
     await callback.answer()
     if callback.message is None:
         return
-    regions = await region_service.list_by_manager(db_user.id)
+    regions = await region_service.list_by_manager(effective_manager_id(db_user))
     await state.set_state(SaleStates.select_region)
     await _edit_step(
         callback.message,
@@ -417,7 +419,7 @@ async def back_client(
         await callback.answer("Дані втрачено. Почніть з меню.", show_alert=True)
         return
     clients = await client_service.list_by_manager_and_region(
-        db_user.id,
+        effective_manager_id(db_user),
         int(region_id),
         exclude_potential=True,
     )
@@ -446,7 +448,7 @@ async def back_brand(
         await callback.answer("Дані втрачено. Почніть з меню.", show_alert=True)
         return
     client = await client_service.get_by_id(int(client_id))
-    if client is None or client.manager_id != db_user.id:
+    if client is None or client.manager_id != effective_manager_id(db_user):
         await callback.answer("Клієнта не знайдено", show_alert=True)
         return
     brands = await brand_service.brands_for_client_stands(client)

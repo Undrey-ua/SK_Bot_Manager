@@ -23,6 +23,7 @@ from web.services.clients_filter import (
     sales_filters_to_client,
 )
 
+from bot.utils.roles import credited_manager
 from config.team import filter_regional_managers
 
 
@@ -264,7 +265,9 @@ class AnalyticsService:
         sales = await self._sales_in_range(date_range, filters)
         totals: dict[str, Decimal] = defaultdict(Decimal)
         for s in sales:
-            totals[s.manager.name] += s.quantity
+            owner = credited_manager(s.manager)
+            label = owner.name if owner is not None else "—"
+            totals[label] += s.quantity
         return [
             AggRow(label=k, value=v)
             for k, v in sorted(totals.items(), key=lambda x: x[1], reverse=True)

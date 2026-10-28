@@ -3,11 +3,11 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from database.models import Brand, Client, Sale, User
+from database.models import Brand, Client, Sale, User, UserRole
 from database.repositories.base import BaseRepository
 
 
@@ -17,10 +17,19 @@ class SaleRepository(BaseRepository):
 
     def _detail_options(self):
         return (
-            selectinload(Sale.manager),
+            selectinload(Sale.manager).selectinload(User.supervisor),
             selectinload(Sale.client).selectinload(Client.region),
             selectinload(Sale.brand),
         )
+
+    @staticmethod
+    def _manager_scope(manager_id: int):
+        """Продажі регіонального менеджера і його менеджерів зі збуту."""
+        team = select(User.id).where(
+            User.role == UserRole.SALES_MANAGER.value,
+            User.supervisor_id == manager_id,
+        )
+        return or_(Sale.manager_id == manager_id, Sale.manager_id.in_(team))
 
     async def create(
         self,
@@ -60,9 +69,9 @@ class SaleRepository(BaseRepository):
             .order_by(Sale.sold_at.desc(), Sale.id.desc())
         )
         if manager_id is not None:
-            stmt = stmt.where(Sale.manager_id == manager_id)
+            stmt = stmt.where(self._manager_scope(manager_id))
         result = await self._session.execute(stmt)
-        return list(result.scalars().all())
+        return list(result.scalars().unique().all())
 
     async def sum_quantity_between(
         self,
@@ -76,7 +85,7 @@ class SaleRepository(BaseRepository):
             Sale.sold_at < end,
         )
         if manager_id is not None:
-            stmt = stmt.where(Sale.manager_id == manager_id)
+            stmt = stmt.where(self._manager_scope(manager_id))
         result = await self._session.execute(stmt)
         return Decimal(str(result.scalar_one()))
 
@@ -85,10 +94,21 @@ class SaleRepository(BaseRepository):
         start: date,
         end: date,
     ) -> dict[int, Decimal]:
+        credited_id = case(
+            (
+                and_(
+                    User.role == UserRole.SALES_MANAGER.value,
+                    User.supervisor_id.is_not(None),
+                ),
+                User.supervisor_id,
+            ),
+            else_=Sale.manager_id,
+        )
         stmt = (
-            select(Sale.manager_id, func.coalesce(func.sum(Sale.quantity), 0))
+            select(credited_id, func.coalesce(func.sum(Sale.quantity), 0))
+            .join(User, User.id == Sale.manager_id)
             .where(Sale.sold_at >= start, Sale.sold_at < end)
-            .group_by(Sale.manager_id)
+            .group_by(credited_id)
         )
         result = await self._session.execute(stmt)
         return {row[0]: Decimal(str(row[1])) for row in result.all()}

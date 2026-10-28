@@ -1221,7 +1221,7 @@ def register_panel_routes(
         comment = f"Продаж з резерву #{reserve.id}"
 
         await SaleRepository(session).create(
-            manager_id=user.id,
+            manager_id=reserve.manager_id,
             client_id=reserve.client_id,
             brand_id=brand_id,
             quantity=qty,

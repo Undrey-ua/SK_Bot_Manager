@@ -38,8 +38,9 @@ from web.roles import (
 )
 from web.services.clients_filter import ClientFilters, build_client_filter_options
 from web.services.dashboard import DashboardService
-from config.work_scope import work_scope_label
+from bot.utils.roles import credited_manager_name
 from config.team import is_regional_manager
+from config.work_scope import work_scope_label
 from web.services.user_admin import user_nav_access_display, user_role_label, user_roles_display
 from web.client_geo import (
     client_city,
@@ -128,6 +129,7 @@ templates.env.globals.update(
     user_nav_access_display=user_nav_access_display,
     is_regional_manager=is_regional_manager,
     work_scope_label=work_scope_label,
+    credited_manager_name=credited_manager_name,
     stand_transfer_operation_label=lambda op: STAND_TRANSFER_OPERATION_LABELS.get(
         op, op
     ),

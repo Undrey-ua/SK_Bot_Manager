@@ -372,7 +372,7 @@
           <td>{{ sale.brand.name if sale.brand else '—' }}</td>
           <td>{{ format_qty(sale.quantity, decimals=2) }}</td>
           <td>{{ sale.comment or '—' }}</td>
-          {% if can_filter_managers %}<td>{{ sale.manager.name if sale.manager else '—' }}</td>{% endif %}
+          {% if can_filter_managers %}<td>{{ credited_manager_name(sale) }}</td>{% endif %}
           <td class="sales-ledger-actions">
             {% if can_manage_sale(current_user, sale.manager_id) %}
             <a class="btn-ghost btn-sm" href="/sales/{{ sale.id }}/edit?return_url={{ sales_return_url | urlencode }}">Редагувати</a>

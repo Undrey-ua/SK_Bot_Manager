@@ -20,6 +20,22 @@ def effective_manager_id(user: User) -> int:
     return user.id
 
 
+def credited_manager(user: User | None) -> User | None:
+    """Кому зараховується продаж: менеджеру зі збуту — його регіональному керівнику."""
+    if user is None:
+        return None
+    if user.role == UserRole.SALES_MANAGER.value and user.supervisor is not None:
+        return user.supervisor
+    return user
+
+
+def credited_manager_name(sale: object) -> str:
+    manager = getattr(sale, "manager", None)
+    owner = credited_manager(manager)
+    name = getattr(owner, "name", None) if owner is not None else None
+    return name or "—"
+
+
 def is_sales_manager(user: User) -> bool:
     return user.role == UserRole.SALES_MANAGER.value
 
