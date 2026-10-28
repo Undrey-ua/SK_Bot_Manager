@@ -1271,6 +1271,10 @@ def register_panel_routes(
         plan_month = query_int(request, "plan_month", default=today.month) or today.month
         if plan_month < 1 or plan_month > 12:
             plan_month = today.month
+        sales_plans_open = (
+            request.query_params.get("plan_year") is not None
+            or request.query_params.get("plan_month") is not None
+        )
 
         managers = await service.list_managers()
         filter_manager_id = scoped_manager_filter(
@@ -1453,6 +1457,7 @@ def register_panel_routes(
                 sales_plan_rows=sales_plan_rows,
                 plan_year=plan_year,
                 plan_month=plan_month,
+                sales_plans_open=sales_plans_open,
                 plan_month_label=plan_month_label_for_ring if user.is_manager else uk_month_name(plan_month),
                 plan_year_display=today.year if user.is_manager else plan_year,
             ),

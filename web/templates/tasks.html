@@ -50,6 +50,10 @@
 
   <form class="filters filters--compact tm-toolbar" method="get" action="/tasks">
     <input type="hidden" name="view" value="{{ current_view }}">
+    {% if sales_plans_open %}
+    <input type="hidden" name="plan_year" value="{{ plan_year }}">
+    <input type="hidden" name="plan_month" value="{{ plan_month }}">
+    {% endif %}
     {% if current_view == 'week' %}<input type="hidden" name="week_start" value="{{ week_start }}">{% endif %}
     {% if status_filter != 'active' %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
     <label class="tm-search">
@@ -191,21 +195,21 @@
 </div>
 
 {% if can_manage_sales_plans %}
-<details class="tm-plans">
+<details id="sales-plans" class="tm-plans"{% if sales_plans_open %} open{% endif %}>
   <summary>План продажів на місяць</summary>
   <section class="card card--compact-form sales-plans-admin">
     <p class="muted sales-plans-admin__hint">Ціль у кв. м для кожного менеджера. Виконання — у розділі «Продажі».</p>
     <form method="post" action="/tasks/sales-plans" class="sales-plans-form">
       <div class="sales-plans-form__period">
         <label>Рік
-          <select name="plan_year">
+          <select name="plan_year" onchange="location.href=salesPlanPeriodUrl(this)">
             {% for y in range(plan_year - 1, plan_year + 2) %}
             <option value="{{ y }}" {% if plan_year == y %}selected{% endif %}>{{ y }}</option>
             {% endfor %}
           </select>
         </label>
         <label>Місяць
-          <select name="plan_month">
+          <select name="plan_month" onchange="location.href=salesPlanPeriodUrl(this)">
             {% for num, name in uk_months %}
             <option value="{{ num }}" {% if plan_month == num %}selected{% endif %}>{{ name }}</option>
             {% endfor %}
@@ -256,4 +260,13 @@
 {% endblock %}
 {% block scripts %}
 <script src="/static/tasks_workspace.js" defer></script>
+<script>
+function salesPlanPeriodUrl(select) {
+  var form = select.form;
+  var params = new URLSearchParams(window.location.search);
+  params.set("plan_year", form.elements.plan_year.value);
+  params.set("plan_month", form.elements.plan_month.value);
+  return "/tasks?" + params.toString() + "#sales-plans";
+}
+</script>
 {% endblock %}
