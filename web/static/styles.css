@@ -1656,36 +1656,11 @@ form.filters.filters--panelled:has(.filters__field--region) {
   cursor: help;
 }
 
-.reserves-views {
-  display: inline-flex;
-  gap: 0.25rem;
-  padding: 0.2rem;
-  margin-bottom: 1rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
-}
-
-.reserves-views__btn {
-  display: inline-flex;
+.reserves-header-actions {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  padding: 0.35rem 0.85rem;
-  border-radius: var(--radius-full);
-  font-size: 0.84rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  text-decoration: none;
-}
-
-.reserves-views__btn:hover {
-  color: var(--text);
-  background: var(--primary-light);
-}
-
-.reserves-views__btn.is-active,
-.reserves-views__btn.is-active:hover {
-  color: #fff;
-  background: var(--primary);
+  gap: 0.5rem;
 }
 
 .reserve-status {

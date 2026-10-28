@@ -6,15 +6,14 @@
     <h1 class="page-title">Резерви</h1>
     <p class="page-subtitle">{% if reserves_view == 'history' %}Продаж, скасування і резерви з минулим терміном{% elif show_reserves_manager %}Залишки та резерви по менеджерах{% else %}Залишки та резерви{% endif %}</p>
   </div>
-  {% if can_create_reserves and reserves_view != 'history' %}
-  <button type="button" class="btn btn-primary" data-open-reserve>+ Додати резерв</button>
-  {% endif %}
+  <div class="reserves-header-actions">
+    <a class="btn {% if reserves_view != 'history' %}btn-primary{% else %}btn-secondary{% endif %}" href="/reserves{% if selected_manager_id %}?manager_id={{ selected_manager_id }}{% endif %}">Активні</a>
+    <a class="btn {% if reserves_view == 'history' %}btn-primary{% else %}btn-secondary{% endif %}" href="/reserves?view=history{% if selected_manager_id %}&manager_id={{ selected_manager_id }}{% endif %}">Історія</a>
+    {% if can_create_reserves and reserves_view != 'history' %}
+    <button type="button" class="btn btn-primary" data-open-reserve>+ Додати резерв</button>
+    {% endif %}
+  </div>
 </header>
-
-<nav class="reserves-views" aria-label="Перегляд резервів">
-  <a class="reserves-views__btn{% if reserves_view != 'history' %} is-active{% endif %}" href="/reserves{% if selected_manager_id %}?manager_id={{ selected_manager_id }}{% endif %}">Активні</a>
-  <a class="reserves-views__btn{% if reserves_view == 'history' %} is-active{% endif %}" href="/reserves?view=history{% if selected_manager_id %}&manager_id={{ selected_manager_id }}{% endif %}">Історія</a>
-</nav>
 
 {% if can_filter_reserves %}
 <form class="filters filters--compact" method="get" action="/reserves">
