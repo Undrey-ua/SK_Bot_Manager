@@ -42,6 +42,7 @@ from bot.utils.roles import credited_manager_name
 from config.team import is_regional_manager
 from config.work_scope import work_scope_label
 from web.services.user_admin import user_nav_access_display, user_role_label, user_roles_display
+from utils.brand_catalog import brand_filter_choices, trade_mark_label
 from web.client_geo import (
     client_city,
     client_display_city,
@@ -132,6 +133,7 @@ templates.env.globals.update(
     is_regional_manager=is_regional_manager,
     work_scope_label=work_scope_label,
     credited_manager_name=credited_manager_name,
+    brand_label=trade_mark_label,
     stand_transfer_operation_label=lambda op: STAND_TRANSFER_OPERATION_LABELS.get(
         op, op
     ),
@@ -763,7 +765,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             period,
             brand_id=brand_id,
         )
-        brands = await service.list_active_brands()
+        brands = await service.list_all_brands()
         sales_has_filters = brand_id is not None
 
         return templates.TemplateResponse(
@@ -784,7 +786,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 sales_rows=sales_rows,
                 sales_total=sales_total,
                 sales_by_brand=sales_by_brand,
-                filter_brands=[(b.id, b.name) for b in brands if b.is_active],
+                filter_brands=brand_filter_choices(brands),
                 selected_brand_id=brand_id,
                 sales_has_filters=sales_has_filters,
                 client_sales_period_labels=CLIENT_SALES_PERIOD_LABELS,
@@ -853,7 +855,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.on_event("startup")
     async def load_visit_task_labels() -> None:
+        from database.brand_sync import sync_brand_split
+
         async with container.session_factory() as session:
             await refresh_visit_task_labels(session)
+            await sync_brand_split(session)
+            await session.commit()
 
     return app

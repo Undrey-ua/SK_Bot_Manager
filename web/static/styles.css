@@ -2819,6 +2819,19 @@ form.filters.filters--panelled:has(.filters__field--region) {
   margin: 0 0 1.25rem;
 }
 
+.compare-brand-note {
+  margin: 0 0 0.75rem;
+}
+
+.compare-brand-total td:first-child {
+  font-weight: 600;
+}
+
+.compare-brand-detail td:first-child {
+  padding-left: 1.75rem;
+  color: var(--muted);
+}
+
 .compare-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -100,7 +100,7 @@
         {% for b in brands %}
         <label class="stands-picker__item">
           <input type="checkbox" name="swatch_brand_id" value="{{ b.id }}" {% if b.id in selected_swatch_brand_ids %}checked{% endif %}>
-          {{ b.name }}
+          {{ brand_label(b.name) }}
         </label>
         {% endfor %}
       </div>

@@ -30,8 +30,11 @@ async def init_db(container) -> None:
         await conn.run_sync(Base.metadata.create_all)
 
     async with container.session_factory() as session:
+        from database.brand_sync import sync_brand_split
+
         stand_service = container.stand_service(session)
         await stand_service.seed_defaults()
+        await sync_brand_split(session)
         await session.commit()
 
     logger.info("Database tables verified")

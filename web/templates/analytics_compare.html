@@ -379,6 +379,12 @@
 
 <section class="card">
   <h2>Продажі по торговим маркам</h2>
+  {% if compare_brands | selectattr('detail') | list %}
+  <p class="muted compare-brand-note">
+    Novocore і Tarkett SPC порівнюються сумою: минулі продажі ще не були розділені на нові лінійки.
+    Жирний рядок — ця сума. Рядки з відступом показують склад і вже входять у суму.
+  </p>
+  {% endif %}
   <div class="table-wrap">
     <table class="table--darkhead">
       <thead>
@@ -392,7 +398,7 @@
       </thead>
       <tbody>
         {% for r in compare_brands %}
-        <tr>
+        <tr class="{% if r.detail %}compare-brand-detail{% elif r.grouped %}compare-brand-total{% endif %}">
           <td>{{ r.label }}</td>
           <td>{{ format_qty(r.previous) }}</td>
           <td>{{ format_qty(r.current) }}</td>

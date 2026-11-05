@@ -16,6 +16,7 @@ from database.repositories.sale import SaleRepository
 from database.repositories.stand import StandRepository
 from database.repositories.user import UserRepository
 from database.repositories.visit import VisitRepository
+from utils.brand_catalog import trade_mark_label
 from web.analytics_periods import DateRange
 from web.visit_periods import current_iso_week, iso_week_range, now_kyiv, today_range
 
@@ -194,6 +195,9 @@ class DashboardService:
     async def list_active_brands(self) -> list[Brand]:
         return await self._brands.list_active()
 
+    async def list_all_brands(self) -> list[Brand]:
+        return await self._brands.list_all()
+
     async def get_client(self, client_id: int) -> Client | None:
         return await self._clients.get_by_id_with_manager(client_id)
 
@@ -246,7 +250,7 @@ class DashboardService:
         totals: dict[str, Decimal] = defaultdict(Decimal)
         for sale in sales:
             if sale.brand:
-                totals[sale.brand.name] += sale.quantity
+                totals[trade_mark_label(sale.brand.name)] += sale.quantity
         return [
             ClientSalesBrandRow(brand_name=name, quantity=qty)
             for name, qty in sorted(totals.items(), key=lambda x: x[1], reverse=True)

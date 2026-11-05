@@ -25,9 +25,7 @@
     <label>Торгова марка
       <select name="brand_id" required>
         {% for b in brands %}
-        {% if b.is_active %}
-        <option value="{{ b.id }}" {% if sale.brand_id == b.id %}selected{% endif %}>{{ b.name }}</option>
-        {% endif %}
+        <option value="{{ b.id }}" {% if sale.brand_id == b.id %}selected{% endif %}>{{ brand_label(b.name) }}{% if not b.is_active %} (до поділу){% endif %}</option>
         {% endfor %}
       </select>
     </label>

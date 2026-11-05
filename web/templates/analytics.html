@@ -369,7 +369,7 @@
             {{ sale.client.legal_name }}
             {% else %}<span class="muted">—</span>{% endif %}
           </td>
-          <td>{{ sale.brand.name if sale.brand else '—' }}</td>
+          <td>{{ brand_label(sale.brand.name) if sale.brand else '—' }}</td>
           <td>{{ format_qty(sale.quantity, decimals=2) }}</td>
           <td>{{ sale.comment or '—' }}</td>
           {% if can_filter_managers %}<td>{{ credited_manager_name(sale) }}</td>{% endif %}

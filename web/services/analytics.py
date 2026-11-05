@@ -25,6 +25,8 @@ from web.services.clients_filter import (
 
 from bot.utils.roles import credited_manager
 from config.team import filter_regional_managers
+from utils.brand_catalog import build_brand_compare_lines, trade_mark_label
+from utils.stand_brand_match import matrix_col_key_from_name, stand_matches_brand
 
 
 @dataclass
@@ -62,6 +64,8 @@ class CompareRow:
     label: str
     current: Decimal
     previous: Decimal
+    detail: bool = False
+    grouped: bool = False
 
     @property
     def delta(self) -> Decimal:
@@ -281,7 +285,7 @@ class AnalyticsService:
         sales = await self._sales_in_range(date_range, filters)
         totals: dict[str, Decimal] = defaultdict(Decimal)
         for s in sales:
-            totals[s.brand.name] += s.quantity
+            totals[self._brand_label(s.brand.name)] += s.quantity
         return [
             AggRow(label=k, value=v)
             for k, v in sorted(totals.items(), key=lambda x: x[1], reverse=True)
@@ -335,7 +339,7 @@ class AnalyticsService:
         sales = await self._sales_in_range(date_range, filters)
         totals: dict[str, Decimal] = defaultdict(Decimal)
         for s in sales:
-            key = f"{client_city(s.client)} · {s.brand.name}"
+            key = f"{client_city(s.client)} · {self._brand_label(s.brand.name)}"
             totals[key] += s.quantity
         return [
             AggRow(label=k, value=v)
@@ -350,7 +354,7 @@ class AnalyticsService:
         sales = await self._sales_in_range(date_range, filters)
         totals: dict[tuple[str, str], Decimal] = defaultdict(Decimal)
         for s in sales:
-            totals[(client_city(s.client), s.brand.name)] += s.quantity
+            totals[(client_city(s.client), self._brand_label(s.brand.name))] += s.quantity
         return [
             SplitRow(left=city, middle=brand, value=value)
             for (city, brand), value in sorted(totals.items(), key=lambda x: x[1], reverse=True)
@@ -364,7 +368,7 @@ class AnalyticsService:
         sales = await self._sales_in_range(date_range, filters)
         totals: dict[str, Decimal] = defaultdict(Decimal)
         for s in sales:
-            key = f"{client_oblast(s.client)} · {s.brand.name}"
+            key = f"{client_oblast(s.client)} · {self._brand_label(s.brand.name)}"
             totals[key] += s.quantity
         return [
             AggRow(label=k, value=v)
@@ -379,7 +383,7 @@ class AnalyticsService:
         sales = await self._sales_in_range(date_range, filters)
         totals: dict[tuple[str, str], Decimal] = defaultdict(Decimal)
         for s in sales:
-            totals[(client_oblast(s.client), s.brand.name)] += s.quantity
+            totals[(client_oblast(s.client), self._brand_label(s.brand.name))] += s.quantity
         return [
             SplitRow(left=oblast, middle=brand, value=value)
             for (oblast, brand), value in sorted(totals.items(), key=lambda x: x[1], reverse=True)
@@ -400,7 +404,7 @@ class AnalyticsService:
         cell: dict[tuple[str, str], Decimal] = defaultdict(Decimal)
 
         for s in sales:
-            brand = s.brand.name
+            brand = self._brand_label(s.brand.name)
             client = s.client.name
             brand_totals[brand] += s.quantity
             client_totals[client] += s.quantity
@@ -737,10 +741,19 @@ class AnalyticsService:
                 totals[r.brand.name] += r.quantity
             return totals
 
-        return self._compare_sorted(
-            by_brand(report_sales),
-            by_brand(base_sales),
-        )
+        return [
+            CompareRow(
+                label=line.label,
+                current=line.current,
+                previous=line.previous,
+                detail=line.detail,
+                grouped=line.grouped,
+            )
+            for line in build_brand_compare_lines(
+                by_brand(report_sales),
+                by_brand(base_sales),
+            )
+        ]
 
     async def compare_clients(
         self,
@@ -816,81 +829,19 @@ class AnalyticsService:
                 continue
             yield stand.name, cls._link_quantity(link)
 
-    # --- Sales matrix helpers (ported from SK_Account main.js) ---
+    # --- Sales matrix helpers ---
 
     @staticmethod
-    def _norm_text(value: str) -> str:
-        return (
-            str(value or "")
-            .strip()
-            .replace("\u2019", "'")
-            .replace("\u2018", "'")
-            .replace("`", "'")
-        )
+    def _brand_label(name: str) -> str:
+        return trade_mark_label(name)
 
-    @classmethod
-    def _stand_tokens_comparable(cls, a: str, b: str) -> bool:
-        def norm(s: str) -> str:
-            return " ".join(cls._norm_text(s).split()).lower()
+    @staticmethod
+    def _sales_matrix_col_key_from_brand(brand_name: str) -> str:
+        return matrix_col_key_from_name(brand_name)
 
-        x = norm(a)
-        y = norm(b)
-        if not x or not y:
-            return False
-        if x == y:
-            return True
-
-        def tail(s: str) -> str:
-            i = s.rfind(":")
-            return s if i < 0 else s[i + 1 :].strip()
-
-        tx = tail(x)
-        ty = tail(y)
-        return tx == y or x == ty or ty == x or y == tx or (tx and ty and tx == ty)
-
-    @classmethod
-    def _is_big_product_line(cls, normalized: str) -> bool:
-        t = cls._norm_text(normalized)
-        return t in {
-            "BIG: Carmelita",
-            "BIG: Pureloc40",
-            "BIG: Novocore Legacy",
-            "BIG (невизначено)",
-            "BIG",
-        }
-
-    @classmethod
-    def _sales_matrix_col_key_from_brand(cls, brand_name: str) -> str:
-        b = cls._norm_text(brand_name)
-        if b.upper() == "BIG":
-            return "BIG"
-        if b.startswith("BIG:"):
-            return "BIG"
-        if cls._is_big_product_line(b):
-            return "BIG"
-        return b
-
-    @classmethod
-    def _matrix_col_keys_match(cls, sale_col_key: str, header_col_key: str) -> bool:
-        a = cls._norm_text(sale_col_key)
-        b = cls._norm_text(header_col_key)
-        if not a or not b:
-            return False
-        if a == b or a.lower() == b.lower():
-            return True
-        if a == "BIG" and b == "BIG":
-            return True
-        if a == "BIG" or b == "BIG":
-            other = b if a == "BIG" else a
-            if other == "BIG":
-                return True
-            return cls._is_big_product_line(other) or other.startswith("BIG:")
-        return cls._stand_tokens_comparable(a, b)
-
-    @classmethod
-    def _stand_key_matches_matrix_col(cls, stand_name: str, col_key: str) -> bool:
-        s = cls._sales_matrix_col_key_from_brand(stand_name)
-        return cls._matrix_col_keys_match(s, col_key) or cls._matrix_col_keys_match(col_key, s)
+    @staticmethod
+    def _stand_key_matches_matrix_col(stand_name: str, col_key: str) -> bool:
+        return stand_matches_brand(stand_name, col_key)
 
     @classmethod
     def _client_stand_badge_names(cls, client: Client | None) -> list[str]:
@@ -1316,11 +1267,8 @@ class AnalyticsService:
                 stand_name = link.stand.name
                 if any(
                     s.client_id == c.id
-                    and (
-                        s.brand.name == stand_name
-                        or stand_name in s.brand.name
-                        or s.brand.name in stand_name
-                    )
+                    and s.brand is not None
+                    and self._stand_key_matches_matrix_col(stand_name, s.brand.name)
                     for s in sales
                     if s.client_id == c.id
                 ):

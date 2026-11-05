@@ -56,7 +56,7 @@
       <div class="stand-badges" aria-label="Свотчі">
         {% for link in client.swatch_links %}
         {% if link.brand and link.brand.is_active %}
-        <span class="swatch-badge">Свотч: {{ link.brand.name }}</span>
+        <span class="swatch-badge">Свотч: {{ brand_label(link.brand.name) }}</span>
         {% endif %}
         {% endfor %}
       </div>
@@ -180,7 +180,7 @@
         {% for sale in sales_rows %}
         <tr>
           <td>{{ format_date(sale.sold_at) }}</td>
-          <td>{{ sale.brand.name if sale.brand else '—' }}</td>
+          <td>{{ brand_label(sale.brand.name) if sale.brand else '—' }}</td>
           <td>{{ format_qty(sale.quantity, decimals=2) }}</td>
           <td>{{ sale.comment or '—' }}</td>
         </tr>

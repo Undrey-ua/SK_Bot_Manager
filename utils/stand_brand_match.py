@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from utils.brand_catalog import stand_column_for_name
+
 
 def norm_text(value: str) -> str:
     return (
@@ -34,41 +36,26 @@ def stand_tokens_comparable(a: str, b: str) -> bool:
 
 
 def is_big_product_line(normalized: str) -> bool:
-    t = norm_text(normalized)
-    return t in {
-        "BIG: Carmelita",
-        "BIG: Pureloc40",
-        "BIG: Novocore Legacy",
-        "BIG (невизначено)",
-        "BIG",
-    }
+    return stand_column_for_name(normalized) == "BIG"
 
 
 def matrix_col_key_from_name(name: str) -> str:
     b = norm_text(name)
-    if b.upper() == "BIG":
-        return "BIG"
-    if b.startswith("BIG:"):
-        return "BIG"
-    if is_big_product_line(b):
-        return "BIG"
+    column = stand_column_for_name(b)
+    if column:
+        return column
     return b
 
 
 def matrix_col_keys_match(sale_col_key: str, header_col_key: str) -> bool:
-    a = norm_text(sale_col_key)
-    b = norm_text(header_col_key)
-    if not a or not b:
+    a_raw = norm_text(sale_col_key)
+    b_raw = norm_text(header_col_key)
+    if not a_raw or not b_raw:
         return False
-    if a == b or a.lower() == b.lower():
+    a = matrix_col_key_from_name(a_raw)
+    b = matrix_col_key_from_name(b_raw)
+    if a == b or a.casefold() == b.casefold():
         return True
-    if a == "BIG" and b == "BIG":
-        return True
-    if a == "BIG" or b == "BIG":
-        other = b if a == "BIG" else a
-        if other == "BIG":
-            return True
-        return is_big_product_line(other) or other.startswith("BIG:")
     return stand_tokens_comparable(a, b)
 
 

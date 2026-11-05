@@ -22,7 +22,7 @@ def build_compare_bar_items(
     limit: int = 10,
     exclude: frozenset[str] = frozenset({"Разом"}),
 ) -> list[dict[str, float | str]]:
-    filtered = [r for r in rows if r.label not in exclude]
+    filtered = [r for r in rows if r.label not in exclude and not r.detail]
     filtered.sort(
         key=lambda r: max(float(r.current), float(r.previous)),
         reverse=True,

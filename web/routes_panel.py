@@ -356,7 +356,7 @@ def register_panel_routes(
                 manager_id=manager_id,
             )
             stands = await dashboard.list_active_stands()
-            brands = await dashboard.list_active_brands()
+            brands = await dashboard.list_all_brands()
             filter_opts = build_sales_filter_options(
                 filter_clients_pool,
                 stands,
@@ -486,7 +486,7 @@ def register_panel_routes(
 
             all_clients = await dashboard.list_clients()
             stands = await dashboard.list_active_stands()
-            brands = await dashboard.list_active_brands()
+            brands = await dashboard.list_all_brands()
             filter_opts = build_sales_filter_options(
                 all_clients,
                 stands,
@@ -805,7 +805,14 @@ def register_panel_routes(
             if c.manager_id == sale.manager_id
         ]
         clients.sort(key=lambda c: c.name.casefold())
-        brands = await dashboard.list_active_brands()
+        from bot.utils.client_brands import brands_for_client
+
+        active_brands = await dashboard.list_active_brands()
+        client = await dashboard.get_client(sale.client_id)
+        brands = brands_for_client(client, active_brands) if client is not None else list(active_brands)
+        if sale.brand is not None and sale.brand.id not in {b.id for b in brands}:
+            brands.append(sale.brand)
+        brands.sort(key=lambda b: (b.sort_order, b.name))
         return_url = request.query_params.get("return_url") or "/analytics?section=sales"
         return templates.TemplateResponse(
             request,
@@ -850,9 +857,13 @@ def register_panel_routes(
 
         all_brands = await dashboard.list_active_brands()
         allowed_ids = {b.id for b in brands_for_client(client, all_brands)}
-        if brand_id not in allowed_ids:
+        same_sale = brand_id == sale.brand_id and client_id == sale.client_id
+        if brand_id not in allowed_ids and not same_sale:
             raise HTTPException(status_code=400, detail="Невірна торгова марка")
-        from_swatch = sale_is_from_swatch(client, brand_id, all_brands)
+        if same_sale:
+            from_swatch = sale.from_swatch
+        else:
+            from_swatch = sale_is_from_swatch(client, brand_id, all_brands)
 
         try:
             qty = Decimal(quantity.replace(",", ".").strip())

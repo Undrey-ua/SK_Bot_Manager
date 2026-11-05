@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from database.models import Brand, Client, Stand
+from utils.brand_catalog import brand_filter_choices
 from web.client_geo import client_city
 
 
@@ -138,5 +139,5 @@ def build_sales_filter_options(
         regions=base.regions,
         cities=base.cities,
         stands=base.stands,
-        brands=[(b.id, b.name) for b in brands if b.is_active],
+        brands=brand_filter_choices(brands),
     )

@@ -5,6 +5,7 @@ from database.repositories.brand import BrandRepository
 from bot.utils.client_brands import (
     brands_for_client,
     is_big_stand,
+    is_tarkett_stand,
     stand_covered_by_brands,
     _brand_for_stand_name,
 )
@@ -25,7 +26,7 @@ class BrandService:
         return await self._repo.get_by_id(brand_id)
 
     async def _resolve_brand_for_stand(self, stand_name: str) -> Brand | None:
-        if is_big_stand(stand_name):
+        if is_big_stand(stand_name) or is_tarkett_stand(stand_name):
             return None
         all_brands = await self._repo.list_all()
         matched = _brand_for_stand_name(stand_name, all_brands)
