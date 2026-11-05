@@ -853,6 +853,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         require_auth=require_auth,
     )
 
+    from web.routes_regions import register_region_routes
+
+    register_region_routes(
+        app,
+        templates=templates,
+        get_session=get_session,
+        require_auth=require_auth,
+    )
+
     @app.on_event("startup")
     async def load_visit_task_labels() -> None:
         from database.brand_sync import sync_brand_split

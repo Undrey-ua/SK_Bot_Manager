@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Області — SK Bot Manager{% endblock %}
+{% block content %}
+<header class="page-header">
+  <h1 class="page-title">Області</h1>
+  <p class="page-subtitle">Виправлення назв у довіднику менеджера. Схожі записи, як «Івано Франківська» і «Івано-Франківська», підсвічені: назву можна змінити або об'єднати дубль — клієнти й резерви залишаться на обраній області.</p>
+</header>
+
+{% if renamed %}
+<p class="notice notice--success">Назву області збережено.</p>
+{% endif %}
+{% if merged %}
+<p class="notice notice--success">Області об'єднано. Клієнтів і резерви перенесено.</p>
+{% endif %}
+{% if deleted %}
+<p class="notice notice--success">Порожню область видалено.</p>
+{% endif %}
+{% if error %}
+<p class="error">{{ error }}</p>
+{% endif %}
+
+{% for group in groups %}
+<section class="card regions-admin-card">
+  <h2>{{ group.manager_name }}</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Назва</th>
+          <th>Клієнти</th>
+          <th>Резерви</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in group.rows %}
+        <tr{% if row.duplicate %} class="region-row--dup"{% endif %}>
+          <td>
+            <div class="region-name-cell">
+              <form method="post" action="/admin/regions/{{ row.id }}/rename" class="region-inline-form">
+                <input type="text" name="name" value="{{ row.name }}" required maxlength="100" aria-label="Назва області">
+                <button type="submit" class="btn btn-primary btn-sm">Зберегти</button>
+              </form>
+              {% if row.duplicate %}
+              <span class="badge badge-warn">схожа назва</span>
+              {% endif %}
+            </div>
+          </td>
+          <td>{{ row.client_count }}</td>
+          <td>{{ row.reserve_count }}</td>
+          <td class="table-actions">
+            {% if row.siblings %}
+            <form method="post" action="/admin/regions/{{ row.id }}/merge" class="region-inline-form" onsubmit="return confirm('Обʼєднати області? Клієнти й резерви перейдуть в обрану область, а ця назва зникне.');">
+              <select name="target_id" aria-label="Обʼєднати з">
+                {% for other in row.siblings %}
+                <option value="{{ other.id }}">{{ other.name }}</option>
+                {% endfor %}
+              </select>
+              <button type="submit" class="btn btn-secondary btn-sm">Об'єднати</button>
+            </form>
+            {% endif %}
+            {% if row.client_count == 0 and row.reserve_count == 0 %}
+            <form method="post" action="/admin/regions/{{ row.id }}/delete" class="region-inline-form" onsubmit="return confirm('Видалити порожню область?');">
+              <button type="submit" class="btn-ghost btn-sm btn-ghost--danger">Видалити</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% else %}
+<section class="card">
+  <p class="muted">Немає областей.</p>
+</section>
+{% endfor %}
+{% endblock %}

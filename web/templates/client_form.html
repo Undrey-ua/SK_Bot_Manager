@@ -55,6 +55,9 @@
         {% endfor %}
       </select>
     </label>
+    {% if is_admin %}
+    <p class="login-hint muted"><a href="/admin/regions">Виправити схожі назви областей</a></p>
+    {% endif %}
     <label>Адреса
       <input type="text" name="address" required value="{% if client %}{{ client.address }}{% endif %}">
     </label>
