@@ -1,7 +1,7 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from bot.utils.roles import is_sales_manager
+from bot.utils.roles import is_leader, is_sales_manager
 from database.models import VISIT_TYPE_LABELS, Client, ManagerRegion, User, VisitType
 
 
@@ -22,8 +22,9 @@ def main_menu_keyboard(user: User | None = None) -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="💰 Додати продаж", callback_data="sale:new"),
         InlineKeyboardButton(text="📦 Резерви", callback_data="reserve:hub"),
     )
+    tasks_label = "📝 Задачі" if user is not None and is_leader(user) else "📝 Мої завдання"
     builder.row(
-        InlineKeyboardButton(text="📝 Мої завдання", callback_data="tasks:hub"),
+        InlineKeyboardButton(text=tasks_label, callback_data="tasks:hub"),
     )
     return builder.as_markup()
 

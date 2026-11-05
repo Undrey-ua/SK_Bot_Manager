@@ -24,3 +24,6 @@ class UserService:
 
     async def list_all(self) -> list[User]:
         return await self._repo.list_all()
+
+    async def list_regional_managers(self) -> list[User]:
+        return await self._repo.list_regional_managers()

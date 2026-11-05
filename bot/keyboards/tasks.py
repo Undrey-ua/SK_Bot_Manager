@@ -3,14 +3,15 @@ from __future__ import annotations
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from database.models import Task
+from database.models import Task, User
 
 WEEKDAYS_UA = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"]
 
 
-def tasks_hub_keyboard() -> InlineKeyboardMarkup:
+def tasks_hub_keyboard(*, for_leader: bool = False) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.row(InlineKeyboardButton(text="➕ Додати задачу", callback_data="tasks:new"))
+    add_label = "➕ Нова задача" if for_leader else "➕ Додати задачу"
+    builder.row(InlineKeyboardButton(text=add_label, callback_data="tasks:new"))
     builder.row(InlineKeyboardButton(text="📋 Усі", callback_data="tasks:list:all"))
     builder.row(
         InlineKeyboardButton(text="Пн", callback_data="tasks:list:0"),
@@ -43,6 +44,20 @@ def task_actions_keyboard(task_id: int, *, is_overdue: bool) -> InlineKeyboardMa
     builder.row(InlineKeyboardButton(text="✅ Виконано", callback_data=f"tasks:done:{task_id}"))
     if is_overdue:
         builder.row(InlineKeyboardButton(text="⏩ Продовжити дедлайн", callback_data=f"tasks:extend:{task_id}"))
+    builder.row(InlineKeyboardButton(text="◀️ Назад", callback_data="tasks:hub"))
+    return builder.as_markup()
+
+
+def task_assignees_keyboard(managers: list[User]) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for manager in managers:
+        builder.row(
+            InlineKeyboardButton(
+                text=manager.name[:60],
+                callback_data=f"tasks:assignee:{manager.id}",
+            )
+        )
+    builder.row(InlineKeyboardButton(text="Всім", callback_data="tasks:assignee:all"))
     builder.row(InlineKeyboardButton(text="◀️ Назад", callback_data="tasks:hub"))
     return builder.as_markup()
 
