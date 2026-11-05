@@ -25,10 +25,22 @@ _OBLAST_SUFFIX_RE = re.compile(r"(ська|ський)(\s+область)?$", re
 _CITY_PREFIX_RE = re.compile(r"^\s*місто\s*:", re.IGNORECASE)
 
 
+# Крапка обовʼязкова: інакше «Мукачево» і «Миколаїв» втрачають першу літеру.
+_CITY_ABBREV_RE = re.compile(r"^(?:м|с)\.\s*", re.IGNORECASE)
+_CITY_KEY_RE = re.compile(r"[\s\-–—]+")
+_CITY_ALIASES = {
+    "івано франківськ": "Івано-Франківськ",
+    "камінь каширський": "Камінь-Каширський",
+    "вознесеньск": "Вознесенськ",
+    "вознесенськ": "Вознесенськ",
+    "укачево": "Мукачево",
+}
+
+
 def _normalize_city(raw: str) -> str:
-    city = raw.strip()
-    city = re.sub(r"^(м\.?\s*)", "", city, flags=re.IGNORECASE).strip()
-    return city
+    city = _CITY_ABBREV_RE.sub("", raw.strip()).strip()
+    key = _CITY_KEY_RE.sub(" ", city.casefold()).strip()
+    return _CITY_ALIASES.get(key, city)
 
 
 def _looks_like_oblast(text: str) -> bool:

@@ -2151,65 +2151,6 @@ form.filters.filters--panelled:has(.filters__field--region) {
   font-size: 0.8rem;
 }
 
-.card form.region-inline-form {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem;
-  margin: 0;
-  padding: 0;
-}
-
-.card form.region-inline-form input,
-.card form.region-inline-form select {
-  width: auto;
-  min-width: 11rem;
-  margin: 0;
-  padding: 0.4rem 0.65rem;
-}
-
-.card form.region-inline-form button[type="submit"].btn-secondary {
-  background: var(--surface);
-  color: var(--text);
-  border: 1px solid var(--border);
-  box-shadow: none;
-}
-
-.card form.region-inline-form button[type="submit"].btn-ghost--danger {
-  background: transparent;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
-  box-shadow: none;
-}
-
-.region-name-cell {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.45rem;
-}
-
-.badge-warn {
-  background: #fff7ed;
-  color: #c2410c;
-}
-
-tr.region-row--dup {
-  background: #fffbeb;
-}
-
-.regions-admin-card {
-  margin-bottom: 1.25rem;
-}
-
-.regions-admin-card table {
-  min-width: 52rem;
-}
-
-.regions-admin-card h2 {
-  padding-bottom: 0.85rem;
-}
-
 .reserve-sale-meta {
   margin: 0 0 0.85rem;
   font-size: 0.875rem;
